@@ -1,0 +1,1291 @@
+import React, { useEffect, useState } from 'react';
+
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  Switch,
+  Platform,
+} from 'react-native';
+
+import DateTimePicker from '@react-native-community/datetimepicker';
+
+import {
+  getMedications,
+  getPatientMedications,
+  createSchedule,
+} from '../services/api';
+
+
+export default function AddScheduleScreen({
+  token,
+  patientId,
+  onScheduleAdded,
+  onCancel,
+}) {
+
+  // =====================================================
+  // MEDICATIONS
+  // =====================================================
+
+  const [medications, setMedications] = useState([]);
+  const [loadingMedications, setLoadingMedications] =
+    useState(true);
+
+  const [selectedMedication, setSelectedMedication] =
+    useState(null);
+
+  const [dose, setDose] = useState('');
+
+
+  // =====================================================
+  // TIME
+  // =====================================================
+
+  const [time, setTime] = useState(
+    new Date(2026, 0, 1, 8, 0)
+  );
+
+  const [showTimePicker, setShowTimePicker] =
+    useState(false);
+
+
+  // =====================================================
+  // DAYS
+  // =====================================================
+
+  const daysOfWeek = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  const [selectedDays, setSelectedDays] =
+    useState([]);
+
+
+  // =====================================================
+  // START DATE
+  // =====================================================
+
+  const [startDate, setStartDate] =
+    useState(new Date());
+
+  const [showStartDatePicker, setShowStartDatePicker] =
+    useState(false);
+
+
+  // =====================================================
+  // END DATE
+  // =====================================================
+
+  const [endDate, setEndDate] =
+    useState(null);
+
+  const [hasEndDate, setHasEndDate] =
+    useState(false);
+
+  const [showEndDatePicker, setShowEndDatePicker] =
+    useState(false);
+
+
+  // =====================================================
+  // ENABLED
+  // =====================================================
+
+  const [enabled, setEnabled] =
+    useState(true);
+
+
+  // =====================================================
+  // SAVING
+  // =====================================================
+
+  const [saving, setSaving] =
+    useState(false);
+
+
+  // =====================================================
+  // LOAD MEDICATIONS
+  // =====================================================
+
+  useEffect(() => {
+
+    const loadMedications = async () => {
+
+      try {
+
+        setLoadingMedications(true);
+
+        const data = patientId
+          ? await getPatientMedications(token, patientId)
+          : await getMedications(token);
+
+        setMedications(
+          Array.isArray(data)
+            ? data
+            : data?.medications || []
+        );
+
+      } catch (error) {
+
+        console.error(
+          'Load medications error:',
+          error
+        );
+
+        Alert.alert(
+          'Error',
+          error.message ||
+            'Failed to load medications.'
+        );
+
+      } finally {
+
+        setLoadingMedications(false);
+
+      }
+
+    };
+
+    loadMedications();
+
+  }, [token, patientId]);
+
+
+  // =====================================================
+  // FORMAT TIME
+  // =====================================================
+
+  const formatTime = (date) => {
+
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+
+    const period =
+      hours >= 12 ? 'PM' : 'AM';
+
+    hours =
+      hours % 12 || 12;
+
+    return (
+      `${hours}:` +
+      `${minutes.toString().padStart(2, '0')} ` +
+      `${period}`
+    );
+
+  };
+
+
+  // =====================================================
+  // FORMAT DATE
+  // =====================================================
+
+  const formatDate = (date) => {
+
+    if (!date) {
+      return '';
+    }
+
+    const month =
+      (date.getMonth() + 1)
+        .toString()
+        .padStart(2, '0');
+
+    const day =
+      date
+        .getDate()
+        .toString()
+        .padStart(2, '0');
+
+    const year =
+      date.getFullYear();
+
+    return `${year}-${month}-${day}`;
+
+  };
+
+
+  // =====================================================
+  // SELECT DAY
+  // =====================================================
+
+  const toggleDay = (day) => {
+
+    setSelectedDays(previous => {
+
+      if (previous.includes(day)) {
+
+        return previous.filter(
+          item => item !== day
+        );
+
+      }
+
+      return [
+        ...previous,
+        day,
+      ];
+
+    });
+
+  };
+
+  const selectMedication = (medication) => {
+    setSelectedMedication(medication);
+    setDose(medication.dosage || '');
+  };
+
+
+  // =====================================================
+  // TIME PICKER
+  // =====================================================
+
+  const handleTimeChange = (
+    event,
+    selectedTime
+  ) => {
+    setShowTimePicker(false);
+
+    if (selectedTime) {
+      setTime(selectedTime);
+    }
+            schedule,
+            patientId
+  };
+
+  const handleWebTimeChange = (event) => {
+    const value = event?.target?.value;
+    if (!value) {
+      return;
+    }
+
+    const [hours, minutes] = value.split(':').map(Number);
+    const nextTime = new Date(time);
+    nextTime.setHours(hours, minutes, 0, 0);
+    setTime(nextTime);
+  };
+
+  const timeInputValue = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+
+
+  // =====================================================
+  // START DATE PICKER
+  // =====================================================
+
+  const handleStartDateChange = (
+    event,
+    selectedDate
+  ) => {
+
+    setShowStartDatePicker(false);
+
+    if (selectedDate) {
+
+      setStartDate(selectedDate);
+
+      // If the current end date is
+      // before the new start date,
+      // clear it.
+
+      if (
+        endDate &&
+        selectedDate > endDate
+      ) {
+
+        setEndDate(null);
+        setHasEndDate(false);
+
+      }
+
+    }
+
+  };
+
+
+  // =====================================================
+  // END DATE PICKER
+  // =====================================================
+
+  const handleEndDateChange = (
+    event,
+    selectedDate
+  ) => {
+
+    setShowEndDatePicker(false);
+
+    if (selectedDate) {
+      setEndDate(selectedDate);
+    }
+
+  };
+
+
+  // =====================================================
+  // SAVE SCHEDULE
+  // =====================================================
+
+  const handleSave = async () => {
+
+    // ---------------------------------------------------
+    // VALIDATE MEDICATION
+    // ---------------------------------------------------
+
+    if (!selectedMedication) {
+
+      Alert.alert(
+        'Missing Medication',
+        'Please select a medication.'
+      );
+
+      return;
+
+    }
+
+    if (!dose.trim()) {
+
+      Alert.alert(
+        'Missing Dose',
+        'Please enter the medication dose.'
+      );
+
+      return;
+
+    }
+
+
+    // ---------------------------------------------------
+    // VALIDATE DAYS
+    // ---------------------------------------------------
+
+    if (selectedDays.length === 0) {
+
+      Alert.alert(
+        'Missing Days',
+        'Please select at least one day.'
+      );
+
+      return;
+
+    }
+
+
+    // ---------------------------------------------------
+    // VALIDATE END DATE
+    // ---------------------------------------------------
+
+    if (
+      hasEndDate &&
+      !endDate
+    ) {
+
+      Alert.alert(
+        'Missing End Date',
+        'Please select an end date.'
+      );
+
+      return;
+
+    }
+
+
+    if (
+      hasEndDate &&
+      endDate < startDate
+    ) {
+
+      Alert.alert(
+        'Invalid Date',
+        'End date cannot be before the start date.'
+      );
+
+      return;
+
+    }
+
+
+    try {
+
+      setSaving(true);
+
+
+      const schedule = {
+
+        medicationId:
+          selectedMedication._id,
+
+        time:
+          formatTime(time),
+
+        dose:
+          dose.trim(),
+
+        days:
+          selectedDays,
+
+        startDate:
+          formatDate(startDate),
+
+        endDate:
+          hasEndDate
+            ? formatDate(endDate)
+            : null,
+
+        enabled,
+
+      };
+
+
+      await createSchedule(
+        token,
+        schedule,
+        patientId
+      );
+
+
+      Alert.alert(
+        'Success',
+        'Medication schedule added successfully.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+
+              if (onScheduleAdded) {
+                onScheduleAdded();
+              }
+
+            },
+          },
+        ]
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Create schedule error:',
+        error
+      );
+
+      Alert.alert(
+        'Error',
+        error.message ||
+          'Failed to create schedule.'
+      );
+
+    } finally {
+
+      setSaving(false);
+
+    }
+
+  };
+
+
+  // =====================================================
+  // SCREEN
+  // =====================================================
+
+  return (
+
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={
+        styles.content
+      }
+      keyboardShouldPersistTaps="handled"
+    >
+
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
+      <View style={styles.header}>
+
+        <Pressable
+          onPress={onCancel}
+          style={styles.backButton}
+        >
+
+          <Text style={styles.backText}>
+            ← Back
+          </Text>
+
+        </Pressable>
+
+        <Text style={styles.title}>
+          Add Schedule
+        </Text>
+
+        <Text style={styles.subtitle}>
+          Set when you want to take this medication.
+        </Text>
+
+      </View>
+
+
+      {/* =================================================
+          MEDICATION
+      ================================================= */}
+
+      <Text style={styles.label}>
+        Medication
+      </Text>
+
+      {loadingMedications ? (
+
+        <View style={styles.loadingBox}>
+
+          <ActivityIndicator />
+
+          <Text style={styles.loadingText}>
+            Loading medications...
+          </Text>
+
+        </View>
+
+      ) : medications.length === 0 ? (
+
+        <View style={styles.emptyBox}>
+
+          <Text style={styles.emptyTitle}>
+            No medications available
+          </Text>
+
+          <Text style={styles.emptyText}>
+            Add a medication first before creating
+            a schedule.
+          </Text>
+
+        </View>
+
+      ) : (
+
+        <View style={styles.medicationList}>
+
+          {medications.map(
+            (medication) => {
+
+              const selected =
+                selectedMedication?._id ===
+                medication._id;
+
+              return (
+
+                <Pressable
+                  key={medication._id}
+                  style={[
+                    styles.medicationOption,
+                    selected &&
+                      styles.medicationOptionSelected,
+                  ]}
+                  onPress={() => selectMedication(medication)}
+                >
+
+                  <View style={styles.medicationInfo}>
+
+                    <Text
+                      style={[
+                        styles.medicationName,
+                        selected &&
+                          styles.selectedText,
+                      ]}
+                    >
+                      {medication.name}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.medicationDetails,
+                        selected &&
+                          styles.selectedSubText,
+                      ]}
+                    >
+                      {medication.dosage}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.medicationDetails,
+                        selected &&
+                          styles.selectedSubText,
+                      ]}
+                    >
+                      {medication.frequency}
+                    </Text>
+
+                  </View>
+
+                  <View
+                    style={[
+                      styles.radio,
+                      selected &&
+                        styles.radioSelected,
+                    ]}
+                  >
+
+                    {selected && (
+                      <View
+                        style={
+                          styles.radioInner
+                        }
+                      />
+                    )}
+
+                  </View>
+
+                </Pressable>
+
+              );
+
+            }
+          )}
+
+        </View>
+
+      )}
+
+
+      {/* =================================================
+          TIME
+      ================================================= */}
+
+      <Text style={styles.label}>
+        Time
+      </Text>
+
+      <Pressable
+        style={styles.inputButton}
+        onPress={() =>
+          setShowTimePicker(true)
+        }
+      >
+
+        <Text style={styles.inputIcon}>
+          🕐
+        </Text>
+
+        <Text style={styles.inputButtonText}>
+          {formatTime(time)}
+        </Text>
+
+      </Pressable>
+
+
+      {Platform.OS === 'web' ? (
+        <TextInput
+          style={styles.input}
+          value={timeInputValue}
+          onChangeText={(value) => handleWebTimeChange({ target: { value } })}
+          type="time"
+          editable={!saving}
+        />
+      ) : showTimePicker && (
+
+        <View style={styles.pickerContainer}>
+
+          <DateTimePicker
+            value={time}
+            mode="time"
+            display={
+              Platform.OS === 'ios'
+                ? 'spinner'
+                : 'default'
+            }
+            onChange={
+              handleTimeChange
+            }
+          />
+
+        </View>
+
+      )}
+
+      <Text style={styles.label}>
+        Dose
+      </Text>
+
+      <TextInput
+        style={styles.input}
+        value={dose}
+        onChangeText={setDose}
+        placeholder="e.g. 1 tablet or 500 mg"
+        placeholderTextColor="#9AA3AF"
+        editable={!saving}
+      />
+
+
+      {/* =================================================
+          DAYS
+      ================================================= */}
+
+      <Text style={styles.label}>
+        Repeat On
+      </Text>
+
+      <View style={styles.daysContainer}>
+
+        {daysOfWeek.map(
+          (day) => {
+
+            const selected =
+              selectedDays.includes(day);
+
+            const shortDay =
+              day.substring(0, 3);
+
+            return (
+
+              <Pressable
+                key={day}
+                style={[
+                  styles.dayButton,
+                  selected &&
+                    styles.dayButtonSelected,
+                ]}
+                onPress={() =>
+                  toggleDay(day)
+                }
+              >
+
+                <Text
+                  style={[
+                    styles.dayText,
+                    selected &&
+                      styles.dayTextSelected,
+                  ]}
+                >
+                  {shortDay}
+                </Text>
+
+              </Pressable>
+
+            );
+
+          }
+        )}
+
+      </View>
+
+
+      {/* =================================================
+          START DATE
+      ================================================= */}
+
+      <Text style={styles.label}>
+        Start Date
+      </Text>
+
+      <Pressable
+        style={styles.inputButton}
+        onPress={() =>
+          setShowStartDatePicker(true)
+        }
+      >
+
+        <Text style={styles.inputIcon}>
+          📅
+        </Text>
+
+        <Text style={styles.inputButtonText}>
+          {formatDate(startDate)}
+        </Text>
+
+      </Pressable>
+
+
+      {showStartDatePicker && (
+
+        <View style={styles.pickerContainer}>
+
+          <DateTimePicker
+            value={startDate}
+            mode="date"
+            display={
+              Platform.OS === 'ios'
+                ? 'spinner'
+                : 'default'
+            }
+            onChange={
+              handleStartDateChange
+            }
+          />
+
+        </View>
+
+      )}
+
+
+      {/* =================================================
+          END DATE
+      ================================================= */}
+
+      <View style={styles.endDateHeader}>
+
+        <Text style={styles.label}>
+          End Date
+        </Text>
+
+        <View style={styles.endDateToggle}>
+
+          <Text style={styles.noEndText}>
+            No end date
+          </Text>
+
+          <Switch
+            value={!hasEndDate}
+            onValueChange={(value) => {
+
+              setHasEndDate(!value);
+
+              if (value) {
+                setEndDate(null);
+              }
+
+            }}
+          />
+
+        </View>
+
+      </View>
+
+
+      {hasEndDate && (
+
+        <>
+
+          <Pressable
+            style={styles.inputButton}
+            onPress={() =>
+              setShowEndDatePicker(true)
+            }
+          >
+
+            <Text style={styles.inputIcon}>
+              📅
+            </Text>
+
+            <Text style={styles.inputButtonText}>
+
+              {endDate
+                ? formatDate(endDate)
+                : 'Select end date'}
+
+            </Text>
+
+          </Pressable>
+
+
+          {showEndDatePicker && (
+
+            <View style={styles.pickerContainer}>
+
+              <DateTimePicker
+                value={
+                  endDate ||
+                  startDate
+                }
+                mode="date"
+                minimumDate={startDate}
+                display={
+                  Platform.OS === 'ios'
+                    ? 'spinner'
+                    : 'default'
+                }
+                onChange={
+                  handleEndDateChange
+                }
+              />
+
+            </View>
+
+          )}
+
+        </>
+
+      )}
+
+
+      {/* =================================================
+          ENABLED
+      ================================================= */}
+
+      <View style={styles.enabledRow}>
+
+        <View>
+
+          <Text style={styles.enabledTitle}>
+            Schedule Enabled
+          </Text>
+
+          <Text style={styles.enabledText}>
+            Enable reminders for this schedule.
+          </Text>
+
+        </View>
+
+        <Switch
+          value={enabled}
+          onValueChange={setEnabled}
+        />
+
+      </View>
+
+
+      {/* =================================================
+          SAVE
+      ================================================= */}
+
+      <Pressable
+        style={[
+          styles.saveButton,
+          saving &&
+            styles.saveButtonDisabled,
+        ]}
+        onPress={handleSave}
+        disabled={saving}
+      >
+
+        {saving ? (
+
+          <ActivityIndicator
+            color="#FFFFFF"
+          />
+
+        ) : (
+
+          <Text style={styles.saveButtonText}>
+            Add Schedule
+          </Text>
+
+        )}
+
+      </Pressable>
+
+
+      {/* =================================================
+          CANCEL
+      ================================================= */}
+
+      <Pressable
+        style={styles.cancelButton}
+        onPress={onCancel}
+        disabled={saving}
+      >
+
+        <Text style={styles.cancelButtonText}>
+          Cancel
+        </Text>
+
+      </Pressable>
+
+    </ScrollView>
+
+  );
+
+}
+
+
+// =======================================================
+// STYLES
+// =======================================================
+
+const styles = StyleSheet.create({
+
+  container: {
+    flex: 1,
+    backgroundColor: '#F6F7FB',
+  },
+
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+
+  header: {
+    marginBottom: 25,
+  },
+
+  backButton: {
+    marginBottom: 15,
+  },
+
+  backText: {
+    color: '#2F6690',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#1E2A4A',
+  },
+
+  subtitle: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E2A4A',
+    marginBottom: 8,
+    marginTop: 18,
+  },
+
+  loadingBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+
+  loadingText: {
+    marginTop: 8,
+    color: '#6B7280',
+  },
+
+  emptyBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+  },
+
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E2A4A',
+    marginBottom: 5,
+  },
+
+  emptyText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+
+  medicationList: {
+    gap: 10,
+  },
+
+  medicationOption: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+
+  medicationOptionSelected: {
+    borderColor: '#2F6690',
+    backgroundColor: '#EEF6FA',
+  },
+
+  medicationInfo: {
+    flex: 1,
+  },
+
+  medicationName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E2A4A',
+    marginBottom: 4,
+  },
+
+  medicationDetails: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+
+  selectedText: {
+    color: '#2F6690',
+  },
+
+  selectedSubText: {
+    color: '#4B6B7C',
+  },
+
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#9CA3AF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+
+  radioSelected: {
+    borderColor: '#2F6690',
+  },
+
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2F6690',
+  },
+
+  inputButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    minHeight: 52,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+
+  inputIcon: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+
+  inputButtonText: {
+    fontSize: 15,
+    color: '#1E2A4A',
+    fontWeight: '500',
+  },
+
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    minHeight: 52,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    fontSize: 15,
+    color: '#1E2A4A',
+  },
+
+  pickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginTop: 8,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  dayButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  dayButtonSelected: {
+    backgroundColor: '#2F6690',
+    borderColor: '#2F6690',
+  },
+
+  dayText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+
+  dayTextSelected: {
+    color: '#FFFFFF',
+  },
+
+  endDateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  endDateToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+  },
+
+  noEndText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginRight: 6,
+  },
+
+  enabledRow: {
+    marginTop: 25,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  enabledTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E2A4A',
+  },
+
+  enabledText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 3,
+  },
+
+  saveButton: {
+    marginTop: 25,
+    backgroundColor: '#2F6690',
+    borderRadius: 12,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  cancelButton: {
+    marginTop: 10,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  cancelButtonText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+});

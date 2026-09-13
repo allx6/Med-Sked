@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Expo / React Native
+.expo/
+.expo-shared/
+web-build/
+.expo-web-build*/
+dist/
+build/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
