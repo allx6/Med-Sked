@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const User = require('../models/User');
 const { createNotification } = require('../services/notificationService');
+const { createAuditLog } = require('../services/auditLogService');
 
 const router = express.Router();
 
@@ -203,6 +204,20 @@ router.post(
 
           await existingRelationship.save();
 
+          await createAuditLog({
+            actorId: req.user.userId,
+            actorRole: req.user.role,
+            action: 'CAREGIVER_REQUEST_CREATED',
+            targetType: 'CAREGIVER_RELATIONSHIP',
+            targetId: existingRelationship._id,
+            details: {
+              caregiverId: existingRelationship.caregiver,
+              patientId: existingRelationship.patient,
+              previousStatus: 'revoked',
+              newStatus: 'pending',
+            },
+          });
+
           await createNotification({
             recipient: patient._id,
             type: 'caregiver_request',
@@ -252,6 +267,20 @@ router.post(
         relatedEntityType: 'CaregiverRelationship',
         relatedEntityId: relationship._id,
         dedupeKey: `caregiver_request:${relationship._id}`,
+      });
+
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_REQUEST_CREATED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: null,
+          newStatus: relationship.status,
+        },
       });
 
 
@@ -487,6 +516,20 @@ router.put(
 
       await relationship.save();
 
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_REQUEST_ACCEPTED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: 'pending',
+          newStatus: relationship.status,
+        },
+      });
+
       await createNotification({
         recipient: relationship.caregiver,
         type: 'caregiver_request_accepted',
@@ -598,6 +641,20 @@ router.put(
         'revoked';
 
       await relationship.save();
+
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_REQUEST_DECLINED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: 'pending',
+          newStatus: relationship.status,
+        },
+      });
 
 
       res.json({
@@ -870,6 +927,20 @@ router.delete(
         'revoked';
 
       await relationship.save();
+
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_RELATIONSHIP_REVOKED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: 'active',
+          newStatus: relationship.status,
+        },
+      });
 
 
       res.json({

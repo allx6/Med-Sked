@@ -5,6 +5,7 @@ const CaregiverRelationship = require('../models/CaregiverRelationship');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const { createNotification } = require('../services/notificationService');
+const { createAuditLog } = require('../services/auditLogService');
 
 const router = express.Router();
 
@@ -115,6 +116,20 @@ router.put(
 
       await relationship.save();
 
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_REQUEST_ACCEPTED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver._id || relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: 'pending',
+          newStatus: relationship.status,
+        },
+      });
+
       await createNotification({
         recipient: relationship.caregiver._id || relationship.caregiver,
         type: 'caregiver_request_accepted',
@@ -193,6 +208,20 @@ router.delete(
       await CaregiverRelationship.deleteOne({
         _id:
           relationship._id,
+      });
+
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_REQUEST_DECLINED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: 'pending',
+          newStatus: 'deleted',
+        },
       });
 
       res.json({
@@ -368,6 +397,20 @@ router.put(
         'revoked';
 
       await relationship.save();
+
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_RELATIONSHIP_REVOKED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: 'active',
+          newStatus: relationship.status,
+        },
+      });
 
       res.json({
 

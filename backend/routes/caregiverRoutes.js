@@ -9,6 +9,7 @@ const CaregiverRelationship = require('../models/CaregiverRelationship');
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
 const { createNotification } = require('../services/notificationService');
+const { createAuditLog } = require('../services/auditLogService');
 
 const router = express.Router();
 
@@ -743,6 +744,20 @@ router.post(
           dedupeKey: `caregiver_request:${existing._id}:${existing.updatedAt?.getTime() || Date.now()}`,
         });
 
+        await createAuditLog({
+          actorId: req.user.userId,
+          actorRole: req.user.role,
+          action: 'CAREGIVER_REQUEST_CREATED',
+          targetType: 'CAREGIVER_RELATIONSHIP',
+          targetId: existing._id,
+          details: {
+            caregiverId: existing.caregiver,
+            patientId: existing.patient,
+            previousStatus: 'revoked',
+            newStatus: existing.status,
+          },
+        });
+
         return res.status(201).json({
           message:
             'Caregiver request sent successfully.',
@@ -775,6 +790,20 @@ router.post(
         relatedEntityType: 'CaregiverRelationship',
         relatedEntityId: relationship._id,
         dedupeKey: `caregiver_request:${relationship._id}`,
+      });
+
+      await createAuditLog({
+        actorId: req.user.userId,
+        actorRole: req.user.role,
+        action: 'CAREGIVER_REQUEST_CREATED',
+        targetType: 'CAREGIVER_RELATIONSHIP',
+        targetId: relationship._id,
+        details: {
+          caregiverId: relationship.caregiver,
+          patientId: relationship.patient,
+          previousStatus: null,
+          newStatus: relationship.status,
+        },
       });
 
       // -------------------------------------------------
