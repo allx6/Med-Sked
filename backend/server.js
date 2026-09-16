@@ -14,6 +14,7 @@ const relationshipRoutes = require('./routes/relationshipRoutes');
 const patientRoutes = require('./routes/patientRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const { detectMissedDoses } = require('./services/missedDoseService');
 const { validateEncryptionKey } = require('./services/encryptionService');
 
@@ -92,6 +93,11 @@ app.use(
 app.use(
   '/api/analytics',
   analyticsRoutes
+);
+
+app.use(
+  '/api/admin',
+  adminRoutes
 );
 
 // =====================================================
