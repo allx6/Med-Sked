@@ -13,6 +13,13 @@ import {
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import TimeSelector from '../components/TimeSelector';
+import {
+  format12HourTime,
+  parse24HourTime,
+  to24HourTime,
+} from '../utils/timeHelpers';
+
 import {
   getMedications,
   getPatientMedications,
@@ -38,8 +45,8 @@ export default function EditScheduleScreen({
       ''
   );
 
-  const [time, setTime] = useState(
-    schedule?.time || ''
+  const [timeSelection, setTimeSelection] = useState(
+    parse24HourTime(schedule?.time)
   );
 
   const [dose, setDose] = useState(
@@ -67,9 +74,6 @@ export default function EditScheduleScreen({
   const [enabled, setEnabled] = useState(
     schedule?.enabled !== false
   );
-
-  const [showTimePicker, setShowTimePicker] =
-    useState(false);
 
   const [showStartDatePicker, setShowStartDatePicker] =
     useState(false);
@@ -139,8 +143,8 @@ export default function EditScheduleScreen({
         ''
     );
 
-    setTime(
-      schedule?.time || ''
+    setTimeSelection(
+      parse24HourTime(schedule?.time)
     );
 
     setDose(
@@ -171,35 +175,6 @@ export default function EditScheduleScreen({
   }, [schedule]);
 
   // =====================================================
-  // FORMAT TIME
-  // =====================================================
-
-  const formatTime = (date) => {
-    let hours = date.getHours();
-
-    const minutes = date.getMinutes();
-
-    const ampm =
-      hours >= 12
-        ? 'PM'
-        : 'AM';
-
-    hours =
-      hours % 12;
-
-    if (hours === 0) {
-      hours = 12;
-    }
-
-    const minuteText =
-      minutes < 10
-        ? `0${minutes}`
-        : minutes;
-
-    return `${hours}:${minuteText} ${ampm}`;
-  };
-
-  // =====================================================
   // FORMAT DATE
   // =====================================================
 
@@ -223,101 +198,6 @@ export default function EditScheduleScreen({
 
     return `${year}-${month}-${day}`;
   };
-
-  // =====================================================
-  // CONVERT STRING TIME TO DATE
-  // =====================================================
-
-  const timeToDate = (timeString) => {
-    const date = new Date();
-
-    if (!timeString) {
-      return date;
-    }
-
-    const match =
-      timeString.match(
-        /(\d+):(\d+)\s?(AM|PM)/i
-      );
-
-    if (match) {
-      let hours =
-        parseInt(
-          match[1],
-          10
-        );
-
-      const minutes =
-        parseInt(
-          match[2],
-          10
-        );
-
-      const ampm =
-        match[3].toUpperCase();
-
-      if (
-        ampm === 'PM' &&
-        hours !== 12
-      ) {
-        hours += 12;
-      }
-
-      if (
-        ampm === 'AM' &&
-        hours === 12
-      ) {
-        hours = 0;
-      }
-
-      date.setHours(hours);
-      date.setMinutes(minutes);
-      date.setSeconds(0);
-      date.setMilliseconds(0);
-    }
-
-    return date;
-  };
-
-  // =====================================================
-  // TIME PICKER
-  // =====================================================
-
-  const handleTimeChange = (
-    event,
-    selectedDate
-  ) => {
-    setShowTimePicker(false);
-
-    if (selectedDate) {
-      setTime(
-        formatTime(selectedDate)
-      );
-    }
-  };
-
-  const handleWebTimeChange = (event) => {
-    const value = event?.target?.value;
-    if (value) {
-      const [hours, minutes] = value.split(':').map(Number);
-      const date = new Date();
-      date.setHours(hours, minutes, 0, 0);
-      setTime(formatTime(date));
-    }
-  };
-
-  const timeInputValue = (() => {
-    const match = String(time || '').match(/(\d+):(\d+)\s?(AM|PM)/i);
-    if (!match) {
-      return '';
-    }
-
-    let hours = Number(match[1]);
-    const minutes = match[2];
-    if (match[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
-    if (match[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
-    return `${String(hours).padStart(2, '0')}:${minutes}`;
-  })();
 
   // =====================================================
   // START DATE PICKER
@@ -391,7 +271,7 @@ export default function EditScheduleScreen({
     // TIME VALIDATION
     // ---------------------------------------------------
 
-    if (!time) {
+    if (!timeSelection) {
       Alert.alert(
         'Missing Time',
         'Please select a medication time.'
@@ -467,7 +347,11 @@ export default function EditScheduleScreen({
     try {
       const updatedSchedule = {
         medicationId,
-        time: time.trim(),
+        time: to24HourTime(
+          timeSelection.hour,
+          timeSelection.minute,
+          timeSelection.period
+        ),
         dose: dose.trim(),
         days,
         startDate:
@@ -632,47 +516,21 @@ export default function EditScheduleScreen({
           Time
         </Text>
 
-        <Pressable
-          style={styles.inputButton}
-          onPress={() =>
-            setShowTimePicker(true)
-          }
-        >
+        <TimeSelector
+          hour={timeSelection.hour}
+          minute={timeSelection.minute}
+          period={timeSelection.period}
+          onChange={setTimeSelection}
+          disabled={saving}
+        />
 
-          <Text
-            style={
-              time
-                ? styles.inputText
-                : styles.placeholderText
-            }
-          >
-            {time || 'Select time'}
-          </Text>
-
-        </Pressable>
-
-        {Platform.OS === 'web' ? (
-          <TextInput
-            style={styles.input}
-            value={timeInputValue}
-            onChangeText={(value) => handleWebTimeChange({ target: { value } })}
-            type="time"
-            editable={!saving}
-          />
-        ) : showTimePicker && (
-          <DateTimePicker
-            value={timeToDate(time)}
-            mode="time"
-            display={
-              Platform.OS === 'ios'
-                ? 'spinner'
-                : 'default'
-            }
-            onChange={
-              handleTimeChange
-            }
-          />
-        )}
+        <Text style={styles.selectedTimeText}>
+          {format12HourTime(
+            timeSelection.hour,
+            timeSelection.minute,
+            timeSelection.period
+          )}
+        </Text>
 
         {/* =================================================
             DOSE
@@ -1014,6 +872,13 @@ const styles = StyleSheet.create({
   inputText: {
     fontSize: 15,
     color: '#1E2A4A',
+  },
+
+  selectedTimeText: {
+    color: '#6B7280',
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
   },
 
   placeholderText: {

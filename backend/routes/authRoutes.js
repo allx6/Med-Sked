@@ -195,20 +195,18 @@ router.post('/register', async (req, res) => {
     // CREATE USER
     // =====================================================
 
-    const user =
-      await User.create({
-        username,
+    const userData = {
+      username,
+      email: normalizedEmail,
+      password: hashedPassword,
+      role,
+    };
 
-        email:
-          normalizedEmail,
+    if (patientId) {
+      userData.patientId = patientId;
+    }
 
-        patientId,
-
-        password:
-          hashedPassword,
-
-        role,
-      });
+    const user = await User.create(userData);
 
 
     // =====================================================

@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const { encrypt, decrypt } = require('../services/encryptionService');
+
 const notificationSchema = new mongoose.Schema(
   {
     recipient: {
@@ -25,6 +27,20 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      set: function encryptNotificationMessage(value) {
+        if (value === null || value === undefined) {
+          return value;
+        }
+
+        return encrypt(value);
+      },
+      get: function decryptNotificationMessage(value) {
+        if (value === null || value === undefined) {
+          return value;
+        }
+
+        return decrypt(value);
+      },
     },
 
     read: {
@@ -52,5 +68,8 @@ const notificationSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+notificationSchema.set('toJSON', { getters: true, virtuals: true });
+notificationSchema.set('toObject', { getters: true, virtuals: true });
 
 module.exports = mongoose.model('Notification', notificationSchema);

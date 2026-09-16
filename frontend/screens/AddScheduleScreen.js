@@ -15,6 +15,12 @@ import {
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import TimeSelector from '../components/TimeSelector';
+import {
+  format12HourTime,
+  to24HourTime,
+} from '../utils/timeHelpers';
+
 import {
   getMedications,
   getPatientMedications,
@@ -47,12 +53,11 @@ export default function AddScheduleScreen({
   // TIME
   // =====================================================
 
-  const [time, setTime] = useState(
-    new Date(2026, 0, 1, 8, 0)
-  );
-
-  const [showTimePicker, setShowTimePicker] =
-    useState(false);
+  const [timeSelection, setTimeSelection] = useState({
+    hour: 8,
+    minute: 0,
+    period: 'AM',
+  });
 
 
   // =====================================================
@@ -163,30 +168,6 @@ export default function AddScheduleScreen({
 
 
   // =====================================================
-  // FORMAT TIME
-  // =====================================================
-
-  const formatTime = (date) => {
-
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
-
-    const period =
-      hours >= 12 ? 'PM' : 'AM';
-
-    hours =
-      hours % 12 || 12;
-
-    return (
-      `${hours}:` +
-      `${minutes.toString().padStart(2, '0')} ` +
-      `${period}`
-    );
-
-  };
-
-
-  // =====================================================
   // FORMAT DATE
   // =====================================================
 
@@ -244,38 +225,6 @@ export default function AddScheduleScreen({
     setSelectedMedication(medication);
     setDose(medication.dosage || '');
   };
-
-
-  // =====================================================
-  // TIME PICKER
-  // =====================================================
-
-  const handleTimeChange = (
-    event,
-    selectedTime
-  ) => {
-    setShowTimePicker(false);
-
-    if (selectedTime) {
-      setTime(selectedTime);
-    }
-            schedule,
-            patientId
-  };
-
-  const handleWebTimeChange = (event) => {
-    const value = event?.target?.value;
-    if (!value) {
-      return;
-    }
-
-    const [hours, minutes] = value.split(':').map(Number);
-    const nextTime = new Date(time);
-    nextTime.setHours(hours, minutes, 0, 0);
-    setTime(nextTime);
-  };
-
-  const timeInputValue = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
 
 
   // =====================================================
@@ -424,7 +373,11 @@ export default function AddScheduleScreen({
           selectedMedication._id,
 
         time:
-          formatTime(time),
+          to24HourTime(
+            timeSelection.hour,
+            timeSelection.minute,
+            timeSelection.period
+          ),
 
         dose:
           dose.trim(),
@@ -664,52 +617,21 @@ export default function AddScheduleScreen({
         Time
       </Text>
 
-      <Pressable
-        style={styles.inputButton}
-        onPress={() =>
-          setShowTimePicker(true)
-        }
-      >
+      <TimeSelector
+        hour={timeSelection.hour}
+        minute={timeSelection.minute}
+        period={timeSelection.period}
+        onChange={setTimeSelection}
+        disabled={saving}
+      />
 
-        <Text style={styles.inputIcon}>
-          🕐
-        </Text>
-
-        <Text style={styles.inputButtonText}>
-          {formatTime(time)}
-        </Text>
-
-      </Pressable>
-
-
-      {Platform.OS === 'web' ? (
-        <TextInput
-          style={styles.input}
-          value={timeInputValue}
-          onChangeText={(value) => handleWebTimeChange({ target: { value } })}
-          type="time"
-          editable={!saving}
-        />
-      ) : showTimePicker && (
-
-        <View style={styles.pickerContainer}>
-
-          <DateTimePicker
-            value={time}
-            mode="time"
-            display={
-              Platform.OS === 'ios'
-                ? 'spinner'
-                : 'default'
-            }
-            onChange={
-              handleTimeChange
-            }
-          />
-
-        </View>
-
-      )}
+      <Text style={styles.selectedTimeText}>
+        {format12HourTime(
+          timeSelection.hour,
+          timeSelection.minute,
+          timeSelection.period
+        )}
+      </Text>
 
       <Text style={styles.label}>
         Dose
@@ -1163,6 +1085,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#1E2A4A',
     fontWeight: '500',
+  },
+
+  selectedTimeText: {
+    color: '#6B7280',
+    fontSize: 13,
+    marginTop: 8,
+    textAlign: 'center',
   },
 
   input: {
