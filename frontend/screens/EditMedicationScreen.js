@@ -90,13 +90,9 @@ export default function EditMedicationScreen({
       return;
     }
 
-    const isPatientForm = !patientId;
-
-    if (isPatientForm) {
-      if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
-        setError('Quantity and refill threshold must be non-negative numbers.');
-        return;
-      }
+    if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
+      setError('Quantity and refill threshold must be non-negative numbers.');
+      return;
     }
 
 
@@ -115,12 +111,9 @@ export default function EditMedicationScreen({
 
         frequency: legacyFrequency.trim() || `Every ${frequencyAmount.trim()} ${frequencyUnit}`,
 
+        quantityOnHand: Number(quantityOnHand),
+        refillThreshold: Number(refillThreshold),
       };
-
-      if (isPatientForm) {
-        updatedMedication.quantityOnHand = Number(quantityOnHand);
-        updatedMedication.refillThreshold = Number(refillThreshold);
-      }
 
 
       const data =
@@ -271,27 +264,23 @@ export default function EditMedicationScreen({
             </>
           )}
 
-          {!patientId ? (
-            <>
-              <TextField
-                label="Quantity on hand"
-                placeholder="e.g. 30"
-                value={quantityOnHand}
-                onChangeText={setQuantityOnHand}
-                keyboardType="decimal-pad"
-                editable={!loading}
-              />
+          <TextField
+            label="Quantity on hand"
+            placeholder="e.g. 30"
+            value={quantityOnHand}
+            onChangeText={setQuantityOnHand}
+            keyboardType="decimal-pad"
+            editable={!loading}
+          />
 
-              <TextField
-                label="Refill threshold"
-                placeholder="e.g. 5"
-                value={refillThreshold}
-                onChangeText={setRefillThreshold}
-                keyboardType="decimal-pad"
-                editable={!loading}
-              />
-            </>
-          ) : null}
+          <TextField
+            label="Refill threshold"
+            placeholder="e.g. 5"
+            value={refillThreshold}
+            onChangeText={setRefillThreshold}
+            keyboardType="decimal-pad"
+            editable={!loading}
+          />
 
 
           {/* ERROR */}

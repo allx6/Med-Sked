@@ -1495,7 +1495,7 @@ export default function DashboardScreen({
           ) : (
 
             medications
-              .slice(0, 3)
+              .slice(0, 5)
               .map(
                 medication => (
 

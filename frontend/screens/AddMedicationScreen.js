@@ -51,13 +51,9 @@ export default function AddMedicationScreen({
       return;
     }
 
-    const isPatientForm = !patientId;
-
-    if (isPatientForm) {
-      if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
-        setError('Quantity and refill threshold must be non-negative numbers.');
-        return;
-      }
+    if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
+      setError('Quantity and refill threshold must be non-negative numbers.');
+      return;
     }
 
     try {
@@ -67,12 +63,9 @@ export default function AddMedicationScreen({
         name: name.trim(),
         dosage: `${dosageAmount.trim()} ${dosageUnit}`,
         frequency: `Every ${frequencyAmount.trim()} ${frequencyUnit}`,
+        quantityOnHand: Number(quantityOnHand),
+        refillThreshold: Number(refillThreshold),
       };
-
-      if (isPatientForm) {
-        medicationPayload.quantityOnHand = Number(quantityOnHand);
-        medicationPayload.refillThreshold = Number(refillThreshold);
-      }
 
       const medication = await createMedication(
         token,
@@ -156,27 +149,23 @@ export default function AddMedicationScreen({
             ))}
           </View>
 
-          {!patientId ? (
-            <>
-              <TextField
-                label="Quantity on hand"
-                placeholder="e.g. 30"
-                value={quantityOnHand}
-                onChangeText={setQuantityOnHand}
-                keyboardType="decimal-pad"
-                editable={!loading}
-              />
+          <TextField
+            label="Quantity on hand"
+            placeholder="e.g. 30"
+            value={quantityOnHand}
+            onChangeText={setQuantityOnHand}
+            keyboardType="decimal-pad"
+            editable={!loading}
+          />
 
-              <TextField
-                label="Refill threshold"
-                placeholder="e.g. 5"
-                value={refillThreshold}
-                onChangeText={setRefillThreshold}
-                keyboardType="decimal-pad"
-                editable={!loading}
-              />
-            </>
-          ) : null}
+          <TextField
+            label="Refill threshold"
+            placeholder="e.g. 5"
+            value={refillThreshold}
+            onChangeText={setRefillThreshold}
+            keyboardType="decimal-pad"
+            editable={!loading}
+          />
 
           <TextField
             label="Frequency interval"

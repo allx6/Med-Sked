@@ -179,7 +179,6 @@ router.post('/', authMiddleware, async (req, res) => {
 
     if (req.user.role === 'caregiver') {
       return authorizeMedicationMutation(req, res, async () => {
-        req.body.patientId = req.body.patientId;
         return createMedicationForOwner(req, res);
       });
     }
@@ -209,15 +208,6 @@ const createMedicationForOwner = async (req, res) => {
       refillThreshold,
     } = req.body;
     const ownerId = getOwnerId(req);
-
-    if (
-      req.user.role === 'caregiver' &&
-      (quantityOnHand !== undefined || refillThreshold !== undefined)
-    ) {
-      return res.status(403).json({
-        message: 'Caregivers cannot modify refill quantities',
-      });
-    }
 
     if (!ownerId) {
       return res.status(400).json({ message: 'Patient ID is required' });
@@ -293,14 +283,6 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
     const normalizedQuantity = parseNonNegativeNumber(quantityOnHand, 'Quantity on hand');
     const normalizedThreshold = parseNonNegativeNumber(refillThreshold, 'Refill threshold');
 
-    if (
-      req.user.role === 'caregiver' &&
-      (quantityOnHand !== undefined || refillThreshold !== undefined)
-    ) {
-      return res.status(403).json({
-        message: 'Caregivers cannot modify refill quantities',
-      });
-    }
     const update = {
       name: name.trim(),
       dosage: dosage.trim(),
