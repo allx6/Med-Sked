@@ -435,7 +435,8 @@ export default function App() {
 
       {screen === 'dashboard' &&
         user &&
-        user.role !== 'caregiver' && (
+        user.role !== 'caregiver' &&
+        user.role !== 'admin' && (
 
           <DashboardScreen
 
@@ -472,7 +473,6 @@ export default function App() {
           />
 
         )}
-
 
       {/* =================================================
           CAREGIVER DASHBOARD
