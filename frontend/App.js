@@ -28,6 +28,7 @@ import PatientConnectionsScreen from './screens/PatientConnectionsScreen';
 import PatientCaregiverRequestsScreen from './screens/PatientCaregiverRequestsScreen';
 import PatientMonitoringScreen from './screens/PatientMonitoringScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import AIAssistantScreen from './screens/AIAssistantScreen';
 
 import DoseHistoryScreen from './screens/DoseHistoryScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
@@ -470,6 +471,8 @@ export default function App() {
               handlePatientCaregiverRequests
             }
 
+            onOpenAiAssistant={() => setScreen('aiAssistant')}
+
           />
 
         )}
@@ -561,6 +564,7 @@ export default function App() {
             patient={selectedPatient}
 
             onOpenAnalytics={() => handleAnalytics(selectedPatient?._id)}
+            onOpenAiAssistant={() => setScreen('aiAssistant')}
             onAddMedication={handleCaregiverAddMedication}
             onEditMedication={handleCaregiverEditMedication}
             onAddSchedule={handleCaregiverAddSchedule}
@@ -868,6 +872,16 @@ export default function App() {
             token={token}
             patientId={analyticsPatientId}
             onBack={() => setScreen(user.role === 'caregiver' ? 'patientMonitoring' : 'profile')}
+          />
+        )}
+
+      {screen === 'aiAssistant' &&
+        user && (
+          <AIAssistantScreen
+            token={token}
+            userRole={user.role}
+            patientId={user.role === 'caregiver' ? selectedPatient?._id : null}
+            onBack={() => setScreen(user.role === 'caregiver' ? 'patientMonitoring' : 'dashboard')}
           />
         )}
 

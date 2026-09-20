@@ -111,6 +111,36 @@ export const registerUser = async (
 };
 
 
+// -----------------------------------------------------
+// ASK AI ASSISTANT
+// POST /api/ai/ask
+// -----------------------------------------------------
+
+export const askAiAssistant = async (
+  token,
+  message,
+  patientId = null
+) => {
+  const patientQuery = patientId
+    ? `?patientId=${encodeURIComponent(patientId)}`
+    : '';
+
+  const response = await fetch(
+    `${API_URL}/api/ai/ask${patientQuery}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(token),
+      },
+      body: JSON.stringify({ message }),
+    }
+  );
+
+  return handleResponse(response);
+};
+
+
 // =====================================================
 // MEDICATIONS
 // =====================================================

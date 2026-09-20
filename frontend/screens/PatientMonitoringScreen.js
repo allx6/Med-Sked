@@ -24,6 +24,7 @@ export default function PatientMonitoringScreen({
   patient,
   onBack,
   onOpenAnalytics,
+  onOpenAiAssistant,
   onAddMedication,
   onEditMedication,
   onAddSchedule,
@@ -174,6 +175,13 @@ export default function PatientMonitoringScreen({
         <Pressable onPress={onOpenAnalytics} style={styles.analyticsButton}>
           <Text style={styles.analyticsButtonText}>View Adherence Analytics</Text>
         </Pressable>
+
+        {patient?._id && onOpenAiAssistant ? (
+          <Pressable onPress={() => onOpenAiAssistant?.()} style={styles.aiButton}>
+            <Text style={styles.aiButtonTitle}>Ask MedSked AI</Text>
+            <Text style={styles.aiButtonSubtitle}>Ask about this patient's medications, doses, adherence, or refills.</Text>
+          </Pressable>
+        ) : null}
 
         {error ? (
           <View style={styles.errorBox}>
@@ -426,6 +434,17 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.lg },
   analyticsButton: { alignSelf: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14, marginBottom: spacing.lg },
   analyticsButtonText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+  aiButton: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    ...shadow.card,
+  },
+  aiButtonTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  aiButtonSubtitle: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.xl, gap: 10 },
   summaryCard: {
     backgroundColor: colors.card,

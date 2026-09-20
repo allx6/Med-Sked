@@ -36,6 +36,7 @@ export default function DashboardScreen({
   onScheduleMedication,
   onDoseHistory,
   onCaregiverConnections,
+  onOpenAiAssistant,
 
 }) {
 
@@ -402,6 +403,29 @@ export default function DashboardScreen({
           <Text style={styles.connectionSubtitle}>Review connected caregivers and pending requests.</Text>
         </View>
         <Text style={styles.connectionArrow}>›</Text>
+      </View>
+    </Pressable>
+  );
+
+  const renderAiAssistantCard = () => (
+    <Pressable
+      onPress={() => onOpenAiAssistant?.()}
+      style={({ pressed }) => [
+        styles.aiCard,
+        pressed && styles.aiCardPressed,
+      ]}
+    >
+      <View style={styles.aiHeader}>
+        <View style={styles.aiIconWrap}>
+          <Text style={styles.aiIconText}>AI</Text>
+        </View>
+
+        <View style={styles.aiTextWrap}>
+          <Text style={styles.aiTitle}>MedSked AI Assistant</Text>
+          <Text style={styles.aiSubtitle}>Ask about your medications, schedules, adherence, or refills.</Text>
+        </View>
+
+        <Text style={styles.aiArrow}>›</Text>
       </View>
     </Pressable>
   );
@@ -833,6 +857,8 @@ export default function DashboardScreen({
           </View>
 
         ) : null}
+
+        {renderAiAssistantCard()}
 
 
         {/* =================================================
@@ -1940,6 +1966,63 @@ const styles = StyleSheet.create({
 
     color: '#991B1B',
 
+  },
+
+  aiCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E3E9EF',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    shadowColor: '#1E2A4A',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  aiCardPressed: {
+    opacity: 0.9,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  aiIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: '#EAF3F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  aiIconText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#2F6690',
+  },
+  aiTextWrap: {
+    flex: 1,
+  },
+  aiTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1E2A4A',
+  },
+  aiSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#6B7280',
+  },
+  aiArrow: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginLeft: 8,
   },
 
 
