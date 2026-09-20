@@ -5,14 +5,30 @@ const MedicationSchedule =
 
 const Medication =
   require('../models/Medication');
+const {
+  isValidObjectId,
+  validateSchedulePayload,
+} = require('../utils/validation');
 
 const authMiddleware =
   require('../middleware/authMiddleware');
 const caregiverMiddleware =
   require('../middleware/caregiverMiddleware');
 const { createNotification } = require('../services/notificationService');
+const {
+  generateTodayDoses,
+  reconcilePendingDosesForSchedule,
+} = require('../services/doseGenerator');
 
 const router = express.Router();
+
+const respondWithError = (res, error) => {
+  if (error && error.statusCode) {
+    return res.status(error.statusCode).json({ message: error.message });
+  }
+
+  return res.status(500).json({ message: 'Failed to process schedule request' });
+};
 
 const authorizeScheduleMutation = (req, res, next) => {
   if (req.user.role === 'caregiver') {
@@ -28,6 +44,15 @@ const getOwnerId = (req) => (
     : req.user.userId
 );
 
+const validateScheduleIdParam = (value) => {
+  if (!isValidObjectId(value)) {
+    const error = new Error('Invalid schedule ID');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return value;
+};
 
 // =====================================================
 // GET ALL MEDICATION SCHEDULES
@@ -85,6 +110,7 @@ router.get(
   async (req, res) => {
 
     try {
+      validateScheduleIdParam(req.params.id);
       const schedule =
         await MedicationSchedule.findOne({
 
@@ -139,6 +165,13 @@ router.post(
   async (req, res) => {
 
     try {
+      const payload = validateSchedulePayload(req.body);
+
+      if (!payload) {
+        const error = new Error('Unexpected schedule fields');
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
 
       const {
         medicationId,
@@ -148,7 +181,7 @@ router.post(
         startDate,
         endDate,
         enabled,
-      } = req.body;
+      } = payload;
 
 
       // =================================================
@@ -192,6 +225,14 @@ router.post(
 
       if (!ownerId) {
         return res.status(400).json({ message: 'Patient ID is required' });
+      }
+
+      if (!isValidObjectId(ownerId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
+
+      if (!isValidObjectId(medicationId)) {
+        return res.status(400).json({ message: 'Invalid medication ID' });
       }
 
       const medication =
@@ -281,10 +322,7 @@ router.post(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to create schedule',
-      });
+      return respondWithError(res, error);
     }
   }
 );
@@ -302,6 +340,14 @@ router.put(
   async (req, res) => {
 
     try {
+      validateScheduleIdParam(req.params.id);
+      const payload = validateSchedulePayload(req.body);
+
+      if (!payload) {
+        const error = new Error('Unexpected schedule fields');
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
 
       const {
         medicationId,
@@ -311,7 +357,7 @@ router.put(
         startDate,
         endDate,
         enabled,
-      } = req.body;
+      } = payload;
 
 
       // =================================================
@@ -355,6 +401,14 @@ router.put(
 
       if (!ownerId) {
         return res.status(400).json({ message: 'Patient ID is required' });
+      }
+
+      if (!isValidObjectId(ownerId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
+
+      if (!isValidObjectId(medicationId)) {
+        return res.status(400).json({ message: 'Invalid medication ID' });
       }
 
       const medication =
@@ -437,6 +491,15 @@ router.put(
 
       await existingSchedule.save();
 
+      if (scheduleChanged) {
+        await reconcilePendingDosesForSchedule({
+          userId: ownerId,
+          scheduleId: existingSchedule._id,
+        });
+
+        await generateTodayDoses(ownerId);
+      }
+
 
       // =================================================
       // POPULATE UPDATED SCHEDULE
@@ -472,10 +535,7 @@ router.put(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to update schedule',
-      });
+      return respondWithError(res, error);
     }
   }
 );
@@ -493,10 +553,15 @@ router.delete(
   async (req, res) => {
 
     try {
+      validateScheduleIdParam(req.params.id);
       const ownerId = getOwnerId(req);
 
       if (!ownerId) {
         return res.status(400).json({ message: 'Patient ID is required' });
+      }
+
+      if (!isValidObjectId(ownerId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
       }
 
       const schedule =

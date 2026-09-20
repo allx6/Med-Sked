@@ -512,7 +512,7 @@ router.put('/users/:userId/role', async (req, res) => {
       userId,
       { $set: { role } },
       {
-        new: true,
+        returnDocument: 'after',
         runValidators: true,
       }
     )

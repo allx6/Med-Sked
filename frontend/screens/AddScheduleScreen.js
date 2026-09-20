@@ -738,8 +738,9 @@ export default function AddScheduleScreen({
                 ? 'spinner'
                 : 'default'
             }
-            onChange={
-              handleStartDateChange
+            onValueChange={
+              (event, selectedDate) =>
+                handleStartDateChange(event, selectedDate)
             }
           />
 
@@ -824,8 +825,9 @@ export default function AddScheduleScreen({
                     ? 'spinner'
                     : 'default'
                 }
-                onChange={
-                  handleEndDateChange
+                onValueChange={
+                  (event, selectedDate) =>
+                    handleEndDateChange(event, selectedDate)
                 }
               />
 

@@ -1622,31 +1622,39 @@ function convertTimeToMinutes(
     return 0;
   }
 
-  const match =
-    time
-      .trim()
-      .match(
-        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
-      );
+  const normalizedTime = time.trim();
+  const twelveHourMatch = normalizedTime.match(
+    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+  );
+  const twentyFourHourMatch = normalizedTime.match(
+    /^(\d{2}):(\d{2})$/
+  );
 
-  if (!match) {
+  if (!twelveHourMatch && !twentyFourHourMatch) {
     return 0;
+  }
+
+  if (twentyFourHourMatch) {
+    return (
+      parseInt(twentyFourHourMatch[1], 10) * 60 +
+      parseInt(twentyFourHourMatch[2], 10)
+    );
   }
 
   let hours =
     parseInt(
-      match[1],
+      twelveHourMatch[1],
       10
     );
 
   const minutes =
     parseInt(
-      match[2],
+      twelveHourMatch[2],
       10
     );
 
   const period =
-    match[3].toUpperCase();
+    twelveHourMatch[3].toUpperCase();
 
   if (period === 'AM') {
 

@@ -10,6 +10,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
 const { createNotification } = require('../services/notificationService');
 const { createAuditLog } = require('../services/auditLogService');
+const { generateTodayDoses } = require('../services/doseGenerator');
 
 const router = express.Router();
 
@@ -112,6 +113,9 @@ router.get(
   async (req, res) => {
 
     try {
+      if (!require('mongoose').Types.ObjectId.isValid(req.params.patientId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
 
       const patient =
         await User.findOne({
@@ -375,6 +379,8 @@ router.get(
       // -------------------------------------------------
       // GET DOSE RECORDS
       // -------------------------------------------------
+
+      await generateTodayDoses(patientId);
 
       const doses =
         await DoseRecord.find({

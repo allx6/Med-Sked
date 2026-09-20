@@ -1008,28 +1008,36 @@ const parseTimeForSorting = (
     };
   }
 
-  const match =
-    String(timeString)
-      .trim()
-      .match(
-        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
-      );
+  const normalizedTime = String(timeString).trim();
+  const twelveHourMatch = normalizedTime.match(
+    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+  );
+  const twentyFourHourMatch = normalizedTime.match(
+    /^(\d{2}):(\d{2})$/
+  );
 
-  if (!match) {
+  if (!twelveHourMatch && !twentyFourHourMatch) {
     return {
       hours: 0,
       minutes: 0,
     };
   }
 
+  if (twentyFourHourMatch) {
+    return {
+      hours: parseInt(twentyFourHourMatch[1], 10),
+      minutes: parseInt(twentyFourHourMatch[2], 10),
+    };
+  }
+
   let hours =
-    parseInt(match[1], 10);
+    parseInt(twelveHourMatch[1], 10);
 
   const minutes =
-    parseInt(match[2], 10);
+    parseInt(twelveHourMatch[2], 10);
 
   const period =
-    match[3].toUpperCase();
+    twelveHourMatch[3].toUpperCase();
 
   if (period === 'AM') {
     if (hours === 12) {

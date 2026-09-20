@@ -85,7 +85,7 @@ const detectMissedDoses = async (now = new Date()) => {
       {
         $set: { status: 'missed' },
       },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     if (!transitioned) {

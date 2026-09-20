@@ -3,6 +3,11 @@ const express = require('express');
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const DoseRecord = require('../models/DoseRecord');
+const {
+  isValidObjectId,
+  pickAllowedFields,
+  containsMongoOperatorPayload,
+} = require('../utils/validation');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -41,6 +46,35 @@ const getOwnerId = (req) => (
     ? req.body?.patientId || req.query?.patientId
     : req.user.userId
 );
+
+const validateMedicationIdParam = (value) => {
+  if (!isValidObjectId(value)) {
+    const error = new Error('Invalid medication ID');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return value;
+};
+
+const validateMedicationPayload = (payload) => {
+  if (containsMongoOperatorPayload(payload)) {
+    const error = new Error('Invalid medication payload');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const allowedFields = ['name', 'dosage', 'frequency', 'quantityOnHand', 'refillThreshold'];
+  const filtered = pickAllowedFields(payload, allowedFields);
+
+  if (!filtered) {
+    const error = new Error('Unexpected medication fields');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return filtered;
+};
 
 
 // ======================================================
@@ -94,6 +128,7 @@ router.get('/', authMiddleware, async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
 
   try {
+    validateMedicationIdParam(req.params.id);
 
     const medication =
       await Medication.findOne({
@@ -148,14 +183,14 @@ router.get('/:id', authMiddleware, async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
 
   try {
-
+    const payload = validateMedicationPayload(req.body);
     const {
       name,
       dosage,
       frequency,
       quantityOnHand,
       refillThreshold,
-    } = req.body;
+    } = payload;
 
 
     if (
@@ -200,14 +235,19 @@ router.post('/', authMiddleware, async (req, res) => {
 
 const createMedicationForOwner = async (req, res) => {
   try {
+    const payload = validateMedicationPayload(req.body);
     const {
       name,
       dosage,
       frequency,
       quantityOnHand,
       refillThreshold,
-    } = req.body;
+    } = payload;
     const ownerId = getOwnerId(req);
+
+    if (req.user.role === 'caregiver' && ownerId && !isValidObjectId(ownerId)) {
+      return res.status(400).json({ message: 'Invalid patient ID' });
+    }
 
     if (!ownerId) {
       return res.status(400).json({ message: 'Patient ID is required' });
@@ -254,14 +294,15 @@ const createMedicationForOwner = async (req, res) => {
 router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res) => {
 
   try {
-
+    validateMedicationIdParam(req.params.id);
+    const payload = validateMedicationPayload(req.body);
     const {
       name,
       dosage,
       frequency,
       quantityOnHand,
       refillThreshold,
-    } = req.body;
+    } = payload;
 
 
     if (
@@ -309,6 +350,10 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
 
     if (!ownerId) {
       return res.status(400).json({ message: 'Patient ID is required' });
+    }
+
+    if (!isValidObjectId(ownerId)) {
+      return res.status(400).json({ message: 'Invalid patient ID' });
     }
 
     const medication =
@@ -374,11 +419,16 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
 router.delete('/:id', authMiddleware, authorizeMedicationMutation, async (req, res) => {
 
   try {
+    validateMedicationIdParam(req.params.id);
 
     const ownerId = getOwnerId(req);
 
     if (!ownerId) {
       return res.status(400).json({ message: 'Patient ID is required' });
+    }
+
+    if (!isValidObjectId(ownerId)) {
+      return res.status(400).json({ message: 'Invalid patient ID' });
     }
 
     const medication =

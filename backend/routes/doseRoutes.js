@@ -111,6 +111,10 @@ router.get(
   authMiddleware,
   async (req, res) => {
     try {
+      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid dose ID' });
+      }
+
       const dose = await DoseRecord.findOne({
         _id: req.params.id,
         userId: req.user.userId,
@@ -318,9 +322,17 @@ router.put(
   },
   async (req, res) => {
     try {
+      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid dose ID' });
+      }
+
       const doseOwnerId = req.user.role === 'caregiver'
         ? req.body.patientId
         : req.user.userId;
+
+      if (req.user.role === 'caregiver' && !require('mongoose').Types.ObjectId.isValid(doseOwnerId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
 
       const existingDose = await DoseRecord.findOne({
         _id: req.params.id,
@@ -366,7 +378,7 @@ router.put(
           },
         },
         {
-          new: true,
+          returnDocument: 'after',
           runValidators: true,
         }
       );
@@ -385,7 +397,7 @@ router.put(
           $inc: { quantityOnHand: -1 },
         },
         {
-          new: true,
+          returnDocument: 'after',
           runValidators: true,
         }
       );
@@ -445,9 +457,17 @@ router.put(
   },
   async (req, res) => {
     try {
+      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid dose ID' });
+      }
+
       const doseOwnerId = req.user.role === 'caregiver'
         ? req.body.patientId
         : req.user.userId;
+
+      if (req.user.role === 'caregiver' && !require('mongoose').Types.ObjectId.isValid(doseOwnerId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
 
       const dose =
         await DoseRecord.findOneAndUpdate(
@@ -462,7 +482,7 @@ router.put(
             },
           },
           {
-            new: true,
+            returnDocument: 'after',
             runValidators: true,
           }
         )
@@ -509,6 +529,10 @@ router.delete(
   authMiddleware,
   async (req, res) => {
     try {
+      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid dose ID' });
+      }
+
       const dose =
         await DoseRecord.findOneAndDelete({
           _id: req.params.id,

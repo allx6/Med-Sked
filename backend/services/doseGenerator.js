@@ -114,31 +114,46 @@ const parseTime = (timeString) => {
     return null;
   }
 
-  const match =
-    timeString
-      .trim()
-      .match(
-        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
-      );
+  const normalizedTime = timeString.trim();
+  const twelveHourMatch = normalizedTime.match(
+    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
+  );
+  const twentyFourHourMatch = normalizedTime.match(
+    /^(\d{2}):(\d{2})$/
+  );
 
-  if (!match) {
+  if (!twelveHourMatch && !twentyFourHourMatch) {
     return null;
+  }
+
+  if (twentyFourHourMatch) {
+    const hours = Number(twentyFourHourMatch[1]);
+    const minutes = Number(twentyFourHourMatch[2]);
+
+    if (hours > 23 || minutes > 59) {
+      return null;
+    }
+
+    return {
+      hours,
+      minutes,
+    };
   }
 
   let hours =
     parseInt(
-      match[1],
+      twelveHourMatch[1],
       10
     );
 
   const minutes =
     parseInt(
-      match[2],
+      twelveHourMatch[2],
       10
     );
 
   const period =
-    match[3].toUpperCase();
+    twelveHourMatch[3].toUpperCase();
 
   if (
     hours < 1 ||
@@ -403,6 +418,25 @@ const createDoseIfNotExists = async ({
 
     throw error;
   }
+};
+
+const reconcilePendingDosesForSchedule = async ({
+  userId,
+  scheduleId,
+  fromDate = new Date(),
+}) => {
+  const fromDateString = formatDate(fromDate);
+
+  const result = await DoseRecord.deleteMany({
+    userId,
+    scheduleId,
+    status: 'pending',
+    scheduledDate: {
+      $gte: fromDateString,
+    },
+  });
+
+  return result.deletedCount || 0;
 };
 
 
@@ -740,4 +774,7 @@ const generateTodayDoses = async (
 module.exports = {
   generateTodayDoses,
   generateDosesForDate,
+  reconcilePendingDosesForSchedule,
+  parseTime,
+  scheduleAppliesToDate,
 };

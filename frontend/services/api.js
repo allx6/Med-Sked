@@ -164,15 +164,19 @@ export const createMedication = async (
   medication,
   patientId
 ) => {
+  const patientQuery = patientId
+    ? `?patientId=${encodeURIComponent(patientId)}`
+    : '';
+
   const response = await fetch(
-    `${API_URL}/api/medications`,
+    `${API_URL}/api/medications${patientQuery}`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders(token),
       },
-      body: JSON.stringify({ ...medication, ...(patientId ? { patientId } : {}) }),
+      body: JSON.stringify(medication),
     }
   );
 
@@ -191,15 +195,19 @@ export const updateMedication = async (
   medication,
   patientId
 ) => {
+  const patientQuery = patientId
+    ? `?patientId=${encodeURIComponent(patientId)}`
+    : '';
+
   const response = await fetch(
-    `${API_URL}/api/medications/${medicationId}`,
+    `${API_URL}/api/medications/${medicationId}${patientQuery}`,
     {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders(token),
       },
-      body: JSON.stringify({ ...medication, ...(patientId ? { patientId } : {}) }),
+      body: JSON.stringify(medication),
     }
   );
 
@@ -247,15 +255,19 @@ export const createSchedule = async (
   schedule,
   patientId
 ) => {
+  const patientQuery = patientId
+    ? `?patientId=${encodeURIComponent(patientId)}`
+    : '';
+
   const response = await fetch(
-    `${API_URL}/api/schedules`,
+    `${API_URL}/api/schedules${patientQuery}`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders(token),
       },
-      body: JSON.stringify({ ...schedule, ...(patientId ? { patientId } : {}) }),
+      body: JSON.stringify(schedule),
     }
   );
 
@@ -313,15 +325,19 @@ export const updateSchedule = async (
   schedule,
   patientId
 ) => {
+  const patientQuery = patientId
+    ? `?patientId=${encodeURIComponent(patientId)}`
+    : '';
+
   const response = await fetch(
-    `${API_URL}/api/schedules/${scheduleId}`,
+    `${API_URL}/api/schedules/${scheduleId}${patientQuery}`,
     {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders(token),
       },
-      body: JSON.stringify({ ...schedule, ...(patientId ? { patientId } : {}) }),
+      body: JSON.stringify(schedule),
     }
   );
 

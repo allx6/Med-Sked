@@ -34,13 +34,17 @@ router.get('/unread-count', authMiddleware, async (req, res) => {
 
 router.put('/:notificationId/read', authMiddleware, async (req, res) => {
   try {
+    if (!require('mongoose').Types.ObjectId.isValid(req.params.notificationId)) {
+      return res.status(400).json({ message: 'Invalid notification ID' });
+    }
+
     const notification = await Notification.findOneAndUpdate(
       {
         _id: req.params.notificationId,
         recipient: req.user.userId,
       },
       { read: true },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!notification) {

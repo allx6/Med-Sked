@@ -322,7 +322,7 @@ export default function PatientMonitoringScreen({
                 : 'Days not specified';
 
               return (
-                <View key={schedule._id || schedule.id} style={styles.doseCard}>
+                <View key={schedule._id || schedule.id} style={[styles.doseCard, styles.scheduleCard]}>
                   <View style={styles.doseInfo}>
                     <Text style={styles.doseName}>{medication.name || 'Medication'}</Text>
                     <Text style={styles.doseMeta}>{schedule.time || schedule.scheduledTime || 'Time not specified'}</Text>
@@ -454,6 +454,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadow.card,
   },
+  scheduleCard: { flexDirection: 'column', alignItems: 'stretch' },
   historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.sm },
   historyRowWrapper: { marginBottom: spacing.sm },
   doseTime: { width: 72, fontSize: 14, fontWeight: '800', color: colors.primary },
@@ -466,11 +467,11 @@ const styles = StyleSheet.create({
   inlineDanger: { paddingVertical: 4, paddingHorizontal: 5 },
   inlineDangerText: { color: colors.dangerText, fontSize: 11, fontWeight: '800' },
   doseCardContainer: { marginBottom: spacing.md },
-  inlineConfirmBox: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, padding: spacing.md, marginTop: 0, marginBottom: spacing.sm },
+  inlineConfirmBox: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, padding: spacing.md, marginTop: 0, marginBottom: spacing.sm, alignSelf: 'stretch', minWidth: 0 },
   confirmBox: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.lg },
   confirmTitle: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  confirmText: { color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
-  confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: spacing.md },
+  confirmText: { color: colors.textSecondary, marginTop: 6, lineHeight: 18, flexShrink: 1 },
+  confirmActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10, marginTop: spacing.md },
   cancelButton: { paddingVertical: 8, paddingHorizontal: 12 },
   cancelButtonText: { color: colors.textSecondary, fontWeight: '800' },
   confirmDeleteButton: { backgroundColor: colors.danger, borderRadius: radius.sm, paddingVertical: 8, paddingHorizontal: 12 },

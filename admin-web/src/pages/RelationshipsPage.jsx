@@ -46,6 +46,14 @@ const displayUser = (user) => {
 };
 
 const formatPermission = (permission) => {
+  if (permission === 'ADHERENCE_SUPPORT') {
+    return 'Adherence support';
+  }
+
+  if (permission === 'VIEW_ONLY') {
+    return 'View only';
+  }
+
   if (permission === true || permission === 'true') {
     return 'Enabled';
   }
@@ -59,7 +67,7 @@ const formatPermission = (permission) => {
 
 export default function RelationshipsPage() {
   const [relationships, setRelationships] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 });
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -100,7 +108,7 @@ export default function RelationshipsPage() {
         });
 
         setRelationships(result?.data || []);
-        setPagination(result?.pagination || { page, limit: 20, total: 0, totalPages: 0 });
+        setPagination(result?.pagination || { page, limit: 20, total: 0, pages: 0 });
       } catch (err) {
         setRelationships([]);
         setError(err.message || 'Unable to load relationships.');
@@ -256,7 +264,7 @@ export default function RelationshipsPage() {
           </div>
         )}
 
-        {!loading && pagination.totalPages > 1 ? (
+        {!loading && pagination.pages > 1 ? (
           <div className="pagination-bar">
             <button
               type="button"
@@ -267,13 +275,13 @@ export default function RelationshipsPage() {
               Previous
             </button>
             <span>
-              Page {pagination.page || page} of {pagination.totalPages || 1}
+              Page {pagination.page || page} of {pagination.pages || 1}
             </span>
             <button
               type="button"
               className="secondary-button"
-              disabled={page >= (pagination.totalPages || 1)}
-              onClick={() => setPage((currentPage) => Math.min(pagination.totalPages || currentPage, currentPage + 1))}
+              disabled={page >= (pagination.pages || 1)}
+              onClick={() => setPage((currentPage) => Math.min(pagination.pages || currentPage, currentPage + 1))}
             >
               Next
             </button>
