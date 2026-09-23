@@ -2,6 +2,11 @@ const DoseRecord = require('../models/DoseRecord');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const Medication = require('../models/Medication');
 
+const logDoseTiming = (label, startTime) => {
+  const elapsed = performance.now() - startTime;
+  console.log(`[Backend][Dose] ${label}: ${elapsed.toFixed(0)} ms`);
+};
+
 
 // =====================================================
 // DAY NAMES
@@ -449,15 +454,37 @@ const generateDosesForDate = async (
   targetDate
 ) => {
 
+  const scheduleQueryStart = performance.now();
   const schedules =
     await MedicationSchedule.find({
       userId,
       enabled: true,
-    });
+    }).lean();
+  logDoseTiming('Schedule query', scheduleQueryStart);
 
+  const medicationIds = [
+    ...new Set(
+      schedules
+        .map((schedule) => schedule.medicationId)
+        .filter(Boolean)
+        .map((id) => id.toString())
+    )
+  ];
+
+  const medicationQueryStart = performance.now();
+  const medicationRecords = medicationIds.length > 0
+    ? await Medication.find({
+        _id: { $in: medicationIds },
+        userId,
+      }).lean()
+    : [];
+  const medicationsById = new Map(
+    medicationRecords.map((medication) => [String(medication._id), medication])
+  );
+  logDoseTiming('Medication query', medicationQueryStart);
 
   let createdCount = 0;
-
+  const processingStart = performance.now();
 
   for (
     const schedule of schedules
@@ -481,14 +508,7 @@ const generateDosesForDate = async (
     // GET MEDICATION
     // -------------------------------------------------
 
-    const medication =
-      await Medication.findOne({
-        _id:
-          schedule.medicationId,
-
-        userId,
-      });
-
+    const medication = medicationsById.get(String(schedule.medicationId));
 
     if (!medication) {
       continue;
@@ -700,6 +720,7 @@ const generateDosesForDate = async (
     }
   }
 
+  logDoseTiming('Processing schedules', processingStart);
 
   return createdCount;
 };
@@ -721,6 +742,9 @@ const generateDosesForDate = async (
 const generateTodayDoses = async (
   userId
 ) => {
+
+  console.log('[Backend][Dose] Generation started');
+  const totalStart = performance.now();
 
   const today =
     new Date();
@@ -758,6 +782,7 @@ const generateTodayDoses = async (
       today
     );
 
+  console.log(`[Backend][Dose] Generation finished: ${((performance.now() - totalStart)).toFixed(0)} ms`);
 
   return {
     created:

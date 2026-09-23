@@ -24,6 +24,11 @@ const isValidLocalDate = (value) => {
     && date.getDate() === day;
 };
 
+const getTodayDate = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
 export const parseLocalDate = (value) => {
   if (!isValidLocalDate(value)) {
     return null;
@@ -59,12 +64,20 @@ export const validateScheduleFields = (schedule) => {
     return 'Please select a valid start date.';
   }
 
+  if (parseLocalDate(schedule.startDate) < getTodayDate()) {
+    return 'Start date cannot be earlier than today.';
+  }
+
   if (schedule.endDate !== null && schedule.endDate !== undefined
     && !isValidLocalDate(schedule.endDate)) {
     return 'Please select a valid end date.';
   }
 
-  if (schedule.endDate && schedule.endDate < schedule.startDate) {
+  if (schedule.endDate && parseLocalDate(schedule.endDate) < getTodayDate()) {
+    return 'End date cannot be earlier than today.';
+  }
+
+  if (schedule.endDate && parseLocalDate(schedule.endDate) < parseLocalDate(schedule.startDate)) {
     return 'End date cannot be before the start date.';
   }
 

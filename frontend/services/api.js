@@ -289,6 +289,14 @@ export const createSchedule = async (
     ? `?patientId=${encodeURIComponent(patientId)}`
     : '';
 
+  console.log(
+    '[Schedule][API] POST /api/schedules',
+    {
+      patientId,
+      payload: schedule,
+    }
+  );
+
   const response = await fetch(
     `${API_URL}/api/schedules${patientQuery}`,
     {
@@ -298,6 +306,15 @@ export const createSchedule = async (
         ...authHeaders(token),
       },
       body: JSON.stringify(schedule),
+    }
+  );
+
+  console.log(
+    '[Schedule][API] Response: POST /api/schedules',
+    {
+      status: response.status,
+      ok: response.ok,
+      patientId,
     }
   );
 
@@ -359,6 +376,15 @@ export const updateSchedule = async (
     ? `?patientId=${encodeURIComponent(patientId)}`
     : '';
 
+  console.log(
+    '[Schedule][API] PUT /api/schedules/:id',
+    {
+      scheduleId,
+      patientId,
+      payload: schedule,
+    }
+  );
+
   const response = await fetch(
     `${API_URL}/api/schedules/${scheduleId}${patientQuery}`,
     {
@@ -368,6 +394,16 @@ export const updateSchedule = async (
         ...authHeaders(token),
       },
       body: JSON.stringify(schedule),
+    }
+  );
+
+  console.log(
+    '[Schedule][API] Response: PUT /api/schedules/:id',
+    {
+      scheduleId,
+      status: response.status,
+      ok: response.ok,
+      patientId,
     }
   );
 

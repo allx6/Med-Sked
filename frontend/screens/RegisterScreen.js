@@ -252,7 +252,7 @@ export default function RegisterScreen({
 
             <Text style={styles.tagline}>
               Start managing your medications
-              with MediSked.
+              with MedSked.
             </Text>
 
           </View>
@@ -270,7 +270,7 @@ export default function RegisterScreen({
 
 
             <Text style={styles.subtitle}>
-              Create your MediSked account below.
+              Create your MedSked account below.
             </Text>
 
 
@@ -477,7 +477,7 @@ export default function RegisterScreen({
           ================================================= */}
 
           <Text style={styles.footerText}>
-            MediSked • Medication Management
+            MedSked • Medication Management
           </Text>
 
         </ScrollView>

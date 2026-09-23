@@ -144,6 +144,11 @@ const validateMedicationFields = (payload) => {
   return null;
 };
 
+const getTodayDate = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
 const validateScheduleFields = (payload) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return 'Invalid schedule payload';
@@ -169,7 +174,7 @@ const validateScheduleFields = (payload) => {
     return 'Time must use HH:mm format.';
   }
 
-  if (typeof payload.dose !== 'string' || !payload.dose.trim()) {
+  if (payload.dose !== undefined && (typeof payload.dose !== 'string' || !payload.dose.trim())) {
     return 'Dose is required.';
   }
 
@@ -187,13 +192,22 @@ const validateScheduleFields = (payload) => {
     return 'Start date must be a valid YYYY-MM-DD date.';
   }
 
+  const startDate = parseLocalDate(payload.startDate);
+  if (startDate < getTodayDate()) {
+    return 'Start date cannot be earlier than today.';
+  }
+
   if (payload.endDate !== null && payload.endDate !== undefined
     && (typeof payload.endDate !== 'string' || !datePattern.test(payload.endDate)
       || Number.isNaN(parseLocalDate(payload.endDate).getTime()))) {
     return 'End date must be a valid YYYY-MM-DD date.';
   }
 
-  if (payload.endDate && payload.endDate < payload.startDate) {
+  if (payload.endDate && parseLocalDate(payload.endDate) < getTodayDate()) {
+    return 'End date cannot be earlier than today.';
+  }
+
+  if (payload.endDate && parseLocalDate(payload.endDate) < startDate) {
     return 'End date cannot be earlier than the start date.';
   }
 

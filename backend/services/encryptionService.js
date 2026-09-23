@@ -73,7 +73,9 @@ const encrypt = (value) => {
   return `enc:${Buffer.from(JSON.stringify(payload)).toString('base64')}`;
 };
 
-const decrypt = (value) => {
+const decrypt = (value, options = {}) => {
+  const { suppressErrorLog = false } = options;
+
   if (value === null || value === undefined) {
     return value;
   }
@@ -83,7 +85,7 @@ const decrypt = (value) => {
   }
 
   if (!value.startsWith('enc:')) {
-    return value;
+    throw new Error('Unable to decrypt the requested value.');
   }
 
   try {
@@ -114,7 +116,9 @@ const decrypt = (value) => {
 
     return decrypted.toString('utf8');
   } catch (error) {
-    console.error('Encryption service decryption failed.');
+    if (!suppressErrorLog) {
+      console.error('Encryption service decryption failed.');
+    }
     throw new Error('Unable to decrypt the requested value.');
   }
 };

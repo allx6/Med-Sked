@@ -1,51 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import {
   Pressable,
   StyleSheet,
   Text,
   View,
+  Platform,
 } from 'react-native';
 
-const STEP_BUTTON_SIZE = 40;
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-const clamp = (value, minimum, maximum) => (
-  Math.min(Math.max(value, minimum), maximum)
-);
-
-const Selector = ({
-  label,
-  value,
-  onDecrease,
-  onIncrease,
-  disabled,
-}) => (
-  <View style={styles.selector}>
-    <Pressable
-      accessibilityLabel={`Increase ${label}`}
-      style={styles.stepButton}
-      onPress={onIncrease}
-      disabled={disabled}
-      hitSlop={6}
-    >
-      <Text style={styles.stepText}>▲</Text>
-    </Pressable>
-
-    <View style={styles.valueBox}>
-      <Text style={styles.valueText}>{value}</Text>
-    </View>
-
-    <Pressable
-      accessibilityLabel={`Decrease ${label}`}
-      style={styles.stepButton}
-      onPress={onDecrease}
-      disabled={disabled}
-      hitSlop={6}
-    >
-      <Text style={styles.stepText}>▼</Text>
-    </Pressable>
-  </View>
-);
+const getPickerDate = (hour, minute, period) => {
+  const normalizedHour = period === 'PM' ? (hour % 12) + 12 : hour % 12;
+  const date = new Date();
+  date.setHours(normalizedHour, minute, 0, 0);
+  return date;
+};
 
 export default function TimeSelector({
   hour,
@@ -54,82 +24,51 @@ export default function TimeSelector({
   onChange,
   disabled = false,
 }) {
-  const changeHour = (amount) => {
+  const [showPicker, setShowPicker] = useState(false);
+
+  const handleTimeSelection = (eventOrDate, maybeDate) => {
+    const selectedDate = maybeDate ?? eventOrDate;
+    setShowPicker(false);
+
+    if (!selectedDate || eventOrDate?.type === 'dismissed') {
+      return;
+    }
+
+    const nextHour = selectedDate.getHours();
+    const nextMinute = selectedDate.getMinutes();
+    const nextPeriod = nextHour >= 12 ? 'PM' : 'AM';
+    const normalizedHour = nextHour % 12 || 12;
+
     onChange({
-      hour: clamp(hour + amount, 1, 12),
-      minute,
-      period,
+      hour: normalizedHour,
+      minute: nextMinute,
+      period: nextPeriod,
     });
   };
 
-  const changeMinute = (amount) => {
-    onChange({
-      hour,
-      minute: (minute + amount + 60) % 60,
-      period,
-    });
-  };
-
-  const changePeriod = () => {
-    onChange({
-      hour,
-      minute,
-      period: period === 'AM' ? 'PM' : 'AM',
-    });
-  };
-
-  const content = (
+  return (
     <View style={styles.container}>
-      <Selector
-        label="hour"
-        value={String(hour).padStart(2, '0')}
-        onDecrease={() => changeHour(-1)}
-        onIncrease={() => changeHour(1)}
+      <Pressable
+        style={styles.timeField}
+        onPress={() => !disabled && setShowPicker(true)}
         disabled={disabled}
-      />
+      >
+        <Text style={styles.valueText}>
+          {String(hour).padStart(2, '0')}:{String(minute).padStart(2, '0')} {period}
+        </Text>
+      </Pressable>
 
-      <Text style={styles.separator}>:</Text>
-
-      <Selector
-        label="minute"
-        value={String(minute).padStart(2, '0')}
-        onDecrease={() => changeMinute(-1)}
-        onIncrease={() => changeMinute(1)}
-        disabled={disabled}
-      />
-
-      <View style={styles.periodSelector}>
-        <Pressable
-          accessibilityLabel="Toggle AM or PM"
-          style={styles.periodButton}
-          onPress={changePeriod}
-          disabled={disabled}
-          hitSlop={6}
-        >
-          <Text style={styles.stepText}>▲</Text>
-        </Pressable>
-        <Pressable
-          style={styles.periodValueBox}
-          onPress={changePeriod}
-          disabled={disabled}
-        >
-          <Text style={styles.valueText}>{period}</Text>
-        </Pressable>
-        <Pressable
-          style={styles.periodButton}
-          onPress={changePeriod}
-          disabled={disabled}
-          hitSlop={6}
-        >
-          <Text style={styles.stepText}>▼</Text>
-        </Pressable>
-      </View>
+      {showPicker && (
+        <DateTimePicker
+          value={getPickerDate(hour, minute, period)}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onValueChange={handleTimeSelection}
+          onDismiss={() => setShowPicker(false)}
+        />
+      )}
     </View>
   );
-
-  return disabled ? (
-    <View style={styles.disabled}>{content}</View>
-  ) : content;
 }
 
 const styles = StyleSheet.create({
@@ -139,70 +78,19 @@ const styles = StyleSheet.create({
     borderColor: '#D8E0E8',
     borderRadius: 12,
     borderWidth: 1,
-    flexDirection: 'row',
     justifyContent: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
-  selector: {
+  timeField: {
+    width: '100%',
     alignItems: 'center',
-    minWidth: 58,
-  },
-  stepButton: {
-    alignItems: 'center',
-    height: STEP_BUTTON_SIZE,
     justifyContent: 'center',
-    width: STEP_BUTTON_SIZE,
-  },
-  stepText: {
-    color: '#2F6690',
-    fontSize: 14,
-  },
-  valueBox: {
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E3E9EF',
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    minWidth: 58,
-    paddingHorizontal: 8,
+    minHeight: 52,
   },
   valueText: {
     color: '#1E2A4A',
     fontSize: 18,
     fontWeight: '700',
-  },
-  separator: {
-    color: '#1E2A4A',
-    fontSize: 22,
-    fontWeight: '700',
-    marginHorizontal: 5,
-  },
-  periodSelector: {
-    alignItems: 'center',
-    marginLeft: 12,
-    minWidth: 64,
-  },
-  periodButton: {
-    alignItems: 'center',
-    height: STEP_BUTTON_SIZE,
-    justifyContent: 'center',
-    width: STEP_BUTTON_SIZE,
-  },
-  periodValueBox: {
-    alignItems: 'center',
-    backgroundColor: '#EAF3F9',
-    borderColor: '#2F6690',
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 44,
-    minWidth: 64,
-    paddingHorizontal: 8,
-  },
-  disabled: {
-    opacity: 0.5,
   },
 });

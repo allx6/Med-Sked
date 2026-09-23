@@ -83,7 +83,11 @@ export default function DashboardScreen({
         isRefresh = false
       ) => {
 
+        const loadStart = performance.now();
+
         try {
+
+          console.log('[Dashboard] Mounted');
 
           if (isRefresh) {
             setRefreshing(true);
@@ -93,36 +97,32 @@ export default function DashboardScreen({
 
           setError('');
 
+          const medicationsStart = performance.now();
+          const medicationPromise = getMedications(token).then((data) => {
+            console.log(`[Dashboard] Medications: ${((performance.now() - medicationsStart)).toFixed(0)} ms`);
+            return data;
+          });
 
-          const medicationData =
-            await getMedications(
-              token
-            );
+          const generationAndRecordsPromise = (async () => {
+            const generateStart = performance.now();
+            await generateTodayDoses(token);
+            console.log(`[Dashboard] Dose generation: ${((performance.now() - generateStart)).toFixed(0)} ms`);
 
-          setMedications(
-            Array.isArray(
-              medicationData
-            )
-              ? medicationData
-              : []
-          );
+            const dosesStart = performance.now();
+            const doseData = await getDoseRecords(token);
+            console.log(`[Dashboard] Dose records: ${((performance.now() - dosesStart)).toFixed(0)} ms`);
+            return doseData;
+          })();
 
+          const [medicationData, doseData] = await Promise.all([
+            medicationPromise,
+            generationAndRecordsPromise,
+          ]);
 
-          await generateTodayDoses(
-            token
-          );
+          setMedications(Array.isArray(medicationData) ? medicationData : []);
+          setDoses(Array.isArray(doseData) ? doseData : []);
 
-
-          const doseData =
-            await getDoseRecords(
-              token
-            );
-
-          setDoses(
-            Array.isArray(doseData)
-              ? doseData
-              : []
-          );
+          console.log(`[Dashboard] Initialization: ${((performance.now() - loadStart)).toFixed(0)} ms`);
 
         } catch (err) {
 

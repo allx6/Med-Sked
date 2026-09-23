@@ -50,6 +50,13 @@ export default function EditScheduleScreen({
       ''
   );
 
+  const todayDate = new Date();
+  const todayStart = new Date(
+    todayDate.getFullYear(),
+    todayDate.getMonth(),
+    todayDate.getDate()
+  );
+
   const [timeSelection, setTimeSelection] = useState(
     parse24HourTime(schedule?.time)
   );
@@ -134,7 +141,7 @@ export default function EditScheduleScreen({
   }, [token, patientId]);
 
   // =====================================================
-  // UPDATE FORM WHEN SCHEDULE CHANGES
+  // INITIALIZE FROM THE SELECTED SCHEDULE
   // =====================================================
 
   useEffect(() => {
@@ -142,42 +149,66 @@ export default function EditScheduleScreen({
       return;
     }
 
-    setMedicationId(
+    const resolvedMedicationId =
       schedule?.medicationId?._id ||
-        schedule?.medicationId ||
-        ''
-    );
+      schedule?.medicationId ||
+      '';
 
+    const scheduleMedication =
+      medications.find(
+        (medication) => medication._id === resolvedMedicationId
+      ) || null;
+
+    setMedicationId(resolvedMedicationId);
     setTimeSelection(
       parse24HourTime(schedule?.time)
     );
-
     setDose(
-      schedule?.dose || ''
+      scheduleMedication?.dosage || schedule?.dose || ''
     );
-
     setDays(
       Array.isArray(schedule?.days)
         ? schedule.days
         : []
     );
-
     setStartDate(
       schedule?.startDate
         ? parseLocalDate(schedule.startDate)
         : new Date()
     );
-
     setEndDate(
       schedule?.endDate
         ? parseLocalDate(schedule.endDate)
         : null
     );
-
     setEnabled(
       schedule?.enabled !== false
     );
-  }, [schedule]);
+  }, [
+    schedule?._id,
+    schedule?.medicationId,
+    schedule?.time,
+    schedule?.dose,
+    schedule?.days,
+    schedule?.startDate,
+    schedule?.endDate,
+    schedule?.enabled,
+  ]);
+
+  useEffect(() => {
+    if (!medicationId) {
+      setDose('');
+      return;
+    }
+
+    const selectedMedication = medications.find(
+      (medication) => medication._id === medicationId
+    );
+
+    if (selectedMedication) {
+      setDose(selectedMedication.dosage || '');
+    }
+  }, [medicationId, medications]);
 
   // =====================================================
   // FORMAT DATE
@@ -214,8 +245,22 @@ export default function EditScheduleScreen({
   ) => {
     setShowStartDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
-      setStartDate(selectedDate);
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+
+      if (nextDate < todayStart) {
+        return;
+      }
+
+      setStartDate(nextDate);
     }
   };
 
@@ -229,8 +274,30 @@ export default function EditScheduleScreen({
   ) => {
     setShowEndDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
-      setEndDate(selectedDate);
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+
+      if (nextDate < todayStart) {
+        return;
+      }
+
+      if (startDate && nextDate < new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+      )) {
+        return;
+      }
+
+      setEndDate(nextDate);
     }
   };
 
@@ -259,6 +326,11 @@ export default function EditScheduleScreen({
   // =====================================================
 
   const handleUpdate = async () => {
+    const selectedMedication = medications.find(
+      (medication) => medication._id === medicationId
+    );
+    const medicationDose = (selectedMedication?.dosage || dose || '').trim();
+
     const updatedSchedule = {
       medicationId,
       time: timeSelection
@@ -268,7 +340,7 @@ export default function EditScheduleScreen({
           timeSelection.period
         )
         : '',
-      dose: dose.trim(),
+      dose: medicationDose,
       days,
       startDate: formatDate(startDate),
       endDate: endDate ? formatDate(endDate) : null,
@@ -285,15 +357,28 @@ export default function EditScheduleScreen({
 
     try {
       console.log(
-        'Updating schedule:',
-        updatedSchedule
+        '[Schedule][Frontend] Preparing update',
+        {
+          scheduleId: schedule?._id,
+          patientId,
+          payload: updatedSchedule,
+        }
       );
 
-      await updateSchedule(
+      const response = await updateSchedule(
         token,
         schedule._id,
         updatedSchedule,
         patientId
+      );
+
+      console.log(
+        '[Schedule][Frontend] Update successful',
+        {
+          scheduleId: schedule?._id,
+          patientId,
+          result: response,
+        }
       );
 
       Alert.alert(
@@ -309,7 +394,7 @@ export default function EditScheduleScreen({
       );
     } catch (error) {
       console.error(
-        'Update schedule error:',
+        '[Schedule][Frontend] Update error',
         error
       );
 
@@ -396,13 +481,11 @@ export default function EditScheduleScreen({
                       medication._id &&
                       styles.selectedOption,
                   ]}
-                  onPress={() =>
-                    setMedicationId(
-                      medication._id
-                    )
-                  }
+                  onPress={() => {
+                    setMedicationId(medication._id);
+                    setDose(medication.dosage || '');
+                  }}
                 >
-
                   <Text
                     style={[
                       styles.medicationName,
@@ -469,12 +552,14 @@ export default function EditScheduleScreen({
         </Text>
 
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, styles.readOnlyInput]}
           value={dose}
-          onChangeText={setDose}
-          placeholder="e.g. 1 tablet"
+          placeholder="Medication dose will appear here"
           placeholderTextColor="#9CA3AF"
           autoCapitalize="none"
+          editable={false}
+          selectTextOnFocus={false}
+          pointerEvents="none"
         />
 
         {/* =================================================
@@ -544,15 +629,16 @@ export default function EditScheduleScreen({
               startDate || new Date()
             }
             mode="date"
+            minimumDate={todayStart}
             display={
               Platform.OS === 'ios'
                 ? 'spinner'
                 : 'default'
             }
-            onValueChange={
-              (event, selectedDate) =>
-                handleStartDateChange(event, selectedDate)
+            onValueChange={(selectedDate) =>
+              handleStartDateChange(undefined, selectedDate)
             }
+            onDismiss={() => setShowStartDatePicker(false)}
           />
         )}
 
@@ -589,18 +675,24 @@ export default function EditScheduleScreen({
           <DateTimePicker
             value={
               endDate ||
+              startDate ||
               new Date()
             }
             mode="date"
+            minimumDate={
+              startDate > todayStart
+                ? startDate
+                : todayStart
+            }
             display={
               Platform.OS === 'ios'
                 ? 'spinner'
                 : 'default'
             }
-            onValueChange={
-              (event, selectedDate) =>
-                handleEndDateChange(event, selectedDate)
+            onValueChange={(selectedDate) =>
+              handleEndDateChange(undefined, selectedDate)
             }
+            onDismiss={() => setShowEndDatePicker(false)}
           />
         )}
 
@@ -826,6 +918,11 @@ const styles = StyleSheet.create({
     minHeight: 50,
     fontSize: 15,
     color: '#1E2A4A',
+  },
+
+  readOnlyInput: {
+    backgroundColor: '#F3F7FB',
+    color: '#4B5563',
   },
 
   daysContainer: {

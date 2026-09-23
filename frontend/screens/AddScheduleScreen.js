@@ -225,9 +225,15 @@ export default function AddScheduleScreen({
 
   const selectMedication = (medication) => {
     setSelectedMedication(medication);
-    setDose(medication.dosage || '');
+    setDose(medication?.dosage || '');
   };
 
+  const todayDate = new Date();
+  const todayStart = new Date(
+    todayDate.getFullYear(),
+    todayDate.getMonth(),
+    todayDate.getDate()
+  );
 
   // =====================================================
   // START DATE PICKER
@@ -240,10 +246,22 @@ export default function AddScheduleScreen({
 
     setShowStartDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
 
-      setStartDate(selectedDate);
+      if (nextDate < todayStart) {
+        return;
+      }
 
+      setStartDate(nextDate);
     }
 
   };
@@ -260,8 +278,30 @@ export default function AddScheduleScreen({
 
     setShowEndDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
-      setEndDate(selectedDate);
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+
+      if (nextDate < todayStart) {
+        return;
+      }
+
+      if (startDate && nextDate < new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+      )) {
+        return;
+      }
+
+      setEndDate(nextDate);
     }
 
   };
@@ -272,6 +312,9 @@ export default function AddScheduleScreen({
   // =====================================================
 
   const handleSave = async () => {
+
+    const medicationDose =
+      (selectedMedication?.dosage || dose || '').trim();
 
     const schedule = {
 
@@ -286,7 +329,7 @@ export default function AddScheduleScreen({
           ),
 
         dose:
-          dose.trim(),
+          medicationDose,
 
         days:
           selectedDays,
@@ -312,13 +355,27 @@ export default function AddScheduleScreen({
     try {
       setSaving(true);
 
+      console.log(
+        '[Schedule][Frontend] Preparing add',
+        {
+          patientId,
+          payload: schedule,
+        }
+      );
 
-      await createSchedule(
+      const response = await createSchedule(
         token,
         schedule,
         patientId
       );
 
+      console.log(
+        '[Schedule][Frontend] Add successful',
+        {
+          patientId,
+          result: response,
+        }
+      );
 
       Alert.alert(
         'Success',
@@ -341,7 +398,7 @@ export default function AddScheduleScreen({
     } catch (error) {
 
       console.error(
-        'Create schedule error:',
+        '[Schedule][Frontend] Add error',
         error
       );
 
@@ -560,12 +617,13 @@ export default function AddScheduleScreen({
       </Text>
 
       <TextInput
-        style={styles.input}
+        style={[styles.input, styles.readOnlyInput]}
         value={dose}
-        onChangeText={setDose}
-        placeholder="e.g. 1 tablet or 500 mg"
+        placeholder="Select a medication to populate the dose"
         placeholderTextColor="#9AA3AF"
-        editable={!saving}
+        editable={false}
+        selectTextOnFocus={false}
+        pointerEvents="none"
       />
 
 
@@ -655,15 +713,16 @@ export default function AddScheduleScreen({
           <DateTimePicker
             value={startDate}
             mode="date"
+            minimumDate={todayStart}
             display={
               Platform.OS === 'ios'
                 ? 'spinner'
                 : 'default'
             }
-            onValueChange={
-              (event, selectedDate) =>
-                handleStartDateChange(event, selectedDate)
+            onValueChange={(selectedDate) =>
+              handleStartDateChange(undefined, selectedDate)
             }
+            onDismiss={() => setShowStartDatePicker(false)}
           />
 
         </View>
@@ -741,16 +800,20 @@ export default function AddScheduleScreen({
                   startDate
                 }
                 mode="date"
-                minimumDate={startDate}
+                minimumDate={
+                  startDate > todayStart
+                    ? startDate
+                    : todayStart
+                }
                 display={
                   Platform.OS === 'ios'
                     ? 'spinner'
                     : 'default'
                 }
-                onValueChange={
-                  (event, selectedDate) =>
-                    handleEndDateChange(event, selectedDate)
+                onValueChange={(selectedDate) =>
+                  handleEndDateChange(undefined, selectedDate)
                 }
+                onDismiss={() => setShowEndDatePicker(false)}
               />
 
             </View>
@@ -1028,6 +1091,11 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     fontSize: 15,
     color: '#1E2A4A',
+  },
+
+  readOnlyInput: {
+    backgroundColor: '#F3F7FB',
+    color: '#4B5563',
   },
 
   pickerContainer: {

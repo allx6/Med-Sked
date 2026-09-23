@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
   View,
@@ -58,25 +58,61 @@ export default function App() {
   const [token, setToken] = useState('');
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
+  const lastUnreadCountTokenRef = useRef(null);
+  const unreadCountRequestRef = useRef(null);
+
   useEffect(() => {
     if (!token) {
+      lastUnreadCountTokenRef.current = null;
+      unreadCountRequestRef.current = null;
       setUnreadNotificationCount(0);
+      return undefined;
+    }
+
+    if (unreadCountRequestRef.current?.token === token) {
+      return undefined;
+    }
+
+    if (lastUnreadCountTokenRef.current === token) {
       return undefined;
     }
 
     let active = true;
     const loadUnreadCount = async () => {
+      console.log('[App] Unread count started');
+      const start = performance.now();
+
       try {
         const result = await getUnreadNotificationCount(token);
-        if (active) setUnreadNotificationCount(Number(result?.count) || 0);
+
+        if (!active) {
+          return;
+        }
+
+        const count = Number(result?.count) || 0;
+        setUnreadNotificationCount(count);
+        lastUnreadCountTokenRef.current = token;
+
+        console.log(`[App] Unread count finished: ${((performance.now() - start)).toFixed(0)} ms`);
       } catch (error) {
-        if (active) setUnreadNotificationCount(0);
+        if (active) {
+          setUnreadNotificationCount(0);
+        }
+      } finally {
+        if (active && unreadCountRequestRef.current?.token === token) {
+          unreadCountRequestRef.current = null;
+        }
       }
     };
 
+    unreadCountRequestRef.current = { token };
     loadUnreadCount();
+
     return () => {
       active = false;
+      if (unreadCountRequestRef.current?.token === token) {
+        unreadCountRequestRef.current = null;
+      }
     };
   }, [token, screen]);
 
