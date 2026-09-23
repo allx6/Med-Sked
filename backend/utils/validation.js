@@ -118,10 +118,37 @@ const validateSchedulePayload = (payload) => {
   return filtered;
 };
 
+const validateMedicationFields = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return 'Invalid medication payload';
+  }
+
+  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+  const dosage = typeof payload.dosage === 'string' ? payload.dosage.trim() : '';
+  const frequency = typeof payload.frequency === 'string' ? payload.frequency.trim() : '';
+
+  if (name.length < 2) {
+    return 'Medication name must contain at least 2 characters.';
+  }
+
+  const dosageMatch = dosage.match(/^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i);
+  if (!dosageMatch || Number(dosageMatch[1]) <= 0) {
+    return 'Dosage must be a number greater than 0.';
+  }
+
+  const frequencyMatch = frequency.match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i);
+  if (!frequencyMatch || Number(frequencyMatch[1]) < 1) {
+    return 'Frequency must be at least 1 hour or day.';
+  }
+
+  return null;
+};
+
 module.exports = {
   isValidObjectId,
   containsMongoOperatorPayload,
   parsePositiveInteger,
   pickAllowedFields,
   validateSchedulePayload,
+  validateMedicationFields,
 };

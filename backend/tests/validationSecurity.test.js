@@ -7,6 +7,7 @@ const {
   containsMongoOperatorPayload,
   parsePositiveInteger,
   validateSchedulePayload,
+  validateMedicationFields,
 } = require('../utils/validation');
 
 test('valid ObjectIds are accepted', () => {
@@ -71,4 +72,29 @@ test('schedule payloads accept optional endDate null while rejecting unexpected 
   });
 
   assert.equal(rejected, null);
+});
+
+test('medication fields accept valid values', () => {
+  assert.equal(validateMedicationFields({
+    name: '  Paracetamol  ',
+    dosage: '500 mg',
+    frequency: 'Every 8 hours',
+  }), null);
+});
+
+test('medication fields reject invalid values and minutes', () => {
+  const invalidPayloads = [
+    { name: '', dosage: '500 mg', frequency: 'Every 8 hours' },
+    { name: 'A', dosage: '500 mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: '0 mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: '-5 mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: 'abc mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: '500 mg', frequency: 'Every 0 hours' },
+    { name: 'Medicine', dosage: '500 mg', frequency: 'Every 8 minutes' },
+    { name: 'Medicine', dosage: '500 mg', frequency: 'Every 8 weeks' },
+  ];
+
+  invalidPayloads.forEach((payload) => {
+    assert.equal(typeof validateMedicationFields(payload), 'string');
+  });
 });

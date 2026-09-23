@@ -16,9 +16,10 @@ import { updateMedication } from '../services/api';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
+import { validateMedicationFields } from '../utils/medicationValidation';
 
 const dosageUnits = ['mg', 'mcg', 'g', 'mL', 'tablet'];
-const frequencyUnits = ['minutes', 'hours', 'days'];
+const frequencyUnits = ['hours', 'days'];
 
 function parseDosage(value) {
   const match = String(value || '').trim().match(/^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i);
@@ -26,7 +27,7 @@ function parseDosage(value) {
 }
 
 function parseFrequency(value) {
-  const match = String(value || '').trim().match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(minutes|hours|days)$/i);
+  const match = String(value || '').trim().match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i);
   return match ? { amount: match[1], unit: match[2].toLowerCase() } : null;
 }
 
@@ -67,31 +68,17 @@ export default function EditMedicationScreen({
 
   const handleSubmit = async () => {
 
-    if (
-      !name.trim() ||
-      (!legacyDosage.trim() && !dosageAmount.trim()) ||
-      (!legacyFrequency.trim() && !frequencyAmount.trim())
-    ) {
-
-      setError(
-        'Please fill in all fields.'
-      );
-
-      return;
-    }
-
-    if (!legacyDosage.trim() && !/^\d+(\.\d+)?$/.test(dosageAmount.trim())) {
-      setError('Dosage amount must be numeric.');
-      return;
-    }
-
-    if (!legacyFrequency.trim() && !/^\d+(\.\d+)?$/.test(frequencyAmount.trim())) {
-      setError('Frequency interval must be numeric.');
-      return;
-    }
-
     if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
       setError('Quantity and refill threshold must be non-negative numbers.');
+      return;
+    }
+
+    const dosage = legacyDosage.trim() || `${dosageAmount.trim()} ${dosageUnit}`;
+    const frequency = legacyFrequency.trim() || `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
+    const medicationError = validateMedicationFields({ name, dosage, frequency });
+
+    if (medicationError) {
+      setError(medicationError);
       return;
     }
 
@@ -107,9 +94,9 @@ export default function EditMedicationScreen({
 
         name: name.trim(),
 
-        dosage: legacyDosage.trim() || `${dosageAmount.trim()} ${dosageUnit}`,
+        dosage,
 
-        frequency: legacyFrequency.trim() || `Every ${frequencyAmount.trim()} ${frequencyUnit}`,
+        frequency,
 
         quantityOnHand: Number(quantityOnHand),
         refillThreshold: Number(refillThreshold),

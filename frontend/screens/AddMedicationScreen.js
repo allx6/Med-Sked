@@ -15,6 +15,7 @@ import { createMedication } from '../services/api';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
+import { validateMedicationFields } from '../utils/medicationValidation';
 
 
 export default function AddMedicationScreen({
@@ -38,21 +39,17 @@ export default function AddMedicationScreen({
   async function handleSubmit() {
     setError('');
 
-    if (!name.trim() || !dosageAmount.trim() || !frequencyAmount.trim()) {
-      setError(
-        'Please fill in all medication fields.'
-      );
-
-      return;
-    }
-
-    if (!/^\d+(\.\d+)?$/.test(dosageAmount.trim()) || !/^\d+(\.\d+)?$/.test(frequencyAmount.trim())) {
-      setError('Dosage and frequency values must be numeric.');
-      return;
-    }
-
     if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
       setError('Quantity and refill threshold must be non-negative numbers.');
+      return;
+    }
+
+    const dosage = `${dosageAmount.trim()} ${dosageUnit}`;
+    const frequency = `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
+    const medicationError = validateMedicationFields({ name, dosage, frequency });
+
+    if (medicationError) {
+      setError(medicationError);
       return;
     }
 
@@ -61,8 +58,8 @@ export default function AddMedicationScreen({
 
       const medicationPayload = {
         name: name.trim(),
-        dosage: `${dosageAmount.trim()} ${dosageUnit}`,
-        frequency: `Every ${frequencyAmount.trim()} ${frequencyUnit}`,
+        dosage,
+        frequency,
         quantityOnHand: Number(quantityOnHand),
         refillThreshold: Number(refillThreshold),
       };
@@ -179,7 +176,7 @@ export default function AddMedicationScreen({
 
           <Text style={styles.unitLabel}>Frequency unit</Text>
           <View style={styles.unitRow}>
-            {['minutes', 'hours', 'days'].map((unit) => (
+            {['hours', 'days'].map((unit) => (
               <Pressable
                 key={unit}
                 onPress={() => setFrequencyUnit(unit)}
