@@ -166,7 +166,7 @@ export default function EditMedicationScreen({
       behavior={
         Platform.OS === 'ios'
           ? 'padding'
-          : undefined
+          : 'height'
       }
     >
 
@@ -174,6 +174,7 @@ export default function EditMedicationScreen({
         contentContainerStyle={
           styles.scroll
         }
+        keyboardShouldPersistTaps="handled"
       >
 
         <View style={styles.card}>

@@ -49,7 +49,7 @@ export default function CaregiverPatientsScreen({ token, onBack, onSelectPatient
       >
         <View style={styles.headerRow}>
           <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
         </View>
 

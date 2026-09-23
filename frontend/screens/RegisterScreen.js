@@ -41,6 +41,7 @@ export default function RegisterScreen({
   const [role, setRole] = useState('patient');
 
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
 
   // =====================================================
@@ -48,8 +49,11 @@ export default function RegisterScreen({
   // =====================================================
 
   const handleRegister = async () => {
+    const nextErrors = {};
 
     if (!name.trim()) {
+      nextErrors.name = 'Please enter your name.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Name',
         'Please enter your name.'
@@ -59,6 +63,8 @@ export default function RegisterScreen({
 
 
     if (!email.trim()) {
+      nextErrors.email = 'Please enter your email.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Email',
         'Please enter your email.'
@@ -66,8 +72,20 @@ export default function RegisterScreen({
       return;
     }
 
+    if (!/^[^\s@]+@gmail\.com$/i.test(email.trim())) {
+      nextErrors.email = 'Please enter a valid Gmail address.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Email',
+        'Please use a Gmail address ending in @gmail.com.'
+      );
+      return;
+    }
+
 
     if (!password) {
+      nextErrors.password = 'Please enter a password.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Password',
         'Please enter a password.'
@@ -76,7 +94,20 @@ export default function RegisterScreen({
     }
 
 
+    if (/\s/.test(password)) {
+      nextErrors.password = 'Password cannot contain spaces.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Password',
+        'Password cannot contain spaces.'
+      );
+      return;
+    }
+
+
     if (password.length < 6) {
+      nextErrors.password = 'Password must be at least 6 characters.';
+      setErrors(nextErrors);
       Alert.alert(
         'Weak Password',
         'Password must be at least 6 characters.'
@@ -86,12 +117,16 @@ export default function RegisterScreen({
 
 
     if (password !== confirmPassword) {
+      nextErrors.confirmPassword = 'Passwords do not match.';
+      setErrors(nextErrors);
       Alert.alert(
         'Passwords Do Not Match',
         'Please make sure both passwords are the same.'
       );
       return;
     }
+
+    setErrors(nextErrors);
 
 
     try {
@@ -150,7 +185,7 @@ export default function RegisterScreen({
         behavior={
           Platform.OS === 'ios'
             ? 'padding'
-            : undefined
+            : 'height'
         }
       >
 
@@ -161,19 +196,6 @@ export default function RegisterScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-
-          {/* =================================================
-              BACKGROUND
-          ================================================= */}
-
-          <View
-            style={styles.backgroundCircleOne}
-          />
-
-          <View
-            style={styles.backgroundCircleTwo}
-          />
-
 
           {/* =================================================
               TOP
@@ -188,19 +210,10 @@ export default function RegisterScreen({
             >
 
               <Text style={styles.backText}>
-                ← Back to Login
+                Back to Login
               </Text>
 
             </Pressable>
-
-
-            <View style={styles.logoCircle}>
-
-              <Text style={styles.logoIcon}>
-                💊
-              </Text>
-
-            </View>
 
 
             <Text style={styles.logoText}>
@@ -210,7 +223,7 @@ export default function RegisterScreen({
 
             <Text style={styles.tagline}>
               Start managing your medications
-              with MediSked.
+              with MedSked.
             </Text>
 
           </View>
@@ -228,7 +241,7 @@ export default function RegisterScreen({
 
 
             <Text style={styles.subtitle}>
-              Create your MediSked account below.
+              Create your MedSked account below.
             </Text>
 
 
@@ -239,8 +252,12 @@ export default function RegisterScreen({
             <TextField
               label="Name"
               value={name}
-              onChangeText={setName}
-              placeholder="Choose a name"
+              onChangeText={(value) => {
+                setName(value);
+                setErrors((current) => ({ ...current, name: '' }));
+              }}
+              placeholder="Enter your name"
+              error={errors.name}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!loading}
@@ -254,8 +271,12 @@ export default function RegisterScreen({
             <TextField
               label="Email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setErrors((current) => ({ ...current, email: '' }));
+              }}
               placeholder="Enter your email"
+              error={errors.email}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -357,8 +378,12 @@ export default function RegisterScreen({
             <PasswordInput
               label="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: '' }));
+              }}
               placeholder="Create a password"
+              error={errors.password}
               editable={!loading}
             />
 
@@ -370,8 +395,12 @@ export default function RegisterScreen({
             <PasswordInput
               label="Confirm Password"
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                setErrors((current) => ({ ...current, confirmPassword: '' }));
+              }}
               placeholder="Enter password again"
+              error={errors.confirmPassword}
               editable={!loading}
             />
 
@@ -419,7 +448,7 @@ export default function RegisterScreen({
           ================================================= */}
 
           <Text style={styles.footerText}>
-            MediSked • Medication Management
+            MedSked • Medication Management
           </Text>
 
         </ScrollView>
@@ -439,12 +468,12 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   scrollContent: {
@@ -453,26 +482,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 30,
     justifyContent: 'center',
-  },
-
-  backgroundCircleOne: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#DCECF5',
-    top: -110,
-    right: -90,
-  },
-
-  backgroundCircleTwo: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: '#E3F1F8',
-    bottom: -70,
-    left: -70,
   },
 
   topSection: {

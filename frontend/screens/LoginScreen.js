@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import {
   View,
+  Image,
   Text,
   TextInput,
   Pressable,
@@ -21,17 +22,24 @@ import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { colors, radius, spacing, shadow, type } from '../theme';
 
+const medSkedLogo = require('../assets/medsked.png');
+
 export default function LoginScreen({
   onLogin,
   onNavigateRegister,
 }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState({});
 
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    const nextErrors = {};
+
     if (!username.trim()) {
+      nextErrors.username = 'Please enter your username.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Username',
         'Please enter your username.'
@@ -39,13 +47,27 @@ export default function LoginScreen({
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username.trim())) {
+      nextErrors.username = 'Please enter a valid email address.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Email',
+        'Please enter a valid email address.'
+      );
+      return;
+    }
+
     if (!password) {
+      nextErrors.password = 'Please enter your password.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Password',
         'Please enter your password.'
       );
       return;
     }
+
+    setErrors(nextErrors);
 
     try {
       setLoading(true);
@@ -84,7 +106,7 @@ export default function LoginScreen({
         behavior={
           Platform.OS === 'ios'
             ? 'padding'
-            : undefined
+            : 'height'
         }
       >
         <ScrollView
@@ -95,25 +117,17 @@ export default function LoginScreen({
           showsVerticalScrollIndicator={false}
         >
 
-          {/* BACKGROUND DECORATION */}
-
-          <View
-            style={styles.backgroundCircleOne}
-          />
-
-          <View
-            style={styles.backgroundCircleTwo}
-          />
-
           {/* LOGO */}
 
           <View style={styles.logoSection}>
 
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoIcon}>
-                💊
-              </Text>
-            </View>
+            <Image
+              accessible
+              accessibilityLabel="MedSked logo"
+              source={medSkedLogo}
+              resizeMode="contain"
+              style={styles.logoImage}
+            />
 
             <Text style={styles.logoText}>
               MedSked
@@ -143,8 +157,12 @@ export default function LoginScreen({
             <TextField
               label="Email"
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(value) => {
+                setUsername(value);
+                setErrors((current) => ({ ...current, username: '' }));
+              }}
               placeholder="Enter your email"
+              error={errors.username}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}
@@ -155,8 +173,12 @@ export default function LoginScreen({
             <PasswordInput
               label="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: '' }));
+              }}
               placeholder="Enter your password"
+              error={errors.password}
               editable={!loading}
             />
 
@@ -195,11 +217,9 @@ export default function LoginScreen({
 
           </View>
 
-          {/* FOOTER */}
+         
 
-          <Text style={styles.footerText}>
-            MediSked • Medication Management
-          </Text>
+         
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -210,12 +230,12 @@ export default function LoginScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   scrollContent: {
@@ -229,38 +249,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  backgroundCircleOne: {
-    position: 'absolute',
-
-    width: 240,
-    height: 240,
-
-    borderRadius: 120,
-
-    backgroundColor: '#DCECF5',
-
-    top: -100,
-    right: -90,
-  },
-
-  backgroundCircleTwo: {
-    position: 'absolute',
-
-    width: 180,
-    height: 180,
-
-    borderRadius: 90,
-
-    backgroundColor: '#E3F1F8',
-
-    bottom: -70,
-    left: -70,
-  },
-
   logoSection: {
     alignItems: 'center',
 
-    marginBottom: 25,
+    marginBottom: 22,
+  },
+
+  logoImage: {
+    width: 150,
+    height: 150,
+    marginBottom: 4,
   },
 
   logoCircle: {
@@ -311,6 +309,10 @@ const styles = StyleSheet.create({
 
   card: {
     width: '100%',
+
+    maxWidth: 520,
+
+    alignSelf: 'center',
 
     padding: 22,
 

@@ -113,13 +113,13 @@ export default function AIAssistantScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 84 : 0}
     >
       <View style={styles.header}>
         {onBack ? (
           <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
         ) : (
           <View style={styles.headerSpacer} />

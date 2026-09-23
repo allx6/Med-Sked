@@ -94,7 +94,7 @@ export default function NotificationsScreen({ token, onBack }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />}
       >
         <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </Pressable>
 
         <View style={styles.headerRow}>

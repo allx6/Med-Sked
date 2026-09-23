@@ -704,15 +704,6 @@ export default function MedicationsScreen({
       }
     >
 
-      {/* BACKGROUND DECORATION */}
-
-      <View
-        style={
-          styles.backgroundCircle
-        }
-      />
-
-
       {/* HEADER */}
 
       <View
@@ -730,14 +721,6 @@ export default function MedicationsScreen({
               styles.buttonPressed,
           ]}
         >
-
-          <Text
-            style={
-              styles.backIcon
-            }
-          >
-            ‹
-          </Text>
 
           <Text
             style={
@@ -1013,25 +996,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#EEF5FA',
+      '#87CEEB',
   },
 
 
   // ===================================================
   // BACKGROUND
   // ===================================================
-
-  backgroundCircle: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor:
-      '#E0EFF7',
-    top: -120,
-    right: -90,
-  },
-
 
   // ===================================================
   // LOADING
@@ -1042,7 +1013,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor:
-      '#EEF5FA',
+      '#87CEEB',
   },
 
   loadingText: {

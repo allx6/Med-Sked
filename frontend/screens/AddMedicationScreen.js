@@ -98,12 +98,13 @@ export default function AddMedicationScreen({
       behavior={
         Platform.OS === 'ios'
           ? 'padding'
-          : undefined
+          : 'height'
       }
     >
 
       <ScrollView
         contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
       >
 
         <View style={styles.card}>
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
 
   wrapper: {
     flex: 1,
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
   },
 
   scroll: {

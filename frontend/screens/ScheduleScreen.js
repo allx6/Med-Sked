@@ -419,7 +419,7 @@ export default function ScheduleScreen({
         >
 
           <Text style={styles.backText}>
-            ← Back
+            Back
           </Text>
 
         </Pressable>
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
     paddingHorizontal: 20,
   },
 
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
   },
 
   loadingText: {
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   medicationIconText: {
@@ -990,7 +990,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 15,
     borderRadius: 20,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   emptyIcon: {

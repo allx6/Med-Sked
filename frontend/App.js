@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import {
+  View,
   StyleSheet,
 } from 'react-native';
 
@@ -38,7 +39,6 @@ import BottomNavigation from './components/BottomNavigation';
 import CaregiverBottomNavigation from './components/CaregiverBottomNavigation';
 import { colors } from './theme';
 import { getUnreadNotificationCount } from './services/api';
-
 
 export default function App() {
 
@@ -394,7 +394,6 @@ export default function App() {
         edges={['top', 'left', 'right']}
         style={styles.container}
       >
-
 
       {/* =================================================
           LOGIN

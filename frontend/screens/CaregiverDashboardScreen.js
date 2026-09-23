@@ -134,14 +134,8 @@ export default function CaregiverDashboardScreen({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <View style={styles.loadingLogo}>
-          <Text style={styles.loadingLogoText}>
-            💊
-          </Text>
-        </View>
-
         <Text style={styles.loadingTitle}>
-          MediSked
+          MedSked
         </Text>
 
         <ActivityIndicator
@@ -165,14 +159,6 @@ export default function CaregiverDashboardScreen({
     <View style={styles.container}>
 
       {/* BACKGROUND */}
-
-      <View
-        style={styles.backgroundCircleOne}
-      />
-
-      <View
-        style={styles.backgroundCircleTwo}
-      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -566,34 +552,14 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
-  },
-
-  backgroundCircleOne: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#E0EFF7',
-    top: -130,
-    right: -100,
-  },
-
-  backgroundCircleTwo: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: '#E5F2F8',
-    bottom: 100,
-    left: -100,
+    backgroundColor: '#87CEEB',
   },
 
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#87CEEB',
   },
 
   loadingLogo: {
@@ -627,8 +593,8 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 18,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
     width: '100%',
     maxWidth: 1000,
     alignSelf: 'center',
@@ -638,8 +604,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 22,
+    marginHorizontal: 16,
+    marginBottom: 18,
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E3E9EF',
+    shadowColor: '#1E2A4A',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    elevation: 2,
   },
 
   headerText: {
@@ -706,7 +685,7 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    marginBottom: 23,
+    marginBottom: 20,
     paddingHorizontal: 20,
   },
 
@@ -733,7 +712,7 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 105,
+    minHeight: 94,
     paddingHorizontal: 8,
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
@@ -747,6 +726,51 @@ const styles = StyleSheet.create({
       height: 3,
     },
     elevation: 2,
+  },
+
+  managementCard: {
+    padding: 16,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#1E2A4A',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 3,
+  },
+
+  managementCardPressed: {
+    opacity: 0.82,
+  },
+
+  managementContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  managementTitle: {
+    color: '#000000',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+
+  managementSubtitle: {
+    maxWidth: 285,
+    marginTop: 5,
+    color: '#000000',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  managementArrow: {
+    marginLeft: 10,
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '300',
   },
 
   summaryItem: {
@@ -777,8 +801,8 @@ const styles = StyleSheet.create({
   patientCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    padding: 14,
+    marginBottom: 12,
+    padding: 15,
     borderRadius: 17,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -821,7 +845,7 @@ const styles = StyleSheet.create({
   },
 
   patientName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
     color: '#1E2A4A',
   },

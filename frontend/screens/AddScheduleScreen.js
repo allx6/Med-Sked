@@ -11,6 +11,7 @@ import {
   ScrollView,
   Switch,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -451,13 +452,20 @@ export default function AddScheduleScreen({
 
   return (
 
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.container}
-      contentContainerStyle={
-        styles.content
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : 'height'
       }
-      keyboardShouldPersistTaps="handled"
     >
+      <ScrollView
+        contentContainerStyle={
+          styles.content
+        }
+        keyboardShouldPersistTaps="handled"
+      >
 
       {/* =================================================
           HEADER
@@ -471,7 +479,7 @@ export default function AddScheduleScreen({
         >
 
           <Text style={styles.backText}>
-            ← Back
+            Back
           </Text>
 
         </Pressable>
@@ -913,7 +921,8 @@ export default function AddScheduleScreen({
 
       </Pressable>
 
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
 
   );
 
@@ -928,7 +937,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
   },
 
   content: {

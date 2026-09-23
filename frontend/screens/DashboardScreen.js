@@ -23,6 +23,7 @@ import {
   takeDose,
   skipDose,
 } from '../services/api';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 
 export default function DashboardScreen({
@@ -53,6 +54,8 @@ export default function DashboardScreen({
     doses,
     setDoses,
   ] = useState([]);
+
+  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
   const [
     loading,
@@ -640,29 +643,12 @@ export default function DashboardScreen({
         }
       >
 
-        <View
-          style={
-            styles.loadingLogo
-          }
-        >
-
-          <Text
-            style={
-              styles.loadingLogoText
-            }
-          >
-            💊
-          </Text>
-
-        </View>
-
-
         <Text
           style={
             styles.loadingTitle
           }
         >
-          MediSked
+          MedSked
         </Text>
 
 
@@ -699,21 +685,6 @@ export default function DashboardScreen({
     <View
       style={styles.container}
     >
-
-      {/* BACKGROUND */}
-
-      <View
-        style={
-          styles.backgroundCircleOne
-        }
-      />
-
-      <View
-        style={
-          styles.backgroundCircleTwo
-        }
-      />
-
 
       <ScrollView
 
@@ -792,7 +763,7 @@ export default function DashboardScreen({
 
           <Pressable
 
-            onPress={onLogout}
+            onPress={() => setShowLogoutConfirmation(true)}
 
             hitSlop={8}
 
@@ -818,6 +789,20 @@ export default function DashboardScreen({
           </Pressable>
 
         </View>
+
+        <ConfirmationDialog
+          visible={showLogoutConfirmation}
+          title="Log out?"
+          message="Are you sure you want to log out of MedSked?"
+          confirmLabel="Log Out"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={() => {
+            setShowLogoutConfirmation(false);
+            onLogout();
+          }}
+          onCancel={() => setShowLogoutConfirmation(false)}
+        />
 
 
         {/* ERROR */}
@@ -1712,46 +1697,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#EEF5FA',
-  },
-
-
-  // ===================================================
-  // BACKGROUND
-  // ===================================================
-
-  backgroundCircleOne: {
-
-    position: 'absolute',
-
-    width: 240,
-    height: 240,
-
-    borderRadius: 120,
-
-    backgroundColor:
-      '#E0EFF7',
-
-    top: -130,
-    right: -100,
-
-  },
-
-  backgroundCircleTwo: {
-
-    position: 'absolute',
-
-    width: 180,
-    height: 180,
-
-    borderRadius: 90,
-
-    backgroundColor:
-      '#E5F2F8',
-
-    bottom: 100,
-    left: -100,
-
+      '#87CEEB',
   },
 
 
@@ -1767,7 +1713,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
 
     backgroundColor:
-      '#EEF5FA',
+      '#87CEEB',
 
   },
 
