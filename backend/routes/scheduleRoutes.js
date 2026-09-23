@@ -5,9 +5,12 @@ const MedicationSchedule =
 
 const Medication =
   require('../models/Medication');
+const DoseRecord =
+  require('../models/DoseRecord');
 const {
   isValidObjectId,
   validateSchedulePayload,
+  validateScheduleFields,
 } = require('../utils/validation');
 
 const authMiddleware =
@@ -144,10 +147,7 @@ router.get(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to retrieve schedule',
-      });
+      return respondWithError(res, error);
     }
   }
 );
@@ -169,6 +169,13 @@ router.post(
 
       if (!payload) {
         const error = new Error('Unexpected schedule fields');
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
+
+      const validationError = validateScheduleFields(payload);
+      if (validationError) {
+        const error = new Error(validationError);
         error.statusCode = 400;
         return respondWithError(res, error);
       }
@@ -345,6 +352,13 @@ router.put(
 
       if (!payload) {
         const error = new Error('Unexpected schedule fields');
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
+
+      const validationError = validateScheduleFields(payload);
+      if (validationError) {
+        const error = new Error(validationError);
         error.statusCode = 400;
         return respondWithError(res, error);
       }
@@ -584,6 +598,12 @@ router.delete(
 
       }
 
+      await DoseRecord.deleteMany({
+        userId: ownerId,
+        scheduleId: schedule._id,
+        status: 'pending',
+      });
+
 
       res.json({
         message:
@@ -597,10 +617,7 @@ router.delete(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to delete schedule',
-      });
+      return respondWithError(res, error);
     }
   }
 );

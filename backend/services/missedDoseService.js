@@ -39,7 +39,7 @@ const parseScheduledDateTime = (scheduledDate, scheduledTime) => {
     if (period === 'PM' && hours !== 12) hours += 12;
   }
 
-  return new Date(
+  const scheduledAt = new Date(
     dateParts[0],
     dateParts[1] - 1,
     dateParts[2],
@@ -48,6 +48,16 @@ const parseScheduledDateTime = (scheduledDate, scheduledTime) => {
     0,
     0
   );
+
+  if (
+    scheduledAt.getFullYear() !== dateParts[0] ||
+    scheduledAt.getMonth() !== dateParts[1] - 1 ||
+    scheduledAt.getDate() !== dateParts[2]
+  ) {
+    return null;
+  }
+
+  return scheduledAt;
 };
 
 const detectMissedDoses = async (now = new Date()) => {

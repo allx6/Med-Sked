@@ -27,6 +27,7 @@ import {
   getPatientMedications,
   createSchedule,
 } from '../services/api';
+import { validateScheduleFields } from '../utils/scheduleValidation';
 
 
 export default function AddScheduleScreen({
@@ -243,20 +244,6 @@ export default function AddScheduleScreen({
 
       setStartDate(selectedDate);
 
-      // If the current end date is
-      // before the new start date,
-      // clear it.
-
-      if (
-        endDate &&
-        selectedDate > endDate
-      ) {
-
-        setEndDate(null);
-        setHasEndDate(false);
-
-      }
-
     }
 
   };
@@ -286,92 +273,10 @@ export default function AddScheduleScreen({
 
   const handleSave = async () => {
 
-    // ---------------------------------------------------
-    // VALIDATE MEDICATION
-    // ---------------------------------------------------
-
-    if (!selectedMedication) {
-
-      Alert.alert(
-        'Missing Medication',
-        'Please select a medication.'
-      );
-
-      return;
-
-    }
-
-    if (!dose.trim()) {
-
-      Alert.alert(
-        'Missing Dose',
-        'Please enter the medication dose.'
-      );
-
-      return;
-
-    }
-
-
-    // ---------------------------------------------------
-    // VALIDATE DAYS
-    // ---------------------------------------------------
-
-    if (selectedDays.length === 0) {
-
-      Alert.alert(
-        'Missing Days',
-        'Please select at least one day.'
-      );
-
-      return;
-
-    }
-
-
-    // ---------------------------------------------------
-    // VALIDATE END DATE
-    // ---------------------------------------------------
-
-    if (
-      hasEndDate &&
-      !endDate
-    ) {
-
-      Alert.alert(
-        'Missing End Date',
-        'Please select an end date.'
-      );
-
-      return;
-
-    }
-
-
-    if (
-      hasEndDate &&
-      endDate < startDate
-    ) {
-
-      Alert.alert(
-        'Invalid Date',
-        'End date cannot be before the start date.'
-      );
-
-      return;
-
-    }
-
-
-    try {
-
-      setSaving(true);
-
-
-      const schedule = {
+    const schedule = {
 
         medicationId:
-          selectedMedication._id,
+          selectedMedication?._id || '',
 
         time:
           to24HourTime(
@@ -397,6 +302,15 @@ export default function AddScheduleScreen({
         enabled,
 
       };
+
+    const scheduleError = validateScheduleFields(schedule);
+    if (scheduleError) {
+      Alert.alert('Invalid Schedule', scheduleError);
+      return;
+    }
+
+    try {
+      setSaving(true);
 
 
       await createSchedule(

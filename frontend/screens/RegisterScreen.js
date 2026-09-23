@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import {
   View,
+  Image,
   Text,
   TextInput,
   Pressable,
@@ -19,6 +20,8 @@ import {
 import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
+
+const medSkedLogo = require('../assets/medsked.png');
 
 export default function RegisterScreen({
   onRegister,
@@ -198,6 +201,19 @@ export default function RegisterScreen({
         >
 
           {/* =================================================
+              BACKGROUND
+          ================================================= */}
+
+          <View
+            style={styles.backgroundCircleOne}
+          />
+
+          <View
+            style={styles.backgroundCircleTwo}
+          />
+
+
+          {/* =================================================
               TOP
           ================================================= */}
 
@@ -216,6 +232,19 @@ export default function RegisterScreen({
             </Pressable>
 
 
+            <View style={styles.logoCircle}>
+
+              <Image
+                accessible
+                accessibilityLabel="MedSked logo"
+                source={medSkedLogo}
+                resizeMode="contain"
+                style={styles.logoImage}
+              />
+
+            </View>
+
+
             <Text style={styles.logoText}>
               Create Account
             </Text>
@@ -223,7 +252,7 @@ export default function RegisterScreen({
 
             <Text style={styles.tagline}>
               Start managing your medications
-              with MedSked.
+              with MediSked.
             </Text>
 
           </View>
@@ -241,7 +270,7 @@ export default function RegisterScreen({
 
 
             <Text style={styles.subtitle}>
-              Create your MedSked account below.
+              Create your MediSked account below.
             </Text>
 
 
@@ -250,13 +279,13 @@ export default function RegisterScreen({
             ================================================= */}
 
             <TextField
-              label="Name"
+              label="Username"
               value={name}
               onChangeText={(value) => {
                 setName(value);
                 setErrors((current) => ({ ...current, name: '' }));
               }}
-              placeholder="Enter your name"
+              placeholder="Enter your Username"
               error={errors.name}
               autoCapitalize="words"
               autoCorrect={false}
@@ -448,7 +477,7 @@ export default function RegisterScreen({
           ================================================= */}
 
           <Text style={styles.footerText}>
-            MedSked • Medication Management
+            MediSked • Medication Management
           </Text>
 
         </ScrollView>
@@ -468,12 +497,12 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#EEF5FA',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#EEF5FA',
   },
 
   scrollContent: {
@@ -482,6 +511,26 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 30,
     justifyContent: 'center',
+  },
+
+  backgroundCircleOne: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: '#DCECF5',
+    top: -110,
+    right: -90,
+  },
+
+  backgroundCircleTwo: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#E3F1F8',
+    bottom: -70,
+    left: -70,
   },
 
   topSection: {
@@ -504,21 +553,18 @@ const styles = StyleSheet.create({
   },
 
   logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 21,
+    width: 104,
+    height: 104,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2F6690',
     marginBottom: 11,
-    shadowColor: '#2F6690',
-    shadowOpacity: 0.20,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    elevation: 5,
+  },
+
+  logoImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 32,
   },
 
   logoIcon: {

@@ -554,18 +554,20 @@ export default function DoseHistoryScreen({
           </View>
         )}
 
-        {/* DELETE */}
+        {/* DELETE PENDING RECORDS ONLY */}
 
-        <Pressable
-          style={styles.deleteButton}
-          onPress={() =>
-            handleDelete(item._id)
-          }
-        >
-          <Text style={styles.deleteText}>
-            Delete Record
-          </Text>
-        </Pressable>
+        {status === 'pending' && (
+          <Pressable
+            style={styles.deleteButton}
+            onPress={() =>
+              handleDelete(item._id)
+            }
+          >
+            <Text style={styles.deleteText}>
+              Delete Record
+            </Text>
+          </Pressable>
+        )}
 
       </View>
     );

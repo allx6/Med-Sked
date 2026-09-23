@@ -26,6 +26,10 @@ import {
   getPatientMedications,
   updateSchedule,
 } from '../services/api';
+import {
+  parseLocalDate,
+  validateScheduleFields,
+} from '../utils/scheduleValidation';
 
 export default function EditScheduleScreen({
   token,
@@ -62,13 +66,13 @@ export default function EditScheduleScreen({
 
   const [startDate, setStartDate] = useState(
     schedule?.startDate
-      ? new Date(schedule.startDate)
+      ? parseLocalDate(schedule.startDate)
       : new Date()
   );
 
   const [endDate, setEndDate] = useState(
     schedule?.endDate
-      ? new Date(schedule.endDate)
+      ? parseLocalDate(schedule.endDate)
       : null
   );
 
@@ -160,13 +164,13 @@ export default function EditScheduleScreen({
 
     setStartDate(
       schedule?.startDate
-        ? new Date(schedule.startDate)
+        ? parseLocalDate(schedule.startDate)
         : new Date()
     );
 
     setEndDate(
       schedule?.endDate
-        ? new Date(schedule.endDate)
+        ? parseLocalDate(schedule.endDate)
         : null
     );
 
@@ -255,115 +259,31 @@ export default function EditScheduleScreen({
   // =====================================================
 
   const handleUpdate = async () => {
-    // ---------------------------------------------------
-    // MEDICATION VALIDATION
-    // ---------------------------------------------------
+    const updatedSchedule = {
+      medicationId,
+      time: timeSelection
+        ? to24HourTime(
+          timeSelection.hour,
+          timeSelection.minute,
+          timeSelection.period
+        )
+        : '',
+      dose: dose.trim(),
+      days,
+      startDate: formatDate(startDate),
+      endDate: endDate ? formatDate(endDate) : null,
+      enabled,
+    };
 
-    if (!medicationId) {
-      Alert.alert(
-        'Missing Medication',
-        'Please select a medication.'
-      );
-
+    const scheduleError = validateScheduleFields(updatedSchedule);
+    if (scheduleError) {
+      Alert.alert('Invalid Schedule', scheduleError);
       return;
     }
-
-    // ---------------------------------------------------
-    // TIME VALIDATION
-    // ---------------------------------------------------
-
-    if (!timeSelection) {
-      Alert.alert(
-        'Missing Time',
-        'Please select a medication time.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // DOSE VALIDATION
-    // ---------------------------------------------------
-
-    if (!dose || !dose.trim()) {
-      Alert.alert(
-        'Missing Dose',
-        'Please enter the medication dose.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // DAYS VALIDATION
-    // ---------------------------------------------------
-
-    if (
-      !Array.isArray(days) ||
-      days.length === 0
-    ) {
-      Alert.alert(
-        'Missing Days',
-        'Please select at least one day.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // START DATE VALIDATION
-    // ---------------------------------------------------
-
-    if (!startDate) {
-      Alert.alert(
-        'Missing Start Date',
-        'Please select a start date.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // END DATE VALIDATION
-    // ---------------------------------------------------
-
-    if (
-      endDate &&
-      endDate < startDate
-    ) {
-      Alert.alert(
-        'Invalid End Date',
-        'End date cannot be earlier than the start date.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // SAVE
-    // ---------------------------------------------------
 
     setSaving(true);
 
     try {
-      const updatedSchedule = {
-        medicationId,
-        time: to24HourTime(
-          timeSelection.hour,
-          timeSelection.minute,
-          timeSelection.period
-        ),
-        dose: dose.trim(),
-        days,
-        startDate:
-          formatDate(startDate),
-        endDate:
-          endDate
-            ? formatDate(endDate)
-            : null,
-        enabled,
-      };
-
       console.log(
         'Updating schedule:',
         updatedSchedule

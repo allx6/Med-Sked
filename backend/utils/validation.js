@@ -144,6 +144,79 @@ const validateMedicationFields = (payload) => {
   return null;
 };
 
+const validateScheduleFields = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return 'Invalid schedule payload';
+  }
+
+  const validDays = new Set([
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ]);
+  const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!isValidObjectId(payload.medicationId)) {
+    return 'A valid medication is required.';
+  }
+
+  if (typeof payload.time !== 'string' || !timePattern.test(payload.time.trim())) {
+    return 'Time must use HH:mm format.';
+  }
+
+  if (typeof payload.dose !== 'string' || !payload.dose.trim()) {
+    return 'Dose is required.';
+  }
+
+  if (!Array.isArray(payload.days) || payload.days.length === 0) {
+    return 'At least one day must be selected.';
+  }
+
+  if (new Set(payload.days).size !== payload.days.length
+    || payload.days.some((day) => typeof day !== 'string' || !validDays.has(day))) {
+    return 'Schedule contains an invalid day.';
+  }
+
+  if (typeof payload.startDate !== 'string' || !datePattern.test(payload.startDate)
+    || Number.isNaN(parseLocalDate(payload.startDate).getTime())) {
+    return 'Start date must be a valid YYYY-MM-DD date.';
+  }
+
+  if (payload.endDate !== null && payload.endDate !== undefined
+    && (typeof payload.endDate !== 'string' || !datePattern.test(payload.endDate)
+      || Number.isNaN(parseLocalDate(payload.endDate).getTime()))) {
+    return 'End date must be a valid YYYY-MM-DD date.';
+  }
+
+  if (payload.endDate && payload.endDate < payload.startDate) {
+    return 'End date cannot be earlier than the start date.';
+  }
+
+  if (payload.enabled !== undefined && typeof payload.enabled !== 'boolean') {
+    return 'Enabled must be a boolean.';
+  }
+
+  return null;
+};
+
+const parseLocalDate = (dateString) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  if (date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day) {
+    return new Date(NaN);
+  }
+
+  return date;
+};
+
 module.exports = {
   isValidObjectId,
   containsMongoOperatorPayload,
@@ -151,4 +224,5 @@ module.exports = {
   pickAllowedFields,
   validateSchedulePayload,
   validateMedicationFields,
+  validateScheduleFields,
 };

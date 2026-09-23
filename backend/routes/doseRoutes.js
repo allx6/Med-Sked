@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 
 const DoseRecord = require('../models/DoseRecord');
 const Medication = require('../models/Medication');
@@ -10,9 +11,31 @@ const { createNotification } = require('../services/notificationService');
 
 const {
   generateTodayDoses,
+  parseTime,
 } = require('../services/doseGenerator');
 
 const router = express.Router();
+
+const isValidDateString = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day;
+};
+
+const validateDoseId = (value, label = 'dose ID') => {
+  if (!mongoose.Types.ObjectId.isValid(value)) {
+    const error = new Error(`Invalid ${label}`);
+    error.statusCode = 400;
+    throw error;
+  }
+};
 
 const populateDose = (doseId) => DoseRecord.findById(doseId)
   .populate(
@@ -111,9 +134,7 @@ router.get(
   authMiddleware,
   async (req, res) => {
     try {
-      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: 'Invalid dose ID' });
-      }
+      validateDoseId(req.params.id);
 
       const dose = await DoseRecord.findOne({
         _id: req.params.id,
@@ -143,9 +164,8 @@ router.get(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to retrieve dose record',
+      res.status(error.statusCode || 500).json({
+        message: error.statusCode ? error.message : 'Failed to retrieve dose record',
       });
     }
   }
@@ -184,6 +204,15 @@ router.post(
           message:
             'Medication, schedule, date, and time are required',
         });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(medicationId)
+        || !mongoose.Types.ObjectId.isValid(scheduleId)) {
+        return res.status(400).json({ message: 'Invalid medication or schedule ID' });
+      }
+
+      if (!isValidDateString(scheduledDate) || !parseTime(String(scheduledTime))) {
+        return res.status(400).json({ message: 'Invalid scheduled date or time' });
       }
 
 
@@ -322,9 +351,7 @@ router.put(
   },
   async (req, res) => {
     try {
-      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: 'Invalid dose ID' });
-      }
+      validateDoseId(req.params.id);
 
       const doseOwnerId = req.user.role === 'caregiver'
         ? req.body.patientId
@@ -347,6 +374,12 @@ router.put(
 
       if (existingDose.status === 'taken') {
         return res.json(await populateDose(existingDose._id));
+      }
+
+      if (existingDose.status !== 'pending') {
+        return res.status(409).json({
+          message: 'Only pending doses can be marked as taken',
+        });
       }
 
       if (existingDose.refillDeducted) {
@@ -432,9 +465,8 @@ router.put(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to mark dose as taken',
+      res.status(error.statusCode || 500).json({
+        message: error.statusCode ? error.message : 'Failed to mark dose as taken',
       });
     }
   }
@@ -457,9 +489,7 @@ router.put(
   },
   async (req, res) => {
     try {
-      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: 'Invalid dose ID' });
-      }
+      validateDoseId(req.params.id);
 
       const doseOwnerId = req.user.role === 'caregiver'
         ? req.body.patientId
@@ -474,6 +504,7 @@ router.put(
           {
             _id: req.params.id,
             userId: doseOwnerId,
+            status: 'pending',
           },
           {
             $set: {
@@ -496,6 +527,17 @@ router.put(
           );
 
       if (!dose) {
+        const existingDose = await DoseRecord.findOne({
+          _id: req.params.id,
+          userId: doseOwnerId,
+        });
+
+        if (existingDose && existingDose.status !== 'pending') {
+          return res.status(409).json({
+            message: 'Only pending doses can be skipped',
+          });
+        }
+
         return res.status(404).json({
           message:
             'Dose record not found',
@@ -510,9 +552,8 @@ router.put(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to skip dose',
+      res.status(error.statusCode || 500).json({
+        message: error.statusCode ? error.message : 'Failed to skip dose',
       });
     }
   }
@@ -529,17 +570,27 @@ router.delete(
   authMiddleware,
   async (req, res) => {
     try {
-      if (!require('mongoose').Types.ObjectId.isValid(req.params.id)) {
-        return res.status(400).json({ message: 'Invalid dose ID' });
-      }
+      validateDoseId(req.params.id);
 
       const dose =
         await DoseRecord.findOneAndDelete({
           _id: req.params.id,
           userId: req.user.userId,
+          status: 'pending',
         });
 
       if (!dose) {
+        const existingDose = await DoseRecord.findOne({
+          _id: req.params.id,
+          userId: req.user.userId,
+        });
+
+        if (existingDose) {
+          return res.status(409).json({
+            message: 'Historical dose records cannot be deleted',
+          });
+        }
+
         return res.status(404).json({
           message:
             'Dose record not found',
@@ -557,9 +608,8 @@ router.delete(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to delete dose record',
+      res.status(error.statusCode || 500).json({
+        message: error.statusCode ? error.message : 'Failed to delete dose record',
       });
     }
   }

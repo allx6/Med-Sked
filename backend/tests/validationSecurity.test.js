@@ -8,6 +8,7 @@ const {
   parsePositiveInteger,
   validateSchedulePayload,
   validateMedicationFields,
+  validateScheduleFields,
 } = require('../utils/validation');
 
 test('valid ObjectIds are accepted', () => {
@@ -96,5 +97,40 @@ test('medication fields reject invalid values and minutes', () => {
 
   invalidPayloads.forEach((payload) => {
     assert.equal(typeof validateMedicationFields(payload), 'string');
+  });
+});
+
+test('schedule fields accept valid values', () => {
+  assert.equal(validateScheduleFields({
+    medicationId: '507f1f77bcf86cd799439011',
+    time: '08:00',
+    dose: '500 mg',
+    days: ['Monday', 'Friday'],
+    startDate: '2026-09-24',
+    endDate: '2026-10-01',
+    enabled: true,
+  }), null);
+});
+
+test('schedule fields reject invalid time, days, dates, and enabled state', () => {
+  const base = {
+    medicationId: '507f1f77bcf86cd799439011',
+    time: '08:00',
+    dose: '500 mg',
+    days: ['Monday'],
+    startDate: '2026-09-24',
+    endDate: null,
+    enabled: true,
+  };
+
+  [
+    { time: '25:00' },
+    { days: [] },
+    { days: ['Funday'] },
+    { startDate: '2026-02-30' },
+    { endDate: '2026-09-23' },
+    { enabled: 'true' },
+  ].forEach((change) => {
+    assert.equal(typeof validateScheduleFields({ ...base, ...change }), 'string');
   });
 });
