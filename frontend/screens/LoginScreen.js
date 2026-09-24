@@ -31,11 +31,13 @@ export default function LoginScreen({
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
+  const [authError, setAuthError] = useState('');
 
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     const nextErrors = {};
+    setAuthError('');
 
     if (!username.trim()) {
       nextErrors.username = 'Please enter your username.';
@@ -89,11 +91,11 @@ export default function LoginScreen({
       );
 
     } catch (error) {
-      Alert.alert(
-        'Login Failed',
-        error.message ||
-          'Unable to log in. Please check your credentials.'
-      );
+      const message =
+        error?.message ||
+        'Unable to log in. Please check your credentials.';
+
+      setAuthError(message);
     } finally {
       setLoading(false);
     }
@@ -160,6 +162,7 @@ export default function LoginScreen({
               onChangeText={(value) => {
                 setUsername(value);
                 setErrors((current) => ({ ...current, username: '' }));
+                setAuthError('');
               }}
               placeholder="Enter your email"
               error={errors.username}
@@ -176,11 +179,16 @@ export default function LoginScreen({
               onChangeText={(value) => {
                 setPassword(value);
                 setErrors((current) => ({ ...current, password: '' }));
+                setAuthError('');
               }}
               placeholder="Enter your password"
               error={errors.password}
               editable={!loading}
             />
+
+            {authError ? (
+              <Text style={styles.authError}>{authError}</Text>
+            ) : null}
 
             {/* LOGIN BUTTON */}
 
@@ -384,6 +392,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
 
     color: '#1E2A4A',
+  },
+
+  authError: {
+    color: '#B42318',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: -4,
   },
 
   loginButton: {

@@ -45,6 +45,7 @@ export default function RegisterScreen({
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [authError, setAuthError] = useState('');
 
 
   // =====================================================
@@ -53,6 +54,7 @@ export default function RegisterScreen({
 
   const handleRegister = async () => {
     const nextErrors = {};
+    setAuthError('');
 
     if (!name.trim()) {
       nextErrors.name = 'Please enter your name.';
@@ -159,13 +161,11 @@ export default function RegisterScreen({
 
 
     } catch (error) {
+      const message =
+        error?.message ||
+        'Unable to create your account.';
 
-      Alert.alert(
-        'Registration Failed',
-        error.message ||
-          'Unable to create your account.'
-      );
-
+      setAuthError(message);
     } finally {
 
       setLoading(false);
@@ -284,6 +284,7 @@ export default function RegisterScreen({
               onChangeText={(value) => {
                 setName(value);
                 setErrors((current) => ({ ...current, name: '' }));
+                setAuthError('');
               }}
               placeholder="Enter your Username"
               error={errors.name}
@@ -303,6 +304,7 @@ export default function RegisterScreen({
               onChangeText={(value) => {
                 setEmail(value);
                 setErrors((current) => ({ ...current, email: '' }));
+                setAuthError('');
               }}
               placeholder="Enter your email"
               error={errors.email}
@@ -410,6 +412,7 @@ export default function RegisterScreen({
               onChangeText={(value) => {
                 setPassword(value);
                 setErrors((current) => ({ ...current, password: '' }));
+                setAuthError('');
               }}
               placeholder="Create a password"
               error={errors.password}
@@ -427,12 +430,16 @@ export default function RegisterScreen({
               onChangeText={(value) => {
                 setConfirmPassword(value);
                 setErrors((current) => ({ ...current, confirmPassword: '' }));
+                setAuthError('');
               }}
               placeholder="Enter password again"
               error={errors.confirmPassword}
               editable={!loading}
             />
 
+            {authError ? (
+              <Text style={styles.authError}>{authError}</Text>
+            ) : null}
 
             {/* =================================================
                 REGISTER BUTTON
@@ -673,6 +680,14 @@ const styles = StyleSheet.create({
   roleDescription: {
     fontSize: 10,
     color: '#6B7280',
+  },
+
+  authError: {
+    color: '#B42318',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: -4,
   },
 
   registerButton: {
