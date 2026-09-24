@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { askAiAssistant } from '../services/api';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -38,6 +39,7 @@ export default function AIAssistantScreen({
   patientId,
   onBack,
 }) {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([
     {
       id: 'welcome',
@@ -190,7 +192,7 @@ export default function AIAssistantScreen({
         </View>
       ) : null}
 
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, { paddingBottom: spacing.lg + insets.bottom }]}>
         <TextInput
           value={input}
           onChangeText={setInput}
