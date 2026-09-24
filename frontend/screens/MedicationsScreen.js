@@ -21,6 +21,8 @@ import {
   deleteMedication,
 } from '../services/api';
 
+import ConfirmationDialog from '../components/ConfirmationDialog';
+
 
 // =====================================================
 // SCREEN
@@ -61,6 +63,9 @@ export default function MedicationsScreen({
     error,
     setError,
   ] = useState('');
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingMedication, setPendingMedication] = useState(null);
 
 
   // =====================================================
@@ -169,29 +174,37 @@ export default function MedicationsScreen({
   };
 
   const handleDeleteMedication = (medication) => {
-    Alert.alert(
-      'Delete Medication',
-      `Delete ${medication.name || 'this medication'} and its schedules and dose history?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteMedication(token, medication._id);
-              setMedications((previous) => previous.filter((item) => item._id !== medication._id));
-              setSchedules((previous) => previous.filter((item) => {
-                const medicationId = item.medicationId?._id || item.medicationId;
-                return String(medicationId) !== String(medication._id);
-              }));
-            } catch (deleteError) {
-              Alert.alert('Delete failed', deleteError.message || 'Failed to delete medication.');
-            }
-          },
-        },
-      ]
-    );
+    setPendingMedication(medication);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteMedication = async () => {
+    if (!pendingMedication) {
+      return;
+    }
+
+    try {
+      await deleteMedication(token, pendingMedication._id);
+
+      setMedications((previous) =>
+        previous.filter((item) => item._id !== pendingMedication._id)
+      );
+
+      setSchedules((previous) =>
+        previous.filter((item) => {
+          const medicationId = item.medicationId?._id || item.medicationId;
+          return String(medicationId) !== String(pendingMedication._id);
+        })
+      );
+
+      setShowDeleteConfirm(false);
+      setPendingMedication(null);
+    } catch (deleteError) {
+      Alert.alert(
+        'Delete failed',
+        deleteError.message || 'Failed to delete medication.'
+      );
+    }
   };
 
 
@@ -976,6 +989,25 @@ export default function MedicationsScreen({
         />
 
       )}
+
+      <ConfirmationDialog
+        visible={showDeleteConfirm}
+        title="Delete medication?"
+        message={pendingMedication
+          ? `Are you sure you want to delete ${pendingMedication.name || 'this medication'}? This will also remove its linked schedules and dose history.`
+          : 'Are you sure you want to delete this medication?'}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={async () => {
+          setShowDeleteConfirm(false);
+          await confirmDeleteMedication();
+        }}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setPendingMedication(null);
+        }}
+      />
 
     </View>
 

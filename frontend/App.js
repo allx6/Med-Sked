@@ -779,6 +779,7 @@ export default function App() {
           <AddScheduleScreen
 
             token={token}
+            autoReturnOnSuccess
 
             onScheduleAdded={
               handleScheduleAdded
@@ -805,6 +806,7 @@ export default function App() {
           <EditScheduleScreen
 
             token={token}
+            autoReturnOnSuccess
 
             schedule={
               selectedSchedule

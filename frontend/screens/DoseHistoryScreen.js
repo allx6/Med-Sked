@@ -26,6 +26,7 @@ import {
 } from '../services/api';
 
 import StatusBadge from '../components/StatusBadge';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function DoseHistoryScreen({
   token,
@@ -41,6 +42,8 @@ export default function DoseHistoryScreen({
   const [doses, setDoses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showActionDialog, setShowActionDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   // Medication filter
   const [selectedMedication, setSelectedMedication] =
@@ -300,47 +303,62 @@ export default function DoseHistoryScreen({
   // =====================================================
 
   const handleDelete = (doseId) => {
-    Alert.alert(
-      'Delete Dose Record',
-      'Are you sure you want to delete this dose record?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
+    setPendingAction({
+      doseId,
+      action: 'delete',
+      confirmLabel: 'Delete',
+    });
+    setShowActionDialog(true);
+  };
 
-          onPress: async () => {
-            try {
-              await deleteDoseRecord(
-                token,
-                doseId
-              );
+  const requestDoseAction = (doseId, action) => {
+    setPendingAction({ doseId, action });
+    setShowActionDialog(true);
+  };
 
-              setDoses((previous) =>
-                previous.filter(
-                  (dose) =>
-                    dose._id !== doseId
-                )
-              );
-            } catch (error) {
-              console.error(
-                'Delete dose error:',
-                error
-              );
+  const confirmPendingDoseAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
 
-              Alert.alert(
-                'Error',
-                error.message ||
-                  'Failed to delete dose record.'
-              );
-            }
-          },
-        },
-      ]
-    );
+    const { doseId, action } = pendingAction;
+
+    try {
+      if (action === 'take') {
+        const updatedDose = await takeDose(token, doseId);
+        setDoses((previous) =>
+          previous.map((dose) =>
+            dose._id === doseId ? updatedDose : dose
+          )
+        );
+      } else if (action === 'skip') {
+        const updatedDose = await skipDose(token, doseId);
+        setDoses((previous) =>
+          previous.map((dose) =>
+            dose._id === doseId ? updatedDose : dose
+          )
+        );
+      } else if (action === 'delete') {
+        await deleteDoseRecord(token, doseId);
+        setDoses((previous) =>
+          previous.filter((dose) => dose._id !== doseId)
+        );
+      }
+
+      setShowActionDialog(false);
+      setPendingAction(null);
+    } catch (error) {
+      console.error(
+        'Dose action error:',
+        error
+      );
+
+      Alert.alert(
+        'Error',
+        error.message ||
+          'Unable to complete this dose action.'
+      );
+    }
   };
 
   // =====================================================
@@ -525,7 +543,7 @@ export default function DoseHistoryScreen({
             <Pressable
               style={styles.takeButton}
               onPress={() =>
-                handleTake(item._id)
+                requestDoseAction(item._id, 'take')
               }
             >
               <Text
@@ -540,7 +558,7 @@ export default function DoseHistoryScreen({
             <Pressable
               style={styles.skipButton}
               onPress={() =>
-                handleSkip(item._id)
+                requestDoseAction(item._id, 'skip')
               }
             >
               <Text
@@ -941,6 +959,41 @@ export default function DoseHistoryScreen({
           refreshing={loading}
         />
       )}
+
+      <ConfirmationDialog
+        visible={showActionDialog}
+        title={
+          pendingAction?.action === 'take'
+            ? 'Mark dose as taken?'
+            : pendingAction?.action === 'skip'
+              ? 'Skip this dose?'
+              : 'Delete dose record?'
+        }
+        message={
+          pendingAction?.action === 'take'
+            ? 'You are about to mark this dose as taken.'
+            : pendingAction?.action === 'skip'
+              ? 'You are about to skip this dose.'
+              : 'Are you sure you want to delete this dose history record?'
+        }
+        confirmLabel={
+          pendingAction?.action === 'take'
+            ? 'Mark as Taken'
+            : pendingAction?.action === 'skip'
+              ? 'Skip'
+              : 'Delete'
+        }
+        cancelLabel="Cancel"
+        danger={pendingAction?.action === 'delete'}
+        onConfirm={async () => {
+          setShowActionDialog(false);
+          await confirmPendingDoseAction();
+        }}
+        onCancel={() => {
+          setShowActionDialog(false);
+          setPendingAction(null);
+        }}
+      />
     </View>
   );
 }

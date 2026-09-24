@@ -10,6 +10,8 @@ import {
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import { to24HourTime } from '../utils/timeHelpers';
+
 const getPickerDate = (hour, minute, period) => {
   const normalizedHour = period === 'PM' ? (hour % 12) + 12 : hour % 12;
   const date = new Date();
@@ -45,6 +47,41 @@ export default function TimeSelector({
       period: nextPeriod,
     });
   };
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        <input
+          type="time"
+          value={to24HourTime(hour, minute, period)}
+          step={60}
+          disabled={disabled}
+          onChange={(event) => {
+            const value = event.target.value;
+
+            if (!value) {
+              return;
+            }
+
+            const [hoursValue, minutesValue] = value.split(':');
+            const hours24 = Number(hoursValue);
+            const parsedMinutes = Number(minutesValue);
+
+            if (Number.isNaN(hours24) || Number.isNaN(parsedMinutes)) {
+              return;
+            }
+
+            onChange({
+              hour: hours24 % 12 || 12,
+              minute: parsedMinutes,
+              period: hours24 >= 12 ? 'PM' : 'AM',
+            });
+          }}
+          style={styles.webTimeInput}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -92,5 +129,19 @@ const styles = StyleSheet.create({
     color: '#1E2A4A',
     fontSize: 18,
     fontWeight: '700',
+  },
+  webTimeInput: {
+    width: '100%',
+    minHeight: 52,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D8E0E8',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#1E2A4A',
+    fontSize: 18,
+    fontWeight: '700',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    boxSizing: 'border-box',
   },
 });

@@ -35,6 +35,7 @@ export default function AddScheduleScreen({
   patientId,
   onScheduleAdded,
   onCancel,
+  autoReturnOnSuccess = false,
 }) {
 
   // =====================================================
@@ -234,6 +235,22 @@ export default function AddScheduleScreen({
     todayDate.getMonth(),
     todayDate.getDate()
   );
+  const isWeb = Platform.OS === 'web';
+
+  const parseWebDateValue = (value) => {
+    if (!value) {
+      return null;
+    }
+
+    const [year, month, day] = value.split('-').map(Number);
+    const nextDate = new Date(year, month - 1, day);
+
+    if (Number.isNaN(nextDate.getTime())) {
+      return null;
+    }
+
+    return nextDate;
+  };
 
   // =====================================================
   // START DATE PICKER
@@ -377,6 +394,10 @@ export default function AddScheduleScreen({
         }
       );
 
+      if (autoReturnOnSuccess && onScheduleAdded) {
+        onScheduleAdded();
+      }
+
       Alert.alert(
         'Success',
         'Medication schedule added successfully.',
@@ -384,11 +405,9 @@ export default function AddScheduleScreen({
           {
             text: 'OK',
             onPress: () => {
-
-              if (onScheduleAdded) {
+              if (!autoReturnOnSuccess && onScheduleAdded) {
                 onScheduleAdded();
               }
-
             },
           },
         ]
@@ -688,45 +707,66 @@ export default function AddScheduleScreen({
         Start Date
       </Text>
 
-      <Pressable
-        style={styles.inputButton}
-        onPress={() =>
-          setShowStartDatePicker(true)
-        }
-      >
+      {isWeb ? (
+        <input
+          type="date"
+          value={formatDate(startDate)}
+          min={formatDate(todayStart)}
+          onChange={(event) => {
+            const nextDate = parseWebDateValue(event.target.value);
 
-        <Text style={styles.inputIcon}>
-          📅
-        </Text>
-
-        <Text style={styles.inputButtonText}>
-          {formatDate(startDate)}
-        </Text>
-
-      </Pressable>
-
-
-      {showStartDatePicker && (
-
-        <View style={styles.pickerContainer}>
-
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            minimumDate={todayStart}
-            display={
-              Platform.OS === 'ios'
-                ? 'spinner'
-                : 'default'
+            if (!nextDate || nextDate < todayStart) {
+              return;
             }
-            onValueChange={(selectedDate) =>
-              handleStartDateChange(undefined, selectedDate)
+
+            setStartDate(nextDate);
+          }}
+          disabled={saving}
+          style={styles.webDateInput}
+        />
+      ) : (
+        <>
+          <Pressable
+            style={styles.inputButton}
+            onPress={() =>
+              setShowStartDatePicker(true)
             }
-            onDismiss={() => setShowStartDatePicker(false)}
-          />
+          >
 
-        </View>
+            <Text style={styles.inputIcon}>
+              📅
+            </Text>
 
+            <Text style={styles.inputButtonText}>
+              {formatDate(startDate)}
+            </Text>
+
+          </Pressable>
+
+
+          {showStartDatePicker && (
+
+            <View style={styles.pickerContainer}>
+
+              <DateTimePicker
+                value={startDate}
+                mode="date"
+                minimumDate={todayStart}
+                display={
+                  Platform.OS === 'ios'
+                    ? 'spinner'
+                    : 'default'
+                }
+                onValueChange={(selectedDate) =>
+                  handleStartDateChange(undefined, selectedDate)
+                }
+                onDismiss={() => setShowStartDatePicker(false)}
+              />
+
+            </View>
+
+          )}
+        </>
       )}
 
 
@@ -766,61 +806,96 @@ export default function AddScheduleScreen({
 
       {hasEndDate && (
 
-        <>
-
-          <Pressable
-            style={styles.inputButton}
-            onPress={() =>
-              setShowEndDatePicker(true)
+        isWeb ? (
+          <input
+            type="date"
+            value={endDate ? formatDate(endDate) : ''}
+            min={
+              startDate > todayStart
+                ? formatDate(startDate)
+                : formatDate(todayStart)
             }
-          >
+            onChange={(event) => {
+              const nextDate = parseWebDateValue(event.target.value);
 
-            <Text style={styles.inputIcon}>
-              📅
-            </Text>
+              if (!nextDate) {
+                return;
+              }
 
-            <Text style={styles.inputButtonText}>
+              if (nextDate < todayStart) {
+                return;
+              }
 
-              {endDate
-                ? formatDate(endDate)
-                : 'Select end date'}
+              if (startDate && nextDate < new Date(
+                startDate.getFullYear(),
+                startDate.getMonth(),
+                startDate.getDate()
+              )) {
+                return;
+              }
 
-            </Text>
+              setEndDate(nextDate);
+            }}
+            disabled={saving}
+            style={styles.webDateInput}
+          />
+        ) : (
+          <>
 
-          </Pressable>
+            <Pressable
+              style={styles.inputButton}
+              onPress={() =>
+                setShowEndDatePicker(true)
+              }
+            >
+
+              <Text style={styles.inputIcon}>
+                📅
+              </Text>
+
+              <Text style={styles.inputButtonText}>
+
+                {endDate
+                  ? formatDate(endDate)
+                  : 'Select end date'}
+
+              </Text>
+
+            </Pressable>
 
 
-          {showEndDatePicker && (
+            {showEndDatePicker && (
 
-            <View style={styles.pickerContainer}>
+              <View style={styles.pickerContainer}>
 
-              <DateTimePicker
-                value={
-                  endDate ||
-                  startDate
-                }
-                mode="date"
-                minimumDate={
-                  startDate > todayStart
-                    ? startDate
-                    : todayStart
-                }
-                display={
-                  Platform.OS === 'ios'
-                    ? 'spinner'
-                    : 'default'
-                }
-                onValueChange={(selectedDate) =>
-                  handleEndDateChange(undefined, selectedDate)
-                }
-                onDismiss={() => setShowEndDatePicker(false)}
-              />
+                <DateTimePicker
+                  value={
+                    endDate ||
+                    startDate
+                  }
+                  mode="date"
+                  minimumDate={
+                    startDate > todayStart
+                      ? startDate
+                      : todayStart
+                  }
+                  display={
+                    Platform.OS === 'ios'
+                      ? 'spinner'
+                      : 'default'
+                  }
+                  onValueChange={(selectedDate) =>
+                    handleEndDateChange(undefined, selectedDate)
+                  }
+                  onDismiss={() => setShowEndDatePicker(false)}
+                />
 
-            </View>
+              </View>
 
-          )}
+            )}
 
-        </>
+          </>
+        )
 
       )}
 
@@ -1062,6 +1137,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+
+  webDateInput: {
+    width: '100%',
+    minHeight: 52,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#1E2A4A',
+    fontSize: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    boxSizing: 'border-box',
   },
 
   inputIcon: {

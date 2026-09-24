@@ -20,6 +20,8 @@ import {
   deleteSchedule,
 } from '../services/api';
 
+import ConfirmationDialog from '../components/ConfirmationDialog';
+
 
 // =====================================================
 // MEDICATION SCHEDULE SCREEN
@@ -40,6 +42,8 @@ export default function ScheduleScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingScheduleId, setPendingScheduleId] = useState(null);
 
 
   // =====================================================
@@ -107,56 +111,35 @@ export default function ScheduleScreen({
   // =====================================================
 
   const handleDelete = (scheduleId) => {
+    setPendingScheduleId(scheduleId);
+    setShowDeleteConfirm(true);
+  };
 
-    Alert.alert(
-      'Delete Schedule',
-      'Are you sure you want to delete this medication schedule?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+  const confirmDeleteSchedule = async () => {
+    if (!pendingScheduleId) {
+      return;
+    }
 
-        {
-          text: 'Delete',
-          style: 'destructive',
+    try {
+      await deleteSchedule(token, pendingScheduleId);
 
-          onPress: async () => {
+      setSchedules((previous) =>
+        previous.filter((schedule) => schedule._id !== pendingScheduleId)
+      );
 
-            try {
+      setShowDeleteConfirm(false);
+      setPendingScheduleId(null);
+    } catch (error) {
+      console.error(
+        'Delete schedule error:',
+        error
+      );
 
-              await deleteSchedule(
-                token,
-                scheduleId
-              );
-
-              setSchedules(
-                previous =>
-                  previous.filter(
-                    schedule =>
-                      schedule._id !== scheduleId
-                  )
-              );
-
-            } catch (error) {
-
-              console.error(
-                'Delete schedule error:',
-                error
-              );
-
-              Alert.alert(
-                'Error',
-                error.message ||
-                'Failed to delete schedule.'
-              );
-
-            }
-
-          },
-        },
-      ]
-    );
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to delete schedule.'
+      );
+    }
   };
 
 
@@ -594,6 +577,23 @@ export default function ScheduleScreen({
         ListFooterComponent={
           <View style={styles.bottomSpacing} />
         }
+      />
+
+      <ConfirmationDialog
+        visible={showDeleteConfirm}
+        title="Delete schedule?"
+        message="Are you sure you want to delete this medication schedule?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={async () => {
+          setShowDeleteConfirm(false);
+          await confirmDeleteSchedule();
+        }}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setPendingScheduleId(null);
+        }}
       />
 
     </View>
