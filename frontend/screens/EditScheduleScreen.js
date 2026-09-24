@@ -752,28 +752,28 @@ export default function EditScheduleScreen({
             </Pressable>
 
             {showEndDatePicker && (
-              <DateTimePicker
-                value={
-                  endDate ||
-                  startDate ||
-                  new Date()
-                }
-                mode="date"
-                minimumDate={
-                  startDate > todayStart
-                    ? startDate
-                    : todayStart
-                }
-                display={
-                  Platform.OS === 'ios'
-                    ? 'spinner'
-                    : 'default'
-                }
-                onValueChange={(selectedDate) =>
-                  handleEndDateChange(undefined, selectedDate)
-                }
-                onDismiss={() => setShowEndDatePicker(false)}
-              />
+              <View style={styles.pickerContainer}>
+                <DateTimePicker
+                  value={
+                    endDate ||
+                    startDate ||
+                    new Date()
+                  }
+                  mode="date"
+                  minimumDate={
+                    startDate > todayStart
+                      ? startDate
+                      : todayStart
+                  }
+                  display={
+                    Platform.OS === 'ios'
+                      ? 'spinner'
+                      : 'default'
+                  }
+                  onValueChange={handleEndDateChange}
+                  onDismiss={() => setShowEndDatePicker(false)}
+                />
+              </View>
             )}
           </>
         )}

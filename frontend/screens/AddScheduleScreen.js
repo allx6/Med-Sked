@@ -871,7 +871,8 @@ export default function AddScheduleScreen({
                 <DateTimePicker
                   value={
                     endDate ||
-                    startDate
+                    startDate ||
+                    new Date()
                   }
                   mode="date"
                   minimumDate={
@@ -884,9 +885,7 @@ export default function AddScheduleScreen({
                       ? 'spinner'
                       : 'default'
                   }
-                  onValueChange={(selectedDate) =>
-                    handleEndDateChange(undefined, selectedDate)
-                  }
+                  onValueChange={handleEndDateChange}
                   onDismiss={() => setShowEndDatePicker(false)}
                 />
 
