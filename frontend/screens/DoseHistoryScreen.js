@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 
 import {
@@ -25,11 +26,15 @@ import {
 } from '../services/api';
 
 import StatusBadge from '../components/StatusBadge';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function DoseHistoryScreen({
   token,
   onBack,
 }) {
+  const { width } = useWindowDimensions();
+  const compactLayout = width < 400;
+
   // =====================================================
   // STATE
   // =====================================================
@@ -37,6 +42,8 @@ export default function DoseHistoryScreen({
   const [doses, setDoses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showActionDialog, setShowActionDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   // Medication filter
   const [selectedMedication, setSelectedMedication] =
@@ -45,6 +52,9 @@ export default function DoseHistoryScreen({
   // Status filter
   const [selectedStatus, setSelectedStatus] =
     useState('all');
+
+  const [selectedDate, setSelectedDate] =
+    useState(() => formatDateForComparison(new Date()));
 
   // =====================================================
   // LOAD DOSE RECORDS
@@ -121,6 +131,16 @@ export default function DoseHistoryScreen({
     }));
   }, [doses]);
 
+  const availableDates = useMemo(() => {
+    return Array.from(
+      new Set(
+        doses
+          .map((dose) => dose.scheduledDate)
+          .filter(Boolean)
+      )
+    ).sort((a, b) => parseLocalDate(a) - parseLocalDate(b));
+  }, [doses]);
+
   // =====================================================
   // FILTER DOSES
   // =====================================================
@@ -137,6 +157,12 @@ export default function DoseHistoryScreen({
         (dose) =>
           dose.medicationId?._id ===
           selectedMedication
+      );
+    }
+
+    if (selectedDate !== 'all') {
+      result = result.filter(
+        (dose) => dose.scheduledDate === selectedDate
       );
     }
 
@@ -171,6 +197,7 @@ export default function DoseHistoryScreen({
     doses,
     selectedMedication,
     selectedStatus,
+    selectedDate,
   ]);
 
   // =====================================================
@@ -276,47 +303,62 @@ export default function DoseHistoryScreen({
   // =====================================================
 
   const handleDelete = (doseId) => {
-    Alert.alert(
-      'Delete Dose Record',
-      'Are you sure you want to delete this dose record?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
+    setPendingAction({
+      doseId,
+      action: 'delete',
+      confirmLabel: 'Delete',
+    });
+    setShowActionDialog(true);
+  };
 
-          onPress: async () => {
-            try {
-              await deleteDoseRecord(
-                token,
-                doseId
-              );
+  const requestDoseAction = (doseId, action) => {
+    setPendingAction({ doseId, action });
+    setShowActionDialog(true);
+  };
 
-              setDoses((previous) =>
-                previous.filter(
-                  (dose) =>
-                    dose._id !== doseId
-                )
-              );
-            } catch (error) {
-              console.error(
-                'Delete dose error:',
-                error
-              );
+  const confirmPendingDoseAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
 
-              Alert.alert(
-                'Error',
-                error.message ||
-                  'Failed to delete dose record.'
-              );
-            }
-          },
-        },
-      ]
-    );
+    const { doseId, action } = pendingAction;
+
+    try {
+      if (action === 'take') {
+        const updatedDose = await takeDose(token, doseId);
+        setDoses((previous) =>
+          previous.map((dose) =>
+            dose._id === doseId ? updatedDose : dose
+          )
+        );
+      } else if (action === 'skip') {
+        const updatedDose = await skipDose(token, doseId);
+        setDoses((previous) =>
+          previous.map((dose) =>
+            dose._id === doseId ? updatedDose : dose
+          )
+        );
+      } else if (action === 'delete') {
+        await deleteDoseRecord(token, doseId);
+        setDoses((previous) =>
+          previous.filter((dose) => dose._id !== doseId)
+        );
+      }
+
+      setShowActionDialog(false);
+      setPendingAction(null);
+    } catch (error) {
+      console.error(
+        'Dose action error:',
+        error
+      );
+
+      Alert.alert(
+        'Error',
+        error.message ||
+          'Unable to complete this dose action.'
+      );
+    }
   };
 
   // =====================================================
@@ -443,14 +485,15 @@ export default function DoseHistoryScreen({
                 {frequency}
               </Text>
             ) : null}
+
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Status</Text>
+              <StatusBadge
+                status={status}
+                label={getStatusText(status)}
+              />
+            </View>
           </View>
-
-          {/* STATUS */}
-
-          <StatusBadge
-            status={status}
-            label={getStatusText(status)}
-          />
         </View>
 
         {/* DOSE DETAILS */}
@@ -495,12 +538,12 @@ export default function DoseHistoryScreen({
 
         {status === 'pending' && (
           <View
-            style={styles.actionRow}
+            style={[styles.actionRow, compactLayout && styles.compactActionRow]}
           >
             <Pressable
               style={styles.takeButton}
               onPress={() =>
-                handleTake(item._id)
+                requestDoseAction(item._id, 'take')
               }
             >
               <Text
@@ -515,7 +558,7 @@ export default function DoseHistoryScreen({
             <Pressable
               style={styles.skipButton}
               onPress={() =>
-                handleSkip(item._id)
+                requestDoseAction(item._id, 'skip')
               }
             >
               <Text
@@ -529,18 +572,20 @@ export default function DoseHistoryScreen({
           </View>
         )}
 
-        {/* DELETE */}
+        {/* DELETE PENDING RECORDS ONLY */}
 
-        <Pressable
-          style={styles.deleteButton}
-          onPress={() =>
-            handleDelete(item._id)
-          }
-        >
-          <Text style={styles.deleteText}>
-            Delete Record
-          </Text>
-        </Pressable>
+        {status === 'pending' && (
+          <Pressable
+            style={styles.deleteButton}
+            onPress={() =>
+              handleDelete(item._id)
+            }
+          >
+            <Text style={styles.deleteText}>
+              Delete Record
+            </Text>
+          </Pressable>
+        )}
 
       </View>
     );
@@ -596,19 +641,19 @@ export default function DoseHistoryScreen({
   // =====================================================
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compactLayout && styles.compactContainer]}>
 
       {/* HEADER */}
 
-      <View style={styles.header}>
+      <View style={[styles.header, compactLayout && styles.compactHeader]}>
         <Pressable
           onPress={onBack}
           style={styles.backButton}
         >
           <Text
-            style={styles.backText}
+            style={[styles.backText, compactLayout && styles.compactBackText]}
           >
-            ‹ Back
+            Back
           </Text>
         </Pressable>
 
@@ -617,12 +662,12 @@ export default function DoseHistoryScreen({
             styles.headerTitleContainer
           }
         >
-          <Text style={styles.title}>
+          <Text style={[styles.title, compactLayout && styles.compactTitle]}>
             Dose History
           </Text>
 
           <Text
-            style={styles.subtitle}
+            style={[styles.subtitle, compactLayout && styles.compactSubtitle]}
           >
             Track your medication doses
           </Text>
@@ -658,6 +703,34 @@ export default function DoseHistoryScreen({
             styles.filterSection
           }
         >
+          <Text style={styles.filterTitle}>Date</Text>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {availableDates.map((date) => (
+              <Pressable
+                key={date}
+                style={[
+                  styles.filterChip,
+                  selectedDate === date && styles.activeFilterChip,
+                ]}
+                onPress={() => setSelectedDate(date)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    selectedDate === date && styles.activeFilterChipText,
+                  ]}
+                >
+                  {getDateLabel(date)}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
           {/* MEDICATION FILTER */}
 
           <Text
@@ -886,6 +959,41 @@ export default function DoseHistoryScreen({
           refreshing={loading}
         />
       )}
+
+      <ConfirmationDialog
+        visible={showActionDialog}
+        title={
+          pendingAction?.action === 'take'
+            ? 'Mark dose as taken?'
+            : pendingAction?.action === 'skip'
+              ? 'Skip this dose?'
+              : 'Delete dose record?'
+        }
+        message={
+          pendingAction?.action === 'take'
+            ? 'You are about to mark this dose as taken.'
+            : pendingAction?.action === 'skip'
+              ? 'You are about to skip this dose.'
+              : 'Are you sure you want to delete this dose history record?'
+        }
+        confirmLabel={
+          pendingAction?.action === 'take'
+            ? 'Mark as Taken'
+            : pendingAction?.action === 'skip'
+              ? 'Skip'
+              : 'Delete'
+        }
+        cancelLabel="Cancel"
+        danger={pendingAction?.action === 'delete'}
+        onConfirm={async () => {
+          setShowActionDialog(false);
+          await confirmPendingDoseAction();
+        }}
+        onCancel={() => {
+          setShowActionDialog(false);
+          setPendingAction(null);
+        }}
+      />
     </View>
   );
 }
@@ -1063,7 +1171,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+  },
+
+  compactContainer: {
+    padding: 12,
   },
 
   // =================================================
@@ -1071,14 +1186,18 @@ const styles = StyleSheet.create({
   // =================================================
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    marginBottom: 8,
+  },
+
+  compactHeader: {
+    marginBottom: 8,
   },
 
   backButton: {
-    marginRight: 12,
-    paddingVertical: 5,
+    alignSelf: 'flex-start',
+    paddingVertical: 3,
   },
 
   backText: {
@@ -1087,8 +1206,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  compactBackText: {
+    fontSize: 14,
+  },
+
   headerTitleContainer: {
-    flex: 1,
+    marginTop: 4,
+    alignItems: 'flex-start',
   },
 
   title: {
@@ -1097,10 +1221,18 @@ const styles = StyleSheet.create({
     color: '#1E2A4A',
   },
 
+  compactTitle: {
+    fontSize: 20,
+  },
+
   subtitle: {
     fontSize: 14,
     color: '#6B7280',
     marginTop: 2,
+  },
+
+  compactSubtitle: {
+    fontSize: 12,
   },
 
   // =================================================
@@ -1140,11 +1272,13 @@ const styles = StyleSheet.create({
 
   filterSection: {
     marginBottom: 12,
+    width: '100%',
+    alignItems: 'flex-start',
   },
 
   filterTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: '#374151',
     marginBottom: 7,
   },
@@ -1155,6 +1289,8 @@ const styles = StyleSheet.create({
 
   filterScroll: {
     gap: 8,
+    flexGrow: 1,
+    justifyContent: 'flex-start',
     paddingRight: 10,
   },
 
@@ -1186,6 +1322,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 12,
     color: '#6B7280',
+    textAlign: 'center',
   },
 
   // =================================================
@@ -1210,6 +1347,8 @@ const styles = StyleSheet.create({
 
   list: {
     paddingBottom: 30,
+    width: '100%',
+    alignSelf: 'center',
   },
 
   emptyList: {
@@ -1229,6 +1368,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 10,
     paddingHorizontal: 2,
+    width: '100%',
   },
 
   dateHeaderText: {
@@ -1274,6 +1414,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    width: '100%',
+    alignSelf: 'center',
   },
 
   cardTop: {
@@ -1303,6 +1445,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     marginTop: 2,
+  },
+
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 7,
+    gap: 8,
+  },
+
+  statusLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
   },
 
   // =================================================
@@ -1374,10 +1529,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 14,
     gap: 8,
+    flexWrap: 'wrap',
+  },
+
+  compactActionRow: {
+    gap: 6,
   },
 
   takeButton: {
     flex: 1,
+    minWidth: 120,
     backgroundColor: '#2F6690',
     borderRadius: 8,
     paddingVertical: 11,
@@ -1392,6 +1553,7 @@ const styles = StyleSheet.create({
 
   skipButton: {
     flex: 1,
+    minWidth: 120,
     backgroundColor: '#E5E7EB',
     borderRadius: 8,
     paddingVertical: 11,
@@ -1410,13 +1572,17 @@ const styles = StyleSheet.create({
 
   deleteButton: {
     marginTop: 12,
+    alignSelf: 'stretch',
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     alignItems: 'center',
-    paddingVertical: 5,
   },
 
   deleteText: {
-    color: '#DC2626',
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

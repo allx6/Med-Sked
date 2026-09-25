@@ -6,6 +6,12 @@ const {
   scheduleAppliesToDate,
 } = require('../services/doseGenerator');
 
+const formatTime = (hours, minutes) => {
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 || 12;
+  return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
 test('dose generation accepts the 24-hour schedule time format', () => {
   assert.deepEqual(parseTime('07:00'), {
     hours: 7,
@@ -59,4 +65,24 @@ test('edited schedule rules control eligibility while preserving an open end dat
     ),
     false
   );
+});
+
+test('fixed schedule times remain explicit and do not use interval arithmetic', () => {
+  const scheduleTime = parseTime('20:00');
+  assert.equal(formatTime(scheduleTime.hours, scheduleTime.minutes), '8:00 PM');
+  assert.notEqual(formatTime(scheduleTime.hours, scheduleTime.minutes), '12:00 AM');
+});
+
+test('eight-hour intervals remain distinct from fixed schedule times', () => {
+  const start = parseTime('08:00');
+  const intervalMinutes = 8 * 60;
+  const generated = [0, 1, 2].map((index) => {
+    const totalMinutes = start.hours * 60 + start.minutes + index * intervalMinutes;
+    return formatTime(
+      Math.floor((totalMinutes % (24 * 60)) / 60),
+      totalMinutes % 60
+    );
+  });
+
+  assert.deepEqual(generated, ['8:00 AM', '4:00 PM', '12:00 AM']);
 });

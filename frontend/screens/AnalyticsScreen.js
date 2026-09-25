@@ -81,7 +81,7 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAnalytics(true)} tintColor={colors.primary} />}
       >
         <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </Pressable>
         <Text style={styles.title}>Adherence Analytics</Text>
         <Text style={styles.subtitle}>Real dose outcomes for the selected period.</Text>

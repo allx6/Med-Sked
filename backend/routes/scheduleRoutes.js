@@ -5,9 +5,12 @@ const MedicationSchedule =
 
 const Medication =
   require('../models/Medication');
+const DoseRecord =
+  require('../models/DoseRecord');
 const {
   isValidObjectId,
   validateSchedulePayload,
+  validateScheduleFields,
 } = require('../utils/validation');
 
 const authMiddleware =
@@ -144,10 +147,7 @@ router.get(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to retrieve schedule',
-      });
+      return respondWithError(res, error);
     }
   }
 );
@@ -165,10 +165,33 @@ router.post(
   async (req, res) => {
 
     try {
+      const ownerId = getOwnerId(req);
+
+      console.log('[Schedule][Backend] POST request received');
+      console.log('[Schedule][Backend] Schedule ID: new schedule');
+      console.log('[Schedule][Backend] User ID:', req.user?.userId);
+      console.log('[Schedule][Backend] patientId:', ownerId);
+      console.log('[Schedule][Backend] Request body:', {
+        medicationId: req.body?.medicationId,
+        time: req.body?.time,
+        dose: req.body?.dose,
+        days: req.body?.days,
+        startDate: req.body?.startDate,
+        endDate: req.body?.endDate,
+        enabled: req.body?.enabled,
+      });
+
       const payload = validateSchedulePayload(req.body);
 
       if (!payload) {
         const error = new Error('Unexpected schedule fields');
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
+
+      const validationError = validateScheduleFields(payload);
+      if (validationError) {
+        const error = new Error(validationError);
         error.statusCode = 400;
         return respondWithError(res, error);
       }
@@ -191,14 +214,13 @@ router.post(
       if (
         !medicationId ||
         !time ||
-        !dose ||
         !days ||
         !startDate
       ) {
 
         return res.status(400).json({
           message:
-            'Medication, time, dose, days, and start date are required',
+            'Medication, time, days, and start date are required',
         });
 
       }
@@ -220,8 +242,6 @@ router.post(
       // =================================================
       // VERIFY MEDICATION
       // =================================================
-
-      const ownerId = getOwnerId(req);
 
       if (!ownerId) {
         return res.status(400).json({ message: 'Patient ID is required' });
@@ -255,6 +275,17 @@ router.post(
 
       }
 
+      const medicationDose =
+        typeof medication.dosage === 'string' && medication.dosage.trim()
+          ? medication.dosage.trim()
+          : (typeof dose === 'string' && dose.trim() ? dose.trim() : '');
+
+      if (!medicationDose) {
+        return res.status(400).json({
+          message: 'Selected medication must include a dosage.',
+        });
+      }
+
 
       // =================================================
       // CREATE SCHEDULE
@@ -271,7 +302,7 @@ router.post(
             time.trim(),
 
           dose:
-            dose.trim(),
+            medicationDose,
 
           days,
 
@@ -311,6 +342,13 @@ router.post(
       });
 
 
+      console.log('[Schedule][Backend] Create successful', {
+        scheduleId: populatedSchedule?._id,
+        userId: req.user?.userId,
+        patientId: ownerId,
+        time: populatedSchedule?.time,
+      });
+
       res.status(201).json(
         populatedSchedule
       );
@@ -318,8 +356,13 @@ router.post(
     } catch (error) {
 
       console.error(
-        'Create schedule error:',
-        error
+        '[Schedule][Backend] Create failed',
+        {
+          scheduleId: req.params?.id,
+          userId: req.user?.userId,
+          patientId: getOwnerId(req),
+          message: error.message,
+        }
       );
 
       return respondWithError(res, error);
@@ -340,11 +383,34 @@ router.put(
   async (req, res) => {
 
     try {
+      const ownerId = getOwnerId(req);
+
+      console.log('[Schedule][Backend] PUT request received');
+      console.log('[Schedule][Backend] Schedule ID:', req.params.id);
+      console.log('[Schedule][Backend] User ID:', req.user?.userId);
+      console.log('[Schedule][Backend] patientId:', ownerId);
+      console.log('[Schedule][Backend] Request body:', {
+        medicationId: req.body?.medicationId,
+        time: req.body?.time,
+        dose: req.body?.dose,
+        days: req.body?.days,
+        startDate: req.body?.startDate,
+        endDate: req.body?.endDate,
+        enabled: req.body?.enabled,
+      });
+
       validateScheduleIdParam(req.params.id);
       const payload = validateSchedulePayload(req.body);
 
       if (!payload) {
         const error = new Error('Unexpected schedule fields');
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
+
+      const validationError = validateScheduleFields(payload);
+      if (validationError) {
+        const error = new Error(validationError);
         error.statusCode = 400;
         return respondWithError(res, error);
       }
@@ -367,14 +433,13 @@ router.put(
       if (
         !medicationId ||
         !time ||
-        !dose ||
         !days ||
         !startDate
       ) {
 
         return res.status(400).json({
           message:
-            'Medication, time, dose, days, and start date are required',
+            'Medication, time, days, and start date are required',
         });
 
       }
@@ -396,8 +461,6 @@ router.put(
       // =================================================
       // VERIFY MEDICATION
       // =================================================
-
-      const ownerId = getOwnerId(req);
 
       if (!ownerId) {
         return res.status(400).json({ message: 'Patient ID is required' });
@@ -429,6 +492,17 @@ router.put(
             'Medication not found',
         });
 
+      }
+
+      const medicationDose =
+        typeof medication.dosage === 'string' && medication.dosage.trim()
+          ? medication.dosage.trim()
+          : (typeof dose === 'string' && dose.trim() ? dose.trim() : '');
+
+      if (!medicationDose) {
+        return res.status(400).json({
+          message: 'Selected medication must include a dosage.',
+        });
       }
 
 
@@ -468,7 +542,7 @@ router.put(
         time.trim();
 
       existingSchedule.dose =
-        dose.trim();
+        medicationDose;
 
       existingSchedule.days =
         days;
@@ -523,6 +597,12 @@ router.put(
         });
       }
 
+      console.log('[Schedule][Backend] Update successful', {
+        scheduleId: existingSchedule?._id,
+        userId: req.user?.userId,
+        patientId: ownerId,
+        time: existingSchedule?.time,
+      });
 
       res.json(
         populatedSchedule
@@ -531,8 +611,13 @@ router.put(
     } catch (error) {
 
       console.error(
-        'Update schedule error:',
-        error
+        '[Schedule][Backend] Update failed',
+        {
+          scheduleId: req.params?.id,
+          userId: req.user?.userId,
+          patientId: getOwnerId(req),
+          message: error.message,
+        }
       );
 
       return respondWithError(res, error);
@@ -584,6 +669,12 @@ router.delete(
 
       }
 
+      await DoseRecord.deleteMany({
+        userId: ownerId,
+        scheduleId: schedule._id,
+        status: 'pending',
+      });
+
 
       res.json({
         message:
@@ -597,10 +688,7 @@ router.delete(
         error
       );
 
-      res.status(500).json({
-        message:
-          'Failed to delete schedule',
-      });
+      return respondWithError(res, error);
     }
   }
 );

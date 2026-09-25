@@ -3,10 +3,12 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 
 import { getCaregiverRequestsForPatient } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function ProfileScreen({ user, token, unreadNotificationCount = 0, onOpenNotifications, onOpenAnalytics, onLogout, onBack, onOpenCaregiverRequests, onOpenPatientConnections }) {
   const patientId = user?.patientId || 'Not assigned';
   const [pendingRequestCount, setPendingRequestCount] = useState(null);
+  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
   useEffect(() => {
     if (!token || user?.role === 'caregiver') {
@@ -49,7 +51,7 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
         <View style={styles.headerRow}>
           {onBack ? (
             <Pressable onPress={onBack} hitSlop={8}>
-              <Text style={styles.backText}>← Back</Text>
+              <Text style={styles.backText}>Back</Text>
             </Pressable>
           ) : null}
         </View>
@@ -145,10 +147,24 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
           </>
         ) : null}
 
-        <Pressable onPress={onLogout} style={({ pressed }) => [styles.logoutButton, pressed && styles.buttonPressed]}>
+        <Pressable onPress={() => setShowLogoutConfirmation(true)} style={({ pressed }) => [styles.logoutButton, pressed && styles.buttonPressed]}>
           <Text style={styles.logoutButtonText}>Logout</Text>
         </Pressable>
       </ScrollView>
+
+      <ConfirmationDialog
+        visible={showLogoutConfirmation}
+        title="Log out?"
+        message="Are you sure you want to log out?"
+        confirmLabel="Log Out"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={() => {
+          setShowLogoutConfirmation(false);
+          onLogout();
+        }}
+        onCancel={() => setShowLogoutConfirmation(false)}
+      />
     </View>
   );
 }

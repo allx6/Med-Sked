@@ -81,7 +81,7 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
         contentContainerStyle={styles.content}
       >
         <Pressable onPress={onBack} hitSlop={8} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </Pressable>
 
         <Text style={styles.title}>Caregiver Requests</Text>

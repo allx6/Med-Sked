@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import {
   View,
+  Image,
   Text,
   TextInput,
   Pressable,
@@ -19,6 +20,8 @@ import {
 import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
+
+const medSkedLogo = require('../assets/medsked.png');
 
 export default function RegisterScreen({
   onRegister,
@@ -41,6 +44,8 @@ export default function RegisterScreen({
   const [role, setRole] = useState('patient');
 
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [authError, setAuthError] = useState('');
 
 
   // =====================================================
@@ -48,8 +53,12 @@ export default function RegisterScreen({
   // =====================================================
 
   const handleRegister = async () => {
+    const nextErrors = {};
+    setAuthError('');
 
     if (!name.trim()) {
+      nextErrors.name = 'Please enter your name.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Name',
         'Please enter your name.'
@@ -59,6 +68,8 @@ export default function RegisterScreen({
 
 
     if (!email.trim()) {
+      nextErrors.email = 'Please enter your email.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Email',
         'Please enter your email.'
@@ -66,8 +77,20 @@ export default function RegisterScreen({
       return;
     }
 
+    if (!/^[^\s@]+@gmail\.com$/i.test(email.trim())) {
+      nextErrors.email = 'Please enter a valid Gmail address.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Email',
+        'Please use a Gmail address ending in @gmail.com.'
+      );
+      return;
+    }
+
 
     if (!password) {
+      nextErrors.password = 'Please enter a password.';
+      setErrors(nextErrors);
       Alert.alert(
         'Missing Password',
         'Please enter a password.'
@@ -76,7 +99,20 @@ export default function RegisterScreen({
     }
 
 
+    if (/\s/.test(password)) {
+      nextErrors.password = 'Password cannot contain spaces.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Password',
+        'Password cannot contain spaces.'
+      );
+      return;
+    }
+
+
     if (password.length < 6) {
+      nextErrors.password = 'Password must be at least 6 characters.';
+      setErrors(nextErrors);
       Alert.alert(
         'Weak Password',
         'Password must be at least 6 characters.'
@@ -86,12 +122,16 @@ export default function RegisterScreen({
 
 
     if (password !== confirmPassword) {
+      nextErrors.confirmPassword = 'Passwords do not match.';
+      setErrors(nextErrors);
       Alert.alert(
         'Passwords Do Not Match',
         'Please make sure both passwords are the same.'
       );
       return;
     }
+
+    setErrors(nextErrors);
 
 
     try {
@@ -121,13 +161,11 @@ export default function RegisterScreen({
 
 
     } catch (error) {
+      const message =
+        error?.message ||
+        'Unable to create your account.';
 
-      Alert.alert(
-        'Registration Failed',
-        error.message ||
-          'Unable to create your account.'
-      );
-
+      setAuthError(message);
     } finally {
 
       setLoading(false);
@@ -150,7 +188,7 @@ export default function RegisterScreen({
         behavior={
           Platform.OS === 'ios'
             ? 'padding'
-            : undefined
+            : 'height'
         }
       >
 
@@ -188,7 +226,7 @@ export default function RegisterScreen({
             >
 
               <Text style={styles.backText}>
-                ← Back to Login
+                Back to Login
               </Text>
 
             </Pressable>
@@ -196,9 +234,13 @@ export default function RegisterScreen({
 
             <View style={styles.logoCircle}>
 
-              <Text style={styles.logoIcon}>
-                💊
-              </Text>
+              <Image
+                accessible
+                accessibilityLabel="MedSked logo"
+                source={medSkedLogo}
+                resizeMode="contain"
+                style={styles.logoImage}
+              />
 
             </View>
 
@@ -210,7 +252,7 @@ export default function RegisterScreen({
 
             <Text style={styles.tagline}>
               Start managing your medications
-              with MediSked.
+              with MedSked.
             </Text>
 
           </View>
@@ -228,7 +270,7 @@ export default function RegisterScreen({
 
 
             <Text style={styles.subtitle}>
-              Create your MediSked account below.
+              Create your MedSked account below.
             </Text>
 
 
@@ -237,10 +279,15 @@ export default function RegisterScreen({
             ================================================= */}
 
             <TextField
-              label="Name"
+              label="Username"
               value={name}
-              onChangeText={setName}
-              placeholder="Choose a name"
+              onChangeText={(value) => {
+                setName(value);
+                setErrors((current) => ({ ...current, name: '' }));
+                setAuthError('');
+              }}
+              placeholder="Enter your Username"
+              error={errors.name}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!loading}
@@ -254,8 +301,13 @@ export default function RegisterScreen({
             <TextField
               label="Email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                setErrors((current) => ({ ...current, email: '' }));
+                setAuthError('');
+              }}
               placeholder="Enter your email"
+              error={errors.email}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -357,8 +409,13 @@ export default function RegisterScreen({
             <PasswordInput
               label="Password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                setErrors((current) => ({ ...current, password: '' }));
+                setAuthError('');
+              }}
               placeholder="Create a password"
+              error={errors.password}
               editable={!loading}
             />
 
@@ -370,11 +427,19 @@ export default function RegisterScreen({
             <PasswordInput
               label="Confirm Password"
               value={confirmPassword}
-              onChangeText={setConfirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                setErrors((current) => ({ ...current, confirmPassword: '' }));
+                setAuthError('');
+              }}
               placeholder="Enter password again"
+              error={errors.confirmPassword}
               editable={!loading}
             />
 
+            {authError ? (
+              <Text style={styles.authError}>{authError}</Text>
+            ) : null}
 
             {/* =================================================
                 REGISTER BUTTON
@@ -419,7 +484,7 @@ export default function RegisterScreen({
           ================================================= */}
 
           <Text style={styles.footerText}>
-            MediSked • Medication Management
+            MedSked • Medication Management
           </Text>
 
         </ScrollView>
@@ -495,21 +560,18 @@ const styles = StyleSheet.create({
   },
 
   logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 21,
+    width: 104,
+    height: 104,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2F6690',
     marginBottom: 11,
-    shadowColor: '#2F6690',
-    shadowOpacity: 0.20,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
-    elevation: 5,
+  },
+
+  logoImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 32,
   },
 
   logoIcon: {
@@ -618,6 +680,14 @@ const styles = StyleSheet.create({
   roleDescription: {
     fontSize: 10,
     color: '#6B7280',
+  },
+
+  authError: {
+    color: '#B42318',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: -4,
   },
 
   registerButton: {

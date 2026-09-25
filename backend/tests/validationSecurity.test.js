@@ -7,6 +7,8 @@ const {
   containsMongoOperatorPayload,
   parsePositiveInteger,
   validateSchedulePayload,
+  validateMedicationFields,
+  validateScheduleFields,
 } = require('../utils/validation');
 
 test('valid ObjectIds are accepted', () => {
@@ -71,4 +73,64 @@ test('schedule payloads accept optional endDate null while rejecting unexpected 
   });
 
   assert.equal(rejected, null);
+});
+
+test('medication fields accept valid values', () => {
+  assert.equal(validateMedicationFields({
+    name: '  Paracetamol  ',
+    dosage: '500 mg',
+    frequency: 'Every 8 hours',
+  }), null);
+});
+
+test('medication fields reject invalid values and minutes', () => {
+  const invalidPayloads = [
+    { name: '', dosage: '500 mg', frequency: 'Every 8 hours' },
+    { name: 'A', dosage: '500 mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: '0 mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: '-5 mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: 'abc mg', frequency: 'Every 8 hours' },
+    { name: 'Medicine', dosage: '500 mg', frequency: 'Every 0 hours' },
+    { name: 'Medicine', dosage: '500 mg', frequency: 'Every 8 minutes' },
+    { name: 'Medicine', dosage: '500 mg', frequency: 'Every 8 weeks' },
+  ];
+
+  invalidPayloads.forEach((payload) => {
+    assert.equal(typeof validateMedicationFields(payload), 'string');
+  });
+});
+
+test('schedule fields accept valid values', () => {
+  assert.equal(validateScheduleFields({
+    medicationId: '507f1f77bcf86cd799439011',
+    time: '08:00',
+    dose: '500 mg',
+    days: ['Monday', 'Friday'],
+    startDate: '2026-09-24',
+    endDate: '2026-10-01',
+    enabled: true,
+  }), null);
+});
+
+test('schedule fields reject invalid time, days, dates, and enabled state', () => {
+  const base = {
+    medicationId: '507f1f77bcf86cd799439011',
+    time: '08:00',
+    dose: '500 mg',
+    days: ['Monday'],
+    startDate: '2026-09-24',
+    endDate: null,
+    enabled: true,
+  };
+
+  [
+    { time: '25:00' },
+    { days: [] },
+    { days: ['Funday'] },
+    { startDate: '2026-02-30' },
+    { endDate: '2026-09-23' },
+    { enabled: 'true' },
+  ].forEach((change) => {
+    assert.equal(typeof validateScheduleFields({ ...base, ...change }), 'string');
+  });
 });

@@ -2,6 +2,18 @@ const mongoose = require('mongoose');
 
 const { encrypt, decrypt } = require('../services/encryptionService');
 
+const safeReadNotificationMessage = (value) => {
+  if (typeof value !== 'string' || !value.startsWith('enc:')) {
+    return '[Encrypted notification unavailable]';
+  }
+
+  try {
+    return decrypt(value, { suppressErrorLog: true });
+  } catch (error) {
+    return '[Encrypted notification unavailable]';
+  }
+};
+
 const notificationSchema = new mongoose.Schema(
   {
     recipient: {
@@ -73,3 +85,4 @@ notificationSchema.set('toJSON', { getters: true, virtuals: true });
 notificationSchema.set('toObject', { getters: true, virtuals: true });
 
 module.exports = mongoose.model('Notification', notificationSchema);
+module.exports.safeReadNotificationMessage = safeReadNotificationMessage;

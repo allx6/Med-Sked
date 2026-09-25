@@ -18,6 +18,7 @@ import {
   skipPatientDose,
 } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function PatientMonitoringScreen({
   token,
@@ -35,9 +36,8 @@ export default function PatientMonitoringScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [actionId, setActionId] = useState(null);
-  const [deleteMedicationId, setDeleteMedicationId] = useState(null);
-  const [deleteScheduleId, setDeleteScheduleId] = useState(null);
-  const [doseConfirmAction, setDoseConfirmAction] = useState(null);
+  const [selectedSection, setSelectedSection] = useState('medications');
+  const [confirmation, setConfirmation] = useState(null);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (!patient?._id) return;
@@ -124,7 +124,6 @@ export default function PatientMonitoringScreen({
         };
       });
 
-      setDoseConfirmAction(null);
     } catch (err) {
       Alert.alert('Dose update failed', err.message || 'Unable to update this dose.');
     } finally {
@@ -136,7 +135,6 @@ export default function PatientMonitoringScreen({
     try {
       setActionId(medication._id);
       await deleteMedication(token, medication._id, patient?._id);
-      setDeleteMedicationId(null);
       await loadOverview(true);
     } catch (err) {
       setError(err.message || 'Unable to delete this medication.');
@@ -149,12 +147,24 @@ export default function PatientMonitoringScreen({
     try {
       setActionId(schedule._id);
       await deleteSchedule(token, schedule._id, patient?._id);
-      setDeleteScheduleId(null);
       await loadOverview(true);
     } catch (err) {
       setError(err.message || 'Unable to delete this schedule.');
     } finally {
       setActionId(null);
+    }
+  };
+
+  const confirmAction = async () => {
+    const current = confirmation;
+    setConfirmation(null);
+
+    if (current?.type === 'medication') {
+      await handleDeleteMedication(current.item);
+    } else if (current?.type === 'schedule') {
+      await handleDeleteSchedule(current.item);
+    } else if (current?.type === 'dose') {
+      await handleDoseAction(current.doseId, current.action);
     }
   };
 
@@ -166,7 +176,7 @@ export default function PatientMonitoringScreen({
         contentContainerStyle={styles.content}
       >
         <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}>Back</Text>
         </Pressable>
 
         <Text style={styles.pageTitle}>{patientName}</Text>
@@ -211,6 +221,51 @@ export default function PatientMonitoringScreen({
           </View>
         </View>
 
+        <View style={styles.todayDosesBox}>
+          <View style={styles.todayDosesHeader}>
+            <Text style={styles.todayDosesTitle}>Today's doses</Text>
+            <Text style={styles.todayDosesCount}>{todayDoses.length}</Text>
+          </View>
+          {todayDoses.length === 0 ? (
+            <Text style={styles.todayDosesEmpty}>No doses scheduled today.</Text>
+          ) : (
+            todayDoses.map((dose) => {
+              const medication = dose.medicationId || {};
+
+              return (
+                <View key={dose._id} style={styles.todayDoseRow}>
+                  <View style={styles.todayDoseInfo}>
+                    <Text style={styles.todayDoseName}>{medication.name || 'Medication'}</Text>
+                    <Text style={styles.todayDoseTime}>{dose.scheduledTime || 'Time not specified'}</Text>
+                  </View>
+                  <Text style={[styles.todayDoseStatus, dose.status === 'taken' ? styles.success : dose.status === 'skipped' ? styles.skipped : dose.status === 'missed' ? styles.missed : styles.pending]}>
+                    {dose.status || 'pending'}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        <View style={styles.sectionFilter}>
+          {[
+            { key: 'medications', label: 'Medications' },
+            { key: 'schedules', label: 'Schedules' },
+            { key: 'doses', label: 'Doses' },
+          ].map((section) => (
+            <Pressable
+              key={section.key}
+              onPress={() => setSelectedSection(section.key)}
+              style={[styles.sectionFilterButton, selectedSection === section.key && styles.sectionFilterButtonActive]}
+            >
+              <Text style={[styles.sectionFilterText, selectedSection === section.key && styles.sectionFilterTextActive]}>
+                {section.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {selectedSection === 'medications' ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Medication Summary</Text>
@@ -227,8 +282,6 @@ export default function PatientMonitoringScreen({
             </View>
           ) : (
             medications.map((medication) => {
-              const isDeletingMedication = deleteMedicationId === (medication._id || medication.id);
-
               return (
                 <View key={medication._id || medication.id} style={styles.doseCardContainer}>
                   <View style={styles.doseCard}>
@@ -242,29 +295,28 @@ export default function PatientMonitoringScreen({
                     {canSupportAdherence ? (
                       <View style={styles.resourceActions}>
                         <Pressable onPress={() => onEditMedication(medication)} style={styles.inlineAction}><Text style={styles.inlineActionText}>Edit</Text></Pressable>
-                        <Pressable onPress={() => setDeleteMedicationId(medication._id || medication.id)} style={styles.inlineDanger}><Text style={styles.inlineDangerText}>Delete</Text></Pressable>
+                        <Pressable
+                          onPress={() => setConfirmation({
+                            type: 'medication',
+                            item: medication,
+                            title: 'Delete medication?',
+                            message: 'This will remove this patient\'s medication and its related records where applicable.',
+                          })}
+                          style={styles.inlineDanger}
+                        >
+                          <Text style={styles.inlineDangerText}>Delete</Text>
+                        </Pressable>
                       </View>
                     ) : null}
                   </View>
-
-                  {isDeletingMedication ? (
-                    <View style={styles.inlineConfirmBox}>
-                      <Text style={styles.confirmTitle}>Delete medication?</Text>
-                      <Text style={styles.confirmText}>This will remove this patient's medication and its related records where applicable.</Text>
-                      <View style={styles.confirmActions}>
-                        <Pressable onPress={() => setDeleteMedicationId(null)} style={styles.cancelButton}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable>
-                        <Pressable onPress={() => handleDeleteMedication(medication)} style={styles.confirmDeleteButton} disabled={actionId === medication._id}>
-                          <Text style={styles.confirmDeleteText}>{actionId === medication._id ? 'Deleting...' : 'Delete'}</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : null}
                 </View>
               );
             })
           )}
         </View>
+        ) : null}
 
+        {selectedSection === 'doses' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dose History</Text>
           {doseHistory.length === 0 ? (
@@ -273,41 +325,41 @@ export default function PatientMonitoringScreen({
             </View>
           ) : doseHistory.slice(0, 20).map((dose) => {
             const medication = dose.medicationId || {};
-            const isDoseConfirmationOpen = doseConfirmAction?.doseId === dose._id;
 
             return (
               <View key={dose._id} style={styles.historyRowWrapper}>
                 <View style={styles.historyRow}>
                   <View style={styles.doseInfo}>
                     <Text style={styles.doseName}>{medication.name || 'Medication'}</Text>
-                    <Text style={styles.doseMeta}>{dose.scheduledDate} at {dose.scheduledTime}</Text>
+                    <Text style={styles.doseDate}>{dose.scheduledDate} at {dose.scheduledTime}</Text>
+                    <Text style={[styles.statusText, styles.statusInDetails, dose.status === 'taken' ? styles.success : dose.status === 'skipped' ? styles.skipped : dose.status === 'missed' ? styles.missed : styles.pending]}>
+                      {dose.status}
+                    </Text>
                   </View>
-                  <Text style={[styles.statusText, dose.status === 'taken' ? styles.success : dose.status === 'skipped' ? styles.skipped : dose.status === 'missed' ? styles.missed : styles.pending]}>{dose.status}</Text>
-                </View>
-
-                {canSupportAdherence && dose.status === 'pending' ? (
-                  <View style={styles.inlineDoseActions}>
-                    <Pressable onPress={() => setDoseConfirmAction({ doseId: dose._id, action: 'take' })} style={styles.takeButton}><Text style={styles.takeButtonText}>Take</Text></Pressable>
-                    <Pressable onPress={() => setDoseConfirmAction({ doseId: dose._id, action: 'skip' })} style={styles.skipButton}><Text style={styles.skipButtonText}>Skip</Text></Pressable>
-                  </View>
-                ) : null}
-
-                {isDoseConfirmationOpen ? (
-                  <View style={styles.inlineConfirmBox}>
-                    <Text style={styles.confirmTitle}>{doseConfirmAction.action === 'take' ? 'Mark dose as taken?' : 'Skip this dose?'}</Text>
-                    <View style={styles.confirmActions}>
-                      <Pressable onPress={() => setDoseConfirmAction(null)} style={styles.cancelButton}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable>
-                      <Pressable onPress={() => handleDoseAction(dose._id, doseConfirmAction.action)} style={styles.confirmDeleteButton} disabled={actionId === dose._id}>
-                        <Text style={styles.confirmDeleteText}>{actionId === dose._id ? 'Updating...' : doseConfirmAction.action === 'take' ? 'Take' : 'Skip'}</Text>
+                  {canSupportAdherence && dose.status === 'pending' ? (
+                    <View style={styles.inlineDoseActions}>
+                      <Pressable
+                        onPress={() => setConfirmation({ doseId: dose._id, action: 'take', type: 'dose', title: 'Mark dose as taken?', message: 'Confirm that this dose was taken.' })}
+                        style={styles.takeButton}
+                      >
+                        <Text style={styles.takeButtonText}>Take</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setConfirmation({ doseId: dose._id, action: 'skip', type: 'dose', title: 'Skip this dose?', message: 'Confirm that this dose should be skipped.' })}
+                        style={styles.skipButton}
+                      >
+                        <Text style={styles.skipButtonText}>Skip</Text>
                       </Pressable>
                     </View>
-                  </View>
-                ) : null}
+                  ) : null}
+                </View>
               </View>
             );
           })}
         </View>
+        ) : null}
 
+        {selectedSection === 'schedules' ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Schedules</Text>
@@ -342,20 +394,17 @@ export default function PatientMonitoringScreen({
                   {canSupportAdherence ? (
                     <View style={styles.resourceActions}>
                       <Pressable onPress={() => onEditSchedule(schedule)} style={styles.inlineAction}><Text style={styles.inlineActionText}>Edit</Text></Pressable>
-                      <Pressable onPress={() => setDeleteScheduleId(schedule._id || schedule.id)} style={styles.inlineDanger}><Text style={styles.inlineDangerText}>Delete</Text></Pressable>
-                    </View>
-                  ) : null}
-
-                  {deleteScheduleId === (schedule._id || schedule.id) ? (
-                    <View style={styles.inlineConfirmBox}>
-                      <Text style={styles.confirmTitle}>Delete schedule?</Text>
-                      <Text style={styles.confirmText}>This will remove this patient's schedule and related dose records where applicable.</Text>
-                      <View style={styles.confirmActions}>
-                        <Pressable onPress={() => setDeleteScheduleId(null)} style={styles.cancelButton}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable>
-                        <Pressable onPress={() => handleDeleteSchedule(schedule)} style={styles.confirmDeleteButton} disabled={actionId === (schedule._id || schedule.id)}>
-                          <Text style={styles.confirmDeleteText}>{actionId === (schedule._id || schedule.id) ? 'Deleting...' : 'Delete'}</Text>
-                        </Pressable>
-                      </View>
+                      <Pressable
+                        onPress={() => setConfirmation({
+                          type: 'schedule',
+                          item: schedule,
+                          title: 'Delete schedule?',
+                          message: 'This will remove this patient\'s schedule and related dose records where applicable.',
+                        })}
+                        style={styles.inlineDanger}
+                      >
+                        <Text style={styles.inlineDangerText}>Delete</Text>
+                      </Pressable>
                     </View>
                   ) : null}
                 </View>
@@ -363,65 +412,19 @@ export default function PatientMonitoringScreen({
             })
           )}
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Doses</Text>
-          {todayDoses.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>✅</Text>
-              <Text style={styles.emptyTitle}>No doses scheduled today.</Text>
-            </View>
-          ) : (
-            todayDoses.map((dose) => {
-              const med = dose.medicationId || {};
-              const isDoseConfirmationOpen = doseConfirmAction?.doseId === dose._id;
-
-              return (
-                <View key={dose._id} style={styles.doseCardContainer}>
-                  <View style={styles.doseCard}>
-                    <Text style={styles.doseTime}>{dose.scheduledTime || '--'}</Text>
-                    <View style={styles.doseInfo}>
-                      <Text style={styles.doseName}>{med.name || 'Medication'}</Text>
-                      <Text style={styles.doseMeta}>{med.dosage || 'Dose not specified'}</Text>
-                    </View>
-                    <Text style={[styles.statusText, dose.status === 'taken' ? styles.success : dose.status === 'skipped' ? styles.skipped : dose.status === 'missed' ? styles.missed : styles.pending]}>{dose.status || 'pending'}</Text>
-                    {canSupportAdherence && dose.status === 'pending' ? (
-                      <View style={styles.doseActions}>
-                        <Pressable
-                          onPress={() => setDoseConfirmAction({ doseId: dose._id, action: 'take' })}
-                          disabled={actionId === dose._id}
-                          style={[styles.takeButton, actionId === dose._id && styles.buttonDisabled]}
-                        >
-                          <Text style={styles.takeButtonText}>{actionId === dose._id ? '...' : 'Take'}</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => setDoseConfirmAction({ doseId: dose._id, action: 'skip' })}
-                          disabled={actionId === dose._id}
-                          style={[styles.skipButton, actionId === dose._id && styles.buttonDisabled]}
-                        >
-                          <Text style={styles.skipButtonText}>Skip</Text>
-                        </Pressable>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  {isDoseConfirmationOpen ? (
-                    <View style={styles.inlineConfirmBox}>
-                      <Text style={styles.confirmTitle}>{doseConfirmAction.action === 'take' ? 'Mark dose as taken?' : 'Skip this dose?'}</Text>
-                      <View style={styles.confirmActions}>
-                        <Pressable onPress={() => setDoseConfirmAction(null)} style={styles.cancelButton}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable>
-                        <Pressable onPress={() => handleDoseAction(dose._id, doseConfirmAction.action)} style={styles.confirmDeleteButton} disabled={actionId === dose._id}>
-                          <Text style={styles.confirmDeleteText}>{actionId === dose._id ? 'Updating...' : doseConfirmAction.action === 'take' ? 'Take' : 'Skip'}</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })
-          )}
-        </View>
+        ) : null}
       </ScrollView>
+
+      <ConfirmationDialog
+        visible={Boolean(confirmation)}
+        title={confirmation?.title || ''}
+        message={confirmation?.message || ''}
+        confirmLabel={confirmation?.type === 'dose' ? confirmation.action === 'take' ? 'Take dose' : 'Skip dose' : 'Delete'}
+        cancelLabel="Cancel"
+        danger={confirmation?.type !== 'dose'}
+        onConfirm={confirmAction}
+        onCancel={() => setConfirmation(null)}
+      />
     </View>
   );
 }
@@ -457,9 +460,32 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: 12, color: colors.textSecondary },
   summaryValue: { fontSize: 24, color: colors.text, fontWeight: '800', marginTop: 6 },
+  todayDosesBox: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    ...shadow.card,
+  },
+  todayDosesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  todayDosesTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
+  todayDosesCount: { color: colors.primary, fontSize: 18, fontWeight: '800' },
+  todayDosesEmpty: { color: colors.textSecondary, fontSize: 13 },
+  todayDoseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  todayDoseInfo: { flex: 1, paddingRight: spacing.sm },
+  todayDoseName: { color: colors.text, fontSize: 14, fontWeight: '700' },
+  todayDoseTime: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+  todayDoseStatus: { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  sectionFilter: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
+  sectionFilterButton: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.card },
+  sectionFilterButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  sectionFilterText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
+  sectionFilterTextActive: { color: colors.white },
   smallActionButton: { backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 7, paddingHorizontal: 12 },
   smallActionText: { color: colors.white, fontSize: 12, fontWeight: '800' },
   doseCard: {
@@ -480,6 +506,7 @@ const styles = StyleSheet.create({
   doseInfo: { flex: 1 },
   doseName: { fontSize: 15, fontWeight: '700', color: colors.text },
   doseMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  doseDate: { fontSize: 14, color: colors.textSecondary, marginTop: 3 },
   resourceActions: { marginLeft: spacing.sm, gap: 5 },
   inlineAction: { paddingVertical: 4, paddingHorizontal: 5 },
   inlineActionText: { color: colors.primary, fontSize: 11, fontWeight: '800' },
@@ -496,6 +523,7 @@ const styles = StyleSheet.create({
   confirmDeleteButton: { backgroundColor: colors.danger, borderRadius: radius.sm, paddingVertical: 8, paddingHorizontal: 12 },
   confirmDeleteText: { color: colors.white, fontWeight: '800' },
   statusText: { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
+  statusInDetails: { marginTop: 4 },
   success: { color: colors.success },
   skipped: { color: colors.skipped },
   missed: { color: colors.dangerText },

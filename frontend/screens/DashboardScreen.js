@@ -23,6 +23,7 @@ import {
   takeDose,
   skipDose,
 } from '../services/api';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 
 export default function DashboardScreen({
@@ -54,6 +55,8 @@ export default function DashboardScreen({
     setDoses,
   ] = useState([]);
 
+  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+
   const [
     loading,
     setLoading,
@@ -80,7 +83,11 @@ export default function DashboardScreen({
         isRefresh = false
       ) => {
 
+        const loadStart = performance.now();
+
         try {
+
+          console.log('[Dashboard] Mounted');
 
           if (isRefresh) {
             setRefreshing(true);
@@ -90,36 +97,32 @@ export default function DashboardScreen({
 
           setError('');
 
+          const medicationsStart = performance.now();
+          const medicationPromise = getMedications(token).then((data) => {
+            console.log(`[Dashboard] Medications: ${((performance.now() - medicationsStart)).toFixed(0)} ms`);
+            return data;
+          });
 
-          const medicationData =
-            await getMedications(
-              token
-            );
+          const generationAndRecordsPromise = (async () => {
+            const generateStart = performance.now();
+            await generateTodayDoses(token);
+            console.log(`[Dashboard] Dose generation: ${((performance.now() - generateStart)).toFixed(0)} ms`);
 
-          setMedications(
-            Array.isArray(
-              medicationData
-            )
-              ? medicationData
-              : []
-          );
+            const dosesStart = performance.now();
+            const doseData = await getDoseRecords(token);
+            console.log(`[Dashboard] Dose records: ${((performance.now() - dosesStart)).toFixed(0)} ms`);
+            return doseData;
+          })();
 
+          const [medicationData, doseData] = await Promise.all([
+            medicationPromise,
+            generationAndRecordsPromise,
+          ]);
 
-          await generateTodayDoses(
-            token
-          );
+          setMedications(Array.isArray(medicationData) ? medicationData : []);
+          setDoses(Array.isArray(doseData) ? doseData : []);
 
-
-          const doseData =
-            await getDoseRecords(
-              token
-            );
-
-          setDoses(
-            Array.isArray(doseData)
-              ? doseData
-              : []
-          );
+          console.log(`[Dashboard] Initialization: ${((performance.now() - loadStart)).toFixed(0)} ms`);
 
         } catch (err) {
 
@@ -640,29 +643,12 @@ export default function DashboardScreen({
         }
       >
 
-        <View
-          style={
-            styles.loadingLogo
-          }
-        >
-
-          <Text
-            style={
-              styles.loadingLogoText
-            }
-          >
-            💊
-          </Text>
-
-        </View>
-
-
         <Text
           style={
             styles.loadingTitle
           }
         >
-          MediSked
+          MedSked
         </Text>
 
 
@@ -699,21 +685,6 @@ export default function DashboardScreen({
     <View
       style={styles.container}
     >
-
-      {/* BACKGROUND */}
-
-      <View
-        style={
-          styles.backgroundCircleOne
-        }
-      />
-
-      <View
-        style={
-          styles.backgroundCircleTwo
-        }
-      />
-
 
       <ScrollView
 
@@ -792,7 +763,7 @@ export default function DashboardScreen({
 
           <Pressable
 
-            onPress={onLogout}
+            onPress={() => setShowLogoutConfirmation(true)}
 
             hitSlop={8}
 
@@ -818,6 +789,20 @@ export default function DashboardScreen({
           </Pressable>
 
         </View>
+
+        <ConfirmationDialog
+          visible={showLogoutConfirmation}
+          title="Log out?"
+          message="Are you sure you want to log out of MedSked?"
+          confirmLabel="Log Out"
+          cancelLabel="Cancel"
+          danger
+          onConfirm={() => {
+            setShowLogoutConfirmation(false);
+            onLogout();
+          }}
+          onCancel={() => setShowLogoutConfirmation(false)}
+        />
 
 
         {/* ERROR */}
@@ -1712,46 +1697,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#EEF5FA',
-  },
-
-
-  // ===================================================
-  // BACKGROUND
-  // ===================================================
-
-  backgroundCircleOne: {
-
-    position: 'absolute',
-
-    width: 240,
-    height: 240,
-
-    borderRadius: 120,
-
-    backgroundColor:
-      '#E0EFF7',
-
-    top: -130,
-    right: -100,
-
-  },
-
-  backgroundCircleTwo: {
-
-    position: 'absolute',
-
-    width: 180,
-    height: 180,
-
-    borderRadius: 90,
-
-    backgroundColor:
-      '#E5F2F8',
-
-    bottom: 100,
-    left: -100,
-
+      '#87CEEB',
   },
 
 
@@ -1767,7 +1713,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
 
     backgroundColor:
-      '#EEF5FA',
+      '#87CEEB',
 
   },
 

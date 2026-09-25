@@ -1,9 +1,18 @@
 const express = require('express');
 
 const Notification = require('../models/Notification');
+const { safeReadNotificationMessage } = require('../models/Notification');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
+
+const sanitizeNotification = (notification) => {
+  const raw = notification?.toObject({ getters: false }) || {};
+  return {
+    ...raw,
+    message: safeReadNotificationMessage(raw.message),
+  };
+};
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
@@ -11,7 +20,7 @@ router.get('/', authMiddleware, async (req, res) => {
       recipient: req.user.userId,
     }).sort({ createdAt: -1 });
 
-    res.json(notifications);
+    res.json(notifications.map(sanitizeNotification));
   } catch (error) {
     console.error('Get notifications error:', error);
     res.status(500).json({ message: 'Failed to retrieve notifications' });

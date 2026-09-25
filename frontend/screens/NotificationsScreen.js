@@ -94,7 +94,7 @@ export default function NotificationsScreen({ token, onBack }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />}
       >
         <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>Back</Text>
         </Pressable>
 
         <View style={styles.headerRow}>
@@ -118,13 +118,15 @@ export default function NotificationsScreen({ token, onBack }) {
           </View>
         ) : null}
 
-        {notifications.length === 0 ? (
+        {!error && notifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🔔</Text>
             <Text style={styles.emptyTitle}>No notifications</Text>
             <Text style={styles.emptyText}>Updates about caregiver requests, schedules, and refill stock will appear here.</Text>
           </View>
-        ) : notifications.map((notification) => (
+        ) : null}
+
+        {!error && notifications.length > 0 ? notifications.map((notification) => (
           <Pressable
             key={notification._id}
             onPress={() => !notification.read && markRead(notification._id)}
@@ -139,7 +141,7 @@ export default function NotificationsScreen({ token, onBack }) {
             <Text style={styles.timestamp}>{formatNotificationTime(notification.createdAt)}</Text>
             {!notification.read ? <Text style={styles.readHint}>Tap to mark as read</Text> : null}
           </Pressable>
-        ))}
+        )) : null}
       </ScrollView>
     </View>
   );

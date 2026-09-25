@@ -20,6 +20,7 @@ import {
 } from '../services/api';
 
 import { colors, radius, spacing, shadow } from '../theme';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function PatientConnectionsScreen({ token, onBack }) {
   const [caregivers, setCaregivers] = useState([]);
@@ -261,7 +262,7 @@ export default function PatientConnectionsScreen({ token, onBack }) {
       >
         <View style={styles.headerRow}>
           <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
         </View>
 
@@ -274,21 +275,6 @@ export default function PatientConnectionsScreen({ token, onBack }) {
             <Pressable onPress={() => loadConnections()}>
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
-          </View>
-        ) : null}
-
-        {confirmation ? (
-          <View style={styles.confirmationBox}>
-            <Text style={styles.confirmationTitle}>{confirmation.title}</Text>
-            <Text style={styles.confirmationMessage}>{confirmation.message}</Text>
-            <View style={styles.confirmationActions}>
-              <Pressable onPress={() => setConfirmation(null)} style={styles.confirmationCancel}>
-                <Text style={styles.confirmationCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={confirmConnectionAction} style={styles.confirmationConfirm}>
-                <Text style={styles.confirmationConfirmText}>{confirmation.type === 'revoke' ? 'Revoke' : 'Confirm'}</Text>
-              </Pressable>
-            </View>
           </View>
         ) : null}
 
@@ -318,6 +304,17 @@ export default function PatientConnectionsScreen({ token, onBack }) {
           )}
         </View>
       </ScrollView>
+
+      <ConfirmationDialog
+        visible={Boolean(confirmation)}
+        title={confirmation?.title || ''}
+        message={confirmation?.message || ''}
+        confirmLabel={confirmation?.type === 'revoke' ? 'Revoke access' : 'Confirm change'}
+        cancelLabel="Cancel"
+        danger={confirmation?.type === 'revoke'}
+        onConfirm={confirmConnectionAction}
+        onCancel={() => setConfirmation(null)}
+      />
     </View>
   );
 }
@@ -365,8 +362,15 @@ const styles = StyleSheet.create({
   permissionButtonActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
   permissionButtonText: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' },
   permissionButtonTextActive: { color: colors.primary },
-  revokeButton: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 5 },
-  revokeButtonText: { color: colors.dangerText, fontSize: 12, fontWeight: '800' },
+  revokeButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.sm,
+    backgroundColor: colors.danger,
+  },
+  revokeButtonText: { color: colors.white, fontSize: 12, fontWeight: '800' },
   actionRow: { flexDirection: 'row', marginTop: 12, gap: 10 },
   primaryButton: {
     flex: 1,

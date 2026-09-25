@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -25,6 +26,10 @@ import {
   getPatientMedications,
   updateSchedule,
 } from '../services/api';
+import {
+  parseLocalDate,
+  validateScheduleFields,
+} from '../utils/scheduleValidation';
 
 export default function EditScheduleScreen({
   token,
@@ -32,6 +37,7 @@ export default function EditScheduleScreen({
   patientId,
   onScheduleUpdated,
   onCancel,
+  autoReturnOnSuccess = false,
 }) {
   // =====================================================
   // STATE
@@ -44,6 +50,29 @@ export default function EditScheduleScreen({
       schedule?.medicationId ||
       ''
   );
+
+  const todayDate = new Date();
+  const todayStart = new Date(
+    todayDate.getFullYear(),
+    todayDate.getMonth(),
+    todayDate.getDate()
+  );
+  const isWeb = Platform.OS === 'web';
+
+  const parseWebDateValue = (value) => {
+    if (!value) {
+      return null;
+    }
+
+    const [year, month, day] = value.split('-').map(Number);
+    const nextDate = new Date(year, month - 1, day);
+
+    if (Number.isNaN(nextDate.getTime())) {
+      return null;
+    }
+
+    return nextDate;
+  };
 
   const [timeSelection, setTimeSelection] = useState(
     parse24HourTime(schedule?.time)
@@ -61,13 +90,13 @@ export default function EditScheduleScreen({
 
   const [startDate, setStartDate] = useState(
     schedule?.startDate
-      ? new Date(schedule.startDate)
+      ? parseLocalDate(schedule.startDate)
       : new Date()
   );
 
   const [endDate, setEndDate] = useState(
     schedule?.endDate
-      ? new Date(schedule.endDate)
+      ? parseLocalDate(schedule.endDate)
       : null
   );
 
@@ -129,7 +158,7 @@ export default function EditScheduleScreen({
   }, [token, patientId]);
 
   // =====================================================
-  // UPDATE FORM WHEN SCHEDULE CHANGES
+  // INITIALIZE FROM THE SELECTED SCHEDULE
   // =====================================================
 
   useEffect(() => {
@@ -137,42 +166,66 @@ export default function EditScheduleScreen({
       return;
     }
 
-    setMedicationId(
+    const resolvedMedicationId =
       schedule?.medicationId?._id ||
-        schedule?.medicationId ||
-        ''
-    );
+      schedule?.medicationId ||
+      '';
 
+    const scheduleMedication =
+      medications.find(
+        (medication) => medication._id === resolvedMedicationId
+      ) || null;
+
+    setMedicationId(resolvedMedicationId);
     setTimeSelection(
       parse24HourTime(schedule?.time)
     );
-
     setDose(
-      schedule?.dose || ''
+      scheduleMedication?.dosage || schedule?.dose || ''
     );
-
     setDays(
       Array.isArray(schedule?.days)
         ? schedule.days
         : []
     );
-
     setStartDate(
       schedule?.startDate
-        ? new Date(schedule.startDate)
+        ? parseLocalDate(schedule.startDate)
         : new Date()
     );
-
     setEndDate(
       schedule?.endDate
-        ? new Date(schedule.endDate)
+        ? parseLocalDate(schedule.endDate)
         : null
     );
-
     setEnabled(
       schedule?.enabled !== false
     );
-  }, [schedule]);
+  }, [
+    schedule?._id,
+    schedule?.medicationId,
+    schedule?.time,
+    schedule?.dose,
+    schedule?.days,
+    schedule?.startDate,
+    schedule?.endDate,
+    schedule?.enabled,
+  ]);
+
+  useEffect(() => {
+    if (!medicationId) {
+      setDose('');
+      return;
+    }
+
+    const selectedMedication = medications.find(
+      (medication) => medication._id === medicationId
+    );
+
+    if (selectedMedication) {
+      setDose(selectedMedication.dosage || '');
+    }
+  }, [medicationId, medications]);
 
   // =====================================================
   // FORMAT DATE
@@ -209,8 +262,22 @@ export default function EditScheduleScreen({
   ) => {
     setShowStartDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
-      setStartDate(selectedDate);
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+
+      if (nextDate < todayStart) {
+        return;
+      }
+
+      setStartDate(nextDate);
     }
   };
 
@@ -224,8 +291,30 @@ export default function EditScheduleScreen({
   ) => {
     setShowEndDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
-      setEndDate(selectedDate);
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+
+      if (nextDate < todayStart) {
+        return;
+      }
+
+      if (startDate && nextDate < new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+      )) {
+        return;
+      }
+
+      setEndDate(nextDate);
     }
   };
 
@@ -254,126 +343,64 @@ export default function EditScheduleScreen({
   // =====================================================
 
   const handleUpdate = async () => {
-    // ---------------------------------------------------
-    // MEDICATION VALIDATION
-    // ---------------------------------------------------
+    const selectedMedication = medications.find(
+      (medication) => medication._id === medicationId
+    );
+    const medicationDose = (selectedMedication?.dosage || dose || '').trim();
 
-    if (!medicationId) {
-      Alert.alert(
-        'Missing Medication',
-        'Please select a medication.'
-      );
+    const updatedSchedule = {
+      medicationId,
+      time: timeSelection
+        ? to24HourTime(
+          timeSelection.hour,
+          timeSelection.minute,
+          timeSelection.period
+        )
+        : '',
+      dose: medicationDose,
+      days,
+      startDate: formatDate(startDate),
+      endDate: endDate ? formatDate(endDate) : null,
+      enabled,
+    };
 
+    const scheduleError = validateScheduleFields(updatedSchedule);
+    if (scheduleError) {
+      Alert.alert('Invalid Schedule', scheduleError);
       return;
     }
-
-    // ---------------------------------------------------
-    // TIME VALIDATION
-    // ---------------------------------------------------
-
-    if (!timeSelection) {
-      Alert.alert(
-        'Missing Time',
-        'Please select a medication time.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // DOSE VALIDATION
-    // ---------------------------------------------------
-
-    if (!dose || !dose.trim()) {
-      Alert.alert(
-        'Missing Dose',
-        'Please enter the medication dose.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // DAYS VALIDATION
-    // ---------------------------------------------------
-
-    if (
-      !Array.isArray(days) ||
-      days.length === 0
-    ) {
-      Alert.alert(
-        'Missing Days',
-        'Please select at least one day.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // START DATE VALIDATION
-    // ---------------------------------------------------
-
-    if (!startDate) {
-      Alert.alert(
-        'Missing Start Date',
-        'Please select a start date.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // END DATE VALIDATION
-    // ---------------------------------------------------
-
-    if (
-      endDate &&
-      endDate < startDate
-    ) {
-      Alert.alert(
-        'Invalid End Date',
-        'End date cannot be earlier than the start date.'
-      );
-
-      return;
-    }
-
-    // ---------------------------------------------------
-    // SAVE
-    // ---------------------------------------------------
 
     setSaving(true);
 
     try {
-      const updatedSchedule = {
-        medicationId,
-        time: to24HourTime(
-          timeSelection.hour,
-          timeSelection.minute,
-          timeSelection.period
-        ),
-        dose: dose.trim(),
-        days,
-        startDate:
-          formatDate(startDate),
-        endDate:
-          endDate
-            ? formatDate(endDate)
-            : null,
-        enabled,
-      };
-
       console.log(
-        'Updating schedule:',
-        updatedSchedule
+        '[Schedule][Frontend] Preparing update',
+        {
+          scheduleId: schedule?._id,
+          patientId,
+          payload: updatedSchedule,
+        }
       );
 
-      await updateSchedule(
+      const response = await updateSchedule(
         token,
         schedule._id,
         updatedSchedule,
         patientId
       );
+
+      console.log(
+        '[Schedule][Frontend] Update successful',
+        {
+          scheduleId: schedule?._id,
+          patientId,
+          result: response,
+        }
+      );
+
+      if (autoReturnOnSuccess && onScheduleUpdated) {
+        onScheduleUpdated();
+      }
 
       Alert.alert(
         'Success',
@@ -381,14 +408,17 @@ export default function EditScheduleScreen({
         [
           {
             text: 'OK',
-            onPress:
-              onScheduleUpdated,
+            onPress: () => {
+              if (!autoReturnOnSuccess && onScheduleUpdated) {
+                onScheduleUpdated();
+              }
+            },
           },
         ]
       );
     } catch (error) {
       console.error(
-        'Update schedule error:',
+        '[Schedule][Frontend] Update error',
         error
       );
 
@@ -407,7 +437,14 @@ export default function EditScheduleScreen({
   // =====================================================
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : 'height'
+      }
+    >
 
       {/* HEADER */}
 
@@ -419,7 +456,7 @@ export default function EditScheduleScreen({
           disabled={saving}
         >
           <Text style={styles.backText}>
-            ← Back
+            Back
           </Text>
         </Pressable>
 
@@ -468,13 +505,11 @@ export default function EditScheduleScreen({
                       medication._id &&
                       styles.selectedOption,
                   ]}
-                  onPress={() =>
-                    setMedicationId(
-                      medication._id
-                    )
-                  }
+                  onPress={() => {
+                    setMedicationId(medication._id);
+                    setDose(medication.dosage || '');
+                  }}
                 >
-
                   <Text
                     style={[
                       styles.medicationName,
@@ -541,12 +576,14 @@ export default function EditScheduleScreen({
         </Text>
 
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, styles.readOnlyInput]}
           value={dose}
-          onChangeText={setDose}
-          placeholder="e.g. 1 tablet"
+          placeholder="Medication dose will appear here"
           placeholderTextColor="#9CA3AF"
           autoCapitalize="none"
+          editable={false}
+          selectTextOnFocus={false}
+          pointerEvents="none"
         />
 
         {/* =================================================
@@ -597,35 +634,57 @@ export default function EditScheduleScreen({
           Start Date
         </Text>
 
-        <Pressable
-          style={styles.inputButton}
-          onPress={() =>
-            setShowStartDatePicker(true)
-          }
-        >
+        {isWeb ? (
+          <input
+            type="date"
+            value={formatDate(startDate)}
+            min={formatDate(todayStart)}
+            onChange={(event) => {
+              const nextDate = parseWebDateValue(event.target.value);
 
-          <Text style={styles.inputText}>
-            {formatDate(startDate)}
-          </Text>
+              if (!nextDate || nextDate < todayStart) {
+                return;
+              }
 
-        </Pressable>
-
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={
-              startDate || new Date()
-            }
-            mode="date"
-            display={
-              Platform.OS === 'ios'
-                ? 'spinner'
-                : 'default'
-            }
-            onValueChange={
-              (event, selectedDate) =>
-                handleStartDateChange(event, selectedDate)
-            }
+              setStartDate(nextDate);
+            }}
+            disabled={saving}
+            style={styles.webDateInput}
           />
+        ) : (
+          <>
+            <Pressable
+              style={styles.inputButton}
+              onPress={() =>
+                setShowStartDatePicker(true)
+              }
+            >
+
+              <Text style={styles.inputText}>
+                {formatDate(startDate)}
+              </Text>
+
+            </Pressable>
+
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={
+                  startDate || new Date()
+                }
+                mode="date"
+                minimumDate={todayStart}
+                display={
+                  Platform.OS === 'ios'
+                    ? 'spinner'
+                    : 'default'
+                }
+                onValueChange={(selectedDate) =>
+                  handleStartDateChange(undefined, selectedDate)
+                }
+                onDismiss={() => setShowStartDatePicker(false)}
+              />
+            )}
+          </>
         )}
 
         {/* =================================================
@@ -636,44 +695,87 @@ export default function EditScheduleScreen({
           End Date
         </Text>
 
-        <Pressable
-          style={styles.inputButton}
-          onPress={() =>
-            setShowEndDatePicker(true)
-          }
-        >
+        {isWeb ? (
+          <input
+            type="date"
+            value={endDate ? formatDate(endDate) : ''}
+            min={
+              startDate > todayStart
+                ? formatDate(startDate)
+                : formatDate(todayStart)
+            }
+            onChange={(event) => {
+              const nextDate = parseWebDateValue(event.target.value);
 
-          <Text
-            style={
-              endDate
-                ? styles.inputText
-                : styles.placeholderText
-            }
-          >
-            {endDate
-              ? formatDate(endDate)
-              : 'No end date'}
-          </Text>
+              if (!nextDate) {
+                return;
+              }
 
-        </Pressable>
+              if (nextDate < todayStart) {
+                return;
+              }
 
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={
-              endDate ||
-              new Date()
-            }
-            mode="date"
-            display={
-              Platform.OS === 'ios'
-                ? 'spinner'
-                : 'default'
-            }
-            onValueChange={
-              (event, selectedDate) =>
-                handleEndDateChange(event, selectedDate)
-            }
+              if (startDate && nextDate < new Date(
+                startDate.getFullYear(),
+                startDate.getMonth(),
+                startDate.getDate()
+              )) {
+                return;
+              }
+
+              setEndDate(nextDate);
+            }}
+            disabled={saving}
+            style={styles.webDateInput}
           />
+        ) : (
+          <>
+            <Pressable
+              style={styles.inputButton}
+              onPress={() =>
+                setShowEndDatePicker(true)
+              }
+            >
+
+              <Text
+                style={
+                  endDate
+                    ? styles.inputText
+                    : styles.placeholderText
+                }
+              >
+                {endDate
+                  ? formatDate(endDate)
+                  : 'No end date'}
+              </Text>
+
+            </Pressable>
+
+            {showEndDatePicker && (
+              <View style={styles.pickerContainer}>
+                <DateTimePicker
+                  value={
+                    endDate ||
+                    startDate ||
+                    new Date()
+                  }
+                  mode="date"
+                  minimumDate={
+                    startDate > todayStart
+                      ? startDate
+                      : todayStart
+                  }
+                  display={
+                    Platform.OS === 'ios'
+                      ? 'spinner'
+                      : 'default'
+                  }
+                  onValueChange={handleEndDateChange}
+                  onDismiss={() => setShowEndDatePicker(false)}
+                />
+              </View>
+            )}
+          </>
         )}
 
         {/* =================================================
@@ -759,7 +861,7 @@ export default function EditScheduleScreen({
 
       </ScrollView>
 
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -771,7 +873,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
   },
 
   header: {
@@ -871,6 +973,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  webDateInput: {
+    width: '100%',
+    minHeight: 50,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D9DEE8',
+    borderRadius: 10,
+    borderWidth: 1,
+    color: '#1E2A4A',
+    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    boxSizing: 'border-box',
+  },
+
   inputText: {
     fontSize: 15,
     color: '#1E2A4A',
@@ -898,6 +1014,11 @@ const styles = StyleSheet.create({
     minHeight: 50,
     fontSize: 15,
     color: '#1E2A4A',
+  },
+
+  readOnlyInput: {
+    backgroundColor: '#F3F7FB',
+    color: '#4B5563',
   },
 
   daysContainer: {

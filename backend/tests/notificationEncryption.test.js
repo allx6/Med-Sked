@@ -5,6 +5,9 @@ process.env.ENCRYPTION_KEY = Buffer.alloc(32, 'A').toString('base64');
 
 const Notification = require('../models/Notification');
 const {
+  safeReadNotificationMessage,
+} = require('../models/Notification');
+const {
   decrypt,
   encrypt,
 } = require('../services/encryptionService');
@@ -93,4 +96,16 @@ test('tampered notification ciphertext is rejected', () => {
   ).toString('base64')}`;
 
   assert.throws(() => notification.message, /Unable to decrypt/);
+});
+
+test('legacy or malformed notification payloads are sanitized without exposing plaintext', () => {
+  assert.equal(
+    safeReadNotificationMessage('enc:not-valid-ciphertext'),
+    '[Encrypted notification unavailable]'
+  );
+
+  assert.equal(
+    safeReadNotificationMessage('plain text notification'),
+    '[Encrypted notification unavailable]'
+  );
 });

@@ -9,6 +9,8 @@ import {
   RefreshControl,
   Alert,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import {
@@ -169,7 +171,14 @@ export default function CaregiverConnectionsScreen({ token, onBack, onOpenPatien
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : 'height'
+      }
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadConnections(true)} tintColor={colors.primary} />}
@@ -177,7 +186,7 @@ export default function CaregiverConnectionsScreen({ token, onBack, onOpenPatien
       >
         <View style={styles.headerRow}>
           <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>← Back</Text>
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
         </View>
 
@@ -261,7 +270,7 @@ export default function CaregiverConnectionsScreen({ token, onBack, onOpenPatien
           )}
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

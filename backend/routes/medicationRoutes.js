@@ -7,6 +7,7 @@ const {
   isValidObjectId,
   pickAllowedFields,
   containsMongoOperatorPayload,
+  validateMedicationFields,
 } = require('../utils/validation');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -69,6 +70,13 @@ const validateMedicationPayload = (payload) => {
 
   if (!filtered) {
     const error = new Error('Unexpected medication fields');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const validationError = validateMedicationFields(filtered);
+  if (validationError) {
+    const error = new Error(validationError);
     error.statusCode = 400;
     throw error;
   }
@@ -281,7 +289,9 @@ const createMedicationForOwner = async (req, res) => {
     return res.status(201).json(medication);
   } catch (error) {
     console.error('Create medication error:', error);
-    return res.status(error.statusCode || 500).json({ message: 'Failed to create medication' });
+    return res.status(error.statusCode || 500).json({
+      message: error.statusCode ? error.message : 'Failed to create medication',
+    });
   }
 };
 
@@ -400,10 +410,7 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
     );
 
     res.status(error.statusCode || 500).json({
-
-      message:
-        'Failed to update medication',
-
+      message: error.statusCode ? error.message : 'Failed to update medication',
     });
 
   }

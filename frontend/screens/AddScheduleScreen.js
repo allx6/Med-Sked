@@ -11,6 +11,7 @@ import {
   ScrollView,
   Switch,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -26,6 +27,7 @@ import {
   getPatientMedications,
   createSchedule,
 } from '../services/api';
+import { validateScheduleFields } from '../utils/scheduleValidation';
 
 
 export default function AddScheduleScreen({
@@ -33,6 +35,7 @@ export default function AddScheduleScreen({
   patientId,
   onScheduleAdded,
   onCancel,
+  autoReturnOnSuccess = false,
 }) {
 
   // =====================================================
@@ -223,9 +226,31 @@ export default function AddScheduleScreen({
 
   const selectMedication = (medication) => {
     setSelectedMedication(medication);
-    setDose(medication.dosage || '');
+    setDose(medication?.dosage || '');
   };
 
+  const todayDate = new Date();
+  const todayStart = new Date(
+    todayDate.getFullYear(),
+    todayDate.getMonth(),
+    todayDate.getDate()
+  );
+  const isWeb = Platform.OS === 'web';
+
+  const parseWebDateValue = (value) => {
+    if (!value) {
+      return null;
+    }
+
+    const [year, month, day] = value.split('-').map(Number);
+    const nextDate = new Date(year, month - 1, day);
+
+    if (Number.isNaN(nextDate.getTime())) {
+      return null;
+    }
+
+    return nextDate;
+  };
 
   // =====================================================
   // START DATE PICKER
@@ -238,24 +263,22 @@ export default function AddScheduleScreen({
 
     setShowStartDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
 
-      setStartDate(selectedDate);
-
-      // If the current end date is
-      // before the new start date,
-      // clear it.
-
-      if (
-        endDate &&
-        selectedDate > endDate
-      ) {
-
-        setEndDate(null);
-        setHasEndDate(false);
-
+      if (nextDate < todayStart) {
+        return;
       }
 
+      setStartDate(nextDate);
     }
 
   };
@@ -272,8 +295,30 @@ export default function AddScheduleScreen({
 
     setShowEndDatePicker(false);
 
+    if (event?.type === 'dismissed') {
+      return;
+    }
+
     if (selectedDate) {
-      setEndDate(selectedDate);
+      const nextDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+
+      if (nextDate < todayStart) {
+        return;
+      }
+
+      if (startDate && nextDate < new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+      )) {
+        return;
+      }
+
+      setEndDate(nextDate);
     }
 
   };
@@ -285,92 +330,13 @@ export default function AddScheduleScreen({
 
   const handleSave = async () => {
 
-    // ---------------------------------------------------
-    // VALIDATE MEDICATION
-    // ---------------------------------------------------
+    const medicationDose =
+      (selectedMedication?.dosage || dose || '').trim();
 
-    if (!selectedMedication) {
-
-      Alert.alert(
-        'Missing Medication',
-        'Please select a medication.'
-      );
-
-      return;
-
-    }
-
-    if (!dose.trim()) {
-
-      Alert.alert(
-        'Missing Dose',
-        'Please enter the medication dose.'
-      );
-
-      return;
-
-    }
-
-
-    // ---------------------------------------------------
-    // VALIDATE DAYS
-    // ---------------------------------------------------
-
-    if (selectedDays.length === 0) {
-
-      Alert.alert(
-        'Missing Days',
-        'Please select at least one day.'
-      );
-
-      return;
-
-    }
-
-
-    // ---------------------------------------------------
-    // VALIDATE END DATE
-    // ---------------------------------------------------
-
-    if (
-      hasEndDate &&
-      !endDate
-    ) {
-
-      Alert.alert(
-        'Missing End Date',
-        'Please select an end date.'
-      );
-
-      return;
-
-    }
-
-
-    if (
-      hasEndDate &&
-      endDate < startDate
-    ) {
-
-      Alert.alert(
-        'Invalid Date',
-        'End date cannot be before the start date.'
-      );
-
-      return;
-
-    }
-
-
-    try {
-
-      setSaving(true);
-
-
-      const schedule = {
+    const schedule = {
 
         medicationId:
-          selectedMedication._id,
+          selectedMedication?._id || '',
 
         time:
           to24HourTime(
@@ -380,7 +346,7 @@ export default function AddScheduleScreen({
           ),
 
         dose:
-          dose.trim(),
+          medicationDose,
 
         days:
           selectedDays,
@@ -397,13 +363,40 @@ export default function AddScheduleScreen({
 
       };
 
+    const scheduleError = validateScheduleFields(schedule);
+    if (scheduleError) {
+      Alert.alert('Invalid Schedule', scheduleError);
+      return;
+    }
 
-      await createSchedule(
+    try {
+      setSaving(true);
+
+      console.log(
+        '[Schedule][Frontend] Preparing add',
+        {
+          patientId,
+          payload: schedule,
+        }
+      );
+
+      const response = await createSchedule(
         token,
         schedule,
         patientId
       );
 
+      console.log(
+        '[Schedule][Frontend] Add successful',
+        {
+          patientId,
+          result: response,
+        }
+      );
+
+      if (autoReturnOnSuccess && onScheduleAdded) {
+        onScheduleAdded();
+      }
 
       Alert.alert(
         'Success',
@@ -412,11 +405,9 @@ export default function AddScheduleScreen({
           {
             text: 'OK',
             onPress: () => {
-
-              if (onScheduleAdded) {
+              if (!autoReturnOnSuccess && onScheduleAdded) {
                 onScheduleAdded();
               }
-
             },
           },
         ]
@@ -426,7 +417,7 @@ export default function AddScheduleScreen({
     } catch (error) {
 
       console.error(
-        'Create schedule error:',
+        '[Schedule][Frontend] Add error',
         error
       );
 
@@ -451,13 +442,20 @@ export default function AddScheduleScreen({
 
   return (
 
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.container}
-      contentContainerStyle={
-        styles.content
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : 'height'
       }
-      keyboardShouldPersistTaps="handled"
     >
+      <ScrollView
+        contentContainerStyle={
+          styles.content
+        }
+        keyboardShouldPersistTaps="handled"
+      >
 
       {/* =================================================
           HEADER
@@ -471,7 +469,7 @@ export default function AddScheduleScreen({
         >
 
           <Text style={styles.backText}>
-            ← Back
+            Back
           </Text>
 
         </Pressable>
@@ -638,12 +636,13 @@ export default function AddScheduleScreen({
       </Text>
 
       <TextInput
-        style={styles.input}
+        style={[styles.input, styles.readOnlyInput]}
         value={dose}
-        onChangeText={setDose}
-        placeholder="e.g. 1 tablet or 500 mg"
+        placeholder="Select a medication to populate the dose"
         placeholderTextColor="#9AA3AF"
-        editable={!saving}
+        editable={false}
+        selectTextOnFocus={false}
+        pointerEvents="none"
       />
 
 
@@ -708,44 +707,66 @@ export default function AddScheduleScreen({
         Start Date
       </Text>
 
-      <Pressable
-        style={styles.inputButton}
-        onPress={() =>
-          setShowStartDatePicker(true)
-        }
-      >
+      {isWeb ? (
+        <input
+          type="date"
+          value={formatDate(startDate)}
+          min={formatDate(todayStart)}
+          onChange={(event) => {
+            const nextDate = parseWebDateValue(event.target.value);
 
-        <Text style={styles.inputIcon}>
-          📅
-        </Text>
-
-        <Text style={styles.inputButtonText}>
-          {formatDate(startDate)}
-        </Text>
-
-      </Pressable>
-
-
-      {showStartDatePicker && (
-
-        <View style={styles.pickerContainer}>
-
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            display={
-              Platform.OS === 'ios'
-                ? 'spinner'
-                : 'default'
+            if (!nextDate || nextDate < todayStart) {
+              return;
             }
-            onValueChange={
-              (event, selectedDate) =>
-                handleStartDateChange(event, selectedDate)
+
+            setStartDate(nextDate);
+          }}
+          disabled={saving}
+          style={styles.webDateInput}
+        />
+      ) : (
+        <>
+          <Pressable
+            style={styles.inputButton}
+            onPress={() =>
+              setShowStartDatePicker(true)
             }
-          />
+          >
 
-        </View>
+            <Text style={styles.inputIcon}>
+              📅
+            </Text>
 
+            <Text style={styles.inputButtonText}>
+              {formatDate(startDate)}
+            </Text>
+
+          </Pressable>
+
+
+          {showStartDatePicker && (
+
+            <View style={styles.pickerContainer}>
+
+              <DateTimePicker
+                value={startDate}
+                mode="date"
+                minimumDate={todayStart}
+                display={
+                  Platform.OS === 'ios'
+                    ? 'spinner'
+                    : 'default'
+                }
+                onValueChange={(selectedDate) =>
+                  handleStartDateChange(undefined, selectedDate)
+                }
+                onDismiss={() => setShowStartDatePicker(false)}
+              />
+
+            </View>
+
+          )}
+        </>
       )}
 
 
@@ -785,57 +806,95 @@ export default function AddScheduleScreen({
 
       {hasEndDate && (
 
-        <>
-
-          <Pressable
-            style={styles.inputButton}
-            onPress={() =>
-              setShowEndDatePicker(true)
+        isWeb ? (
+          <input
+            type="date"
+            value={endDate ? formatDate(endDate) : ''}
+            min={
+              startDate > todayStart
+                ? formatDate(startDate)
+                : formatDate(todayStart)
             }
-          >
+            onChange={(event) => {
+              const nextDate = parseWebDateValue(event.target.value);
 
-            <Text style={styles.inputIcon}>
-              📅
-            </Text>
+              if (!nextDate) {
+                return;
+              }
 
-            <Text style={styles.inputButtonText}>
+              if (nextDate < todayStart) {
+                return;
+              }
 
-              {endDate
-                ? formatDate(endDate)
-                : 'Select end date'}
+              if (startDate && nextDate < new Date(
+                startDate.getFullYear(),
+                startDate.getMonth(),
+                startDate.getDate()
+              )) {
+                return;
+              }
 
-            </Text>
+              setEndDate(nextDate);
+            }}
+            disabled={saving}
+            style={styles.webDateInput}
+          />
+        ) : (
+          <>
 
-          </Pressable>
+            <Pressable
+              style={styles.inputButton}
+              onPress={() =>
+                setShowEndDatePicker(true)
+              }
+            >
+
+              <Text style={styles.inputIcon}>
+                📅
+              </Text>
+
+              <Text style={styles.inputButtonText}>
+
+                {endDate
+                  ? formatDate(endDate)
+                  : 'Select end date'}
+
+              </Text>
+
+            </Pressable>
 
 
-          {showEndDatePicker && (
+            {showEndDatePicker && (
 
-            <View style={styles.pickerContainer}>
+              <View style={styles.pickerContainer}>
 
-              <DateTimePicker
-                value={
-                  endDate ||
-                  startDate
-                }
-                mode="date"
-                minimumDate={startDate}
-                display={
-                  Platform.OS === 'ios'
-                    ? 'spinner'
-                    : 'default'
-                }
-                onValueChange={
-                  (event, selectedDate) =>
-                    handleEndDateChange(event, selectedDate)
-                }
-              />
+                <DateTimePicker
+                  value={
+                    endDate ||
+                    startDate ||
+                    new Date()
+                  }
+                  mode="date"
+                  minimumDate={
+                    startDate > todayStart
+                      ? startDate
+                      : todayStart
+                  }
+                  display={
+                    Platform.OS === 'ios'
+                      ? 'spinner'
+                      : 'default'
+                  }
+                  onValueChange={handleEndDateChange}
+                  onDismiss={() => setShowEndDatePicker(false)}
+                />
 
-            </View>
+              </View>
 
-          )}
+            )}
 
-        </>
+          </>
+        )
 
       )}
 
@@ -913,7 +972,8 @@ export default function AddScheduleScreen({
 
       </Pressable>
 
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
 
   );
 
@@ -928,7 +988,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#F6F7FB',
+    backgroundColor: '#87CEEB',
   },
 
   content: {
@@ -1078,6 +1138,20 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
 
+  webDateInput: {
+    width: '100%',
+    minHeight: 52,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    borderWidth: 1,
+    color: '#1E2A4A',
+    fontSize: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    boxSizing: 'border-box',
+  },
+
   inputIcon: {
     fontSize: 18,
     marginRight: 10,
@@ -1105,6 +1179,11 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     fontSize: 15,
     color: '#1E2A4A',
+  },
+
+  readOnlyInput: {
+    backgroundColor: '#F3F7FB',
+    color: '#4B5563',
   },
 
   pickerContainer: {
