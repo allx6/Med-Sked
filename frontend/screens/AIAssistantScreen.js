@@ -33,6 +33,34 @@ const caregiverSuggestions = [
   'Which medicines have low supply?',
 ];
 
+const formatAssistantMessage = (content) => {
+  if (!content) {
+    return '';
+  }
+
+  const normalized = String(content)
+    .replace(/\r\n/g, '\n')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+    .trim();
+
+  return normalized
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trimStart();
+
+      if (/^[-*]\s+/.test(trimmed)) {
+        return `• ${trimmed.replace(/^[-*]\s+/, '')}`;
+      }
+
+      return line;
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
 export default function AIAssistantScreen({
   token,
   userRole,
@@ -158,7 +186,9 @@ export default function AIAssistantScreen({
                   message.role === 'user' ? styles.userText : styles.assistantText,
                 ]}
               >
-                {message.content}
+                {message.role === 'assistant'
+                  ? formatAssistantMessage(message.content)
+                  : message.content}
               </Text>
             </View>
           </View>

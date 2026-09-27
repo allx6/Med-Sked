@@ -70,6 +70,13 @@ test('AI system instruction contains the medication safety boundaries', () => {
   assert.match(AI_SYSTEM_INSTRUCTION, /untrusted input/i);
 });
 
+test('AI system instruction distinguishes general medication definitions from MedSked patient data', () => {
+  assert.match(AI_SYSTEM_INSTRUCTION, /general medication definition/i);
+  assert.match(AI_SYSTEM_INSTRUCTION, /MedSked patient data/i);
+  assert.match(AI_SYSTEM_INSTRUCTION, /What is cetirizine\?/i);
+  assert.match(AI_SYSTEM_INSTRUCTION, /What dosage of cetirizine do I have\?/i);
+});
+
 test('patient AI scope comes from the JWT and returns only the answer', async () => {
   const response = createResponse();
   let receivedPatientId;
