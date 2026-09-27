@@ -18,6 +18,9 @@ const toPercent = (value) => {
   return Number(value.toFixed(2));
 };
 
+const formatPercent = (value) => `${toPercent(value)}%`;
+const formatNumber = (value) => Number(value || 0).toLocaleString();
+
 const DashboardCard = ({ title, children }) => (
   <div className="panel chart-panel">
     <h3>{title}</h3>
@@ -230,6 +233,17 @@ export default function AnalyticsPage() {
     ];
   }, [data]);
 
+  const analyticsSummary = useMemo(() => {
+    const trend = trendChart.filter((item) => Number.isFinite(item.adherence));
+    const latest = trend[trend.length - 1]?.adherence ?? 0;
+    const first = trend[0]?.adherence ?? latest;
+    const bestTime = [...timeOfDayChart].sort((a, b) => b.adherence - a.adherence)[0];
+    const weakestRegimen = [...regimenChart].sort((a, b) => a.adherence - b.adherence)[0];
+    const missed = doseChart.find((item) => item.status === 'Missed')?.count || 0;
+
+    return { latest, change: latest - first, bestTime, weakestRegimen, missed };
+  }, [doseChart, regimenChart, timeOfDayChart, trendChart]);
+
   if (loading) {
     return (
       <div className="page-stack">
@@ -262,8 +276,9 @@ export default function AnalyticsPage() {
     <div className="page-stack">
       <div className="panel page-header">
         <div>
-          <p className="eyebrow">Overview</p>
+          <p className="eyebrow">Decision support</p>
           <h2>Analytics</h2>
+          <p className="page-intro">Explore adherence and medication activity over the selected period.</p>
         </div>
         <div className="segmented-control">
           {[7, 30, 90].map((option) => (
@@ -276,6 +291,31 @@ export default function AnalyticsPage() {
               {option} days
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="analytics-summary" aria-label="Analytics summary">
+        <div className="summary-highlight">
+          <span>Latest adherence</span>
+          <strong>{formatPercent(analyticsSummary.latest)}</strong>
+          <small className={analyticsSummary.change >= 0 ? 'trend-positive' : 'trend-negative'}>
+            {analyticsSummary.change >= 0 ? '↑' : '↓'} {Math.abs(toPercent(analyticsSummary.change))}% vs period start
+          </small>
+        </div>
+        <div className="summary-highlight">
+          <span>Missed doses</span>
+          <strong>{formatNumber(analyticsSummary.missed)}</strong>
+          <small>Across the selected dose data</small>
+        </div>
+        <div className="summary-highlight">
+          <span>Strongest time window</span>
+          <strong>{analyticsSummary.bestTime?.name || 'No data'}</strong>
+          <small>{analyticsSummary.bestTime ? `${formatPercent(analyticsSummary.bestTime.adherence)} adherence` : 'Awaiting records'}</small>
+        </div>
+        <div className="summary-highlight">
+          <span>Lowest regimen adherence</span>
+          <strong>{analyticsSummary.weakestRegimen?.name || 'No data'}</strong>
+          <small>{analyticsSummary.weakestRegimen ? `${formatPercent(analyticsSummary.weakestRegimen.adherence)} adherence` : 'Awaiting records'}</small>
         </div>
       </div>
 
