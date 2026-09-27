@@ -59,6 +59,19 @@ export const loginAdmin = async (email, password) => {
   return handleResponse(response, { isLogin: true });
 };
 
+export const createUserAccount = async (payload) => {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await handleResponse(response);
+  return { message: result.message, user: result.user };
+};
+
 export const getAdminStats = async (token) => fetchWithToken('/api/admin/stats', token);
 
 export const getAdminDoseOutcomes = async (token) => fetchWithToken('/api/admin/analytics/dose-outcomes', token);

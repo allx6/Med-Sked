@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { listUsers, updateUserRole } from '../services/api';
+import { createUserAccount, listUsers, updateUserRole } from '../services/api';
 
 const getStoredAuth = () => {
   try {
@@ -47,6 +47,11 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createEmailError, setCreateEmailError] = useState('');
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'patient' });
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -55,7 +60,7 @@ export default function UsersPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchInput]);
+  }, [searchInput]);  
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -129,6 +134,49 @@ export default function UsersPage() {
     }
   };
 
+  const createUser = async (event) => {
+    event.preventDefault();
+    const email = newUser.email.trim();
+
+    if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
+      setCreateError('');
+      setCreateEmailError('Enter an email address ending in @gmail.com.');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      setCreateError('');
+      setCreateEmailError('');
+      await createUserAccount({
+        name: newUser.name.trim(),
+        email,
+        password: newUser.password,
+        role: newUser.role,
+      });
+      setStatusMessage(`${getRoleLabel(newUser.role)} account created successfully.`);
+      setNewUser({ name: '', email: '', password: '', role: 'patient' });
+      setCreateEmailError('');
+      setCreateOpen(false);
+      setSearchInput('');
+      setSearchTerm('');
+      setRoleFilter('');
+      setPage(1);
+    } catch (err) {
+      setCreateError(err.message || 'Unable to create account.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const closeCreateForm = () => {
+    if (creating) return;
+    setCreateOpen(false);
+    setCreateError('');
+    setCreateEmailError('');
+    setNewUser({ name: '', email: '', password: '', role: 'patient' });
+  };
+
   const hasUsers = users.length > 0;
 
   return (
@@ -138,6 +186,17 @@ export default function UsersPage() {
           <p className="eyebrow">Management</p>
           <h2>Users</h2>
         </div>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() => {
+            setCreateError('');
+            setCreateEmailError('');
+            setCreateOpen(true);
+          }}
+        >
+          Add user
+        </button>
       </div>
 
       <div className="panel">
@@ -181,7 +240,6 @@ export default function UsersPage() {
                   <th>Email</th>
                   <th>Role</th>
                   <th>Created</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -193,6 +251,7 @@ export default function UsersPage() {
                       <select
                         className="select-input compact"
                         value={user.role || ''}
+                        aria-label={`Role for ${user.username || user.email || 'user'}`}
                         onChange={(event) => updateRole(user, event.target.value)}
                       >
                         <option value="patient">Patient</option>
@@ -201,11 +260,6 @@ export default function UsersPage() {
                       </select>
                     </td>
                     <td>{formatDate(user.createdAt)}</td>
-                    <td>
-                      <span className={`status-badge status-${user.role || 'unknown'}`}>
-                        {getRoleLabel(user.role)}
-                      </span>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -217,26 +271,110 @@ export default function UsersPage() {
           <div className="pagination-bar">
             <button
               type="button"
-              className="secondary-button"
+              className="pagination-button pagination-button-previous"
               disabled={page <= 1}
               onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
             >
-              Previous
+              <span className="pagination-arrow" aria-hidden="true">←</span>
+              <span>Previous</span>
             </button>
-            <span>
-              Page {pagination.page || page} of {pagination.totalPages || 1}
+            <span className="pagination-current" aria-live="polite">
+              Page <strong>{pagination.page || page}</strong> of <strong>{pagination.totalPages || 1}</strong>
             </span>
             <button
               type="button"
-              className="secondary-button"
+              className="pagination-button pagination-button-next"
               disabled={page >= (pagination.totalPages || 1)}
               onClick={() => setPage((currentPage) => Math.min(pagination.totalPages || currentPage, currentPage + 1))}
             >
-              Next
+              <span>Next</span>
+              <span className="pagination-arrow" aria-hidden="true">→</span>
             </button>
           </div>
         ) : null}
       </div>
+
+      {createOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeCreateForm();
+          }}
+        >
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="create-user-title">
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">User management</p>
+                <h3 id="create-user-title">Create account</h3>
+              </div>
+              <button type="button" className="modal-close" aria-label="Close create account form" onClick={closeCreateForm}>
+                ×
+              </button>
+            </div>
+            <form className="user-form" onSubmit={createUser}>
+              <label>
+                Full name
+                <input
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={newUser.name}
+                  onChange={(event) => setNewUser((current) => ({ ...current, name: event.target.value }))}
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  autoComplete="email"
+                  required
+                  aria-invalid={Boolean(createEmailError)}
+                  aria-describedby={createEmailError ? 'create-user-email-error' : undefined}
+                  value={newUser.email}
+                  onChange={(event) => {
+                    setCreateEmailError('');
+                    setNewUser((current) => ({ ...current, email: event.target.value }));
+                  }}
+                />
+                {createEmailError ? <small id="create-user-email-error" className="field-error" role="alert">{createEmailError}</small> : null}
+              </label>
+              <label>
+                Temporary password
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+                  value={newUser.password}
+                  onChange={(event) => setNewUser((current) => ({ ...current, password: event.target.value }))}
+                />
+                <small className="form-hint">At least 6 characters.</small>
+              </label>
+              <label>
+                Account type
+                <select
+                  className="select-input"
+                  value={newUser.role}
+                  onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value }))}
+                >
+                  <option value="patient">Patient</option>
+                  <option value="caregiver">Caregiver</option>
+                </select>
+              </label>
+              {createError ? <div className="error-state" role="alert">{createError}</div> : null}
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" disabled={creating} onClick={closeCreateForm}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-button" disabled={creating}>
+                  {creating ? 'Creating…' : 'Create account'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

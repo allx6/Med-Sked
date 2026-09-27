@@ -183,6 +183,24 @@ export default function RelationshipsPage() {
       </div>
 
       <div className="panel">
+        <h3>Relationship details</h3>
+        {detailsLoading ? (
+          <div className="loading-state">Loading relationship details…</div>
+        ) : selectedRelationship ? (
+          <div className="detail-grid">
+            <div><span>Caregiver</span><strong>{displayUser(selectedRelationship.caregiver)}</strong></div>
+            <div><span>Patient</span><strong>{displayUser(selectedRelationship.patient)}</strong></div>
+            <div><span>Status</span><strong>{selectedRelationship.status || 'Unknown'}</strong></div>
+            <div><span>Permission</span><strong>{formatPermission(selectedRelationship.permission)}</strong></div>
+            <div><span>Created</span><strong>{formatDate(selectedRelationship.createdAt)}</strong></div>
+            <div><span>Updated</span><strong>{formatDate(selectedRelationship.updatedAt)}</strong></div>
+          </div>
+        ) : (
+          <div className="empty-state">Select a relationship to inspect its details.</div>
+        )}
+      </div>
+
+      <div className="panel">
         <div className="toolbar">
           <input
             className="search-input"
@@ -200,7 +218,7 @@ export default function RelationshipsPage() {
               setPage(1);
             }}
           >
-            <option value="">All statuses</option>
+            <option value="">All status</option>
             <option value="pending">Pending</option>
             <option value="active">Active</option>
             <option value="revoked">Revoked</option>
@@ -242,7 +260,7 @@ export default function RelationshipsPage() {
                     <td className="actions-cell">
                       <button
                         type="button"
-                        className="secondary-button small"
+                        className="relationship-action-button relationship-details-button small"
                         onClick={() => openRelationshipDetails(relationship._id)}
                       >
                         Details
@@ -250,7 +268,7 @@ export default function RelationshipsPage() {
                       {relationship.status !== 'revoked' ? (
                         <button
                           type="button"
-                          className="logout-button small"
+                          className="relationship-action-button relationship-revoke-button small"
                           onClick={() => handleRevoke(relationship)}
                         >
                           Revoke
@@ -289,23 +307,6 @@ export default function RelationshipsPage() {
         ) : null}
       </div>
 
-      <div className="panel">
-        <h3>Relationship details</h3>
-        {detailsLoading ? (
-          <div className="loading-state">Loading relationship details…</div>
-        ) : selectedRelationship ? (
-          <div className="detail-grid">
-            <div><span>Caregiver</span><strong>{displayUser(selectedRelationship.caregiver)}</strong></div>
-            <div><span>Patient</span><strong>{displayUser(selectedRelationship.patient)}</strong></div>
-            <div><span>Status</span><strong>{selectedRelationship.status || 'Unknown'}</strong></div>
-            <div><span>Permission</span><strong>{formatPermission(selectedRelationship.permission)}</strong></div>
-            <div><span>Created</span><strong>{formatDate(selectedRelationship.createdAt)}</strong></div>
-            <div><span>Updated</span><strong>{formatDate(selectedRelationship.updatedAt)}</strong></div>
-          </div>
-        ) : (
-          <div className="empty-state">Select a relationship to inspect its details.</div>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+
+import ConfirmDialog from './ConfirmDialog';
 
 const navItems = [
   { label: 'Dashboard', to: '/dashboard' },
@@ -21,6 +24,7 @@ const getStoredAuth = () => {
 export default function AdminLayout({ children }) {
   const navigate = useNavigate();
   const auth = getStoredAuth();
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('medsked-admin-auth');
@@ -52,11 +56,16 @@ export default function AdminLayout({ children }) {
 
         <div className="sidebar-footer">
           <div className="user-pill">{auth?.user?.username || 'Admin'}</div>
-          <button className="logout-button" onClick={handleLogout}>Logout</button>
+          <button className="logout-button" onClick={() => setLogoutDialogOpen(true)}>Logout</button>
         </div>
       </aside>
 
       <main className="content-panel">{children}</main>
+      <ConfirmDialog
+        open={logoutDialogOpen}
+        onCancel={() => setLogoutDialogOpen(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }

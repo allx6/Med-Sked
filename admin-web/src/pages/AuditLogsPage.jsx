@@ -31,6 +31,8 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatNumber = (value) => Number(value || 0).toLocaleString();
+
 const formatActor = (actor) => {
   if (!actor) {
     return 'Unavailable';
@@ -38,6 +40,15 @@ const formatActor = (actor) => {
 
   const name = actor.username || actor.email || actor.role || 'Unknown actor';
   return `${name}${actor.role ? ` (${actor.role})` : ''}`;
+};
+
+const formatAuditAction = (action) => {
+  if (!action) return 'Unknown';
+
+  return String(action)
+    .replace(/[_-]+/g, ' ')
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 };
 
 const formatDetailValue = (value) => {
@@ -128,19 +139,72 @@ export default function AuditLogsPage() {
     return Object.entries(selectedLog.details || {});
   }, [selectedLog]);
 
+  const hasActiveFilters = Boolean(action || targetType || actorId || fromDate || toDate);
+
+  const clearFilters = () => {
+    setAction('');
+    setTargetType('');
+    setActorId('');
+    setFromDate('');
+    setToDate('');
+    setPage(1);
+  };
+
   return (
     <div className="page-stack">
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Security</p>
           <h2>Audit Logs</h2>
+          <p className="page-intro">Review administrative events and relationship changes.</p>
         </div>
       </div>
 
       <div className="panel">
-        <div className="toolbar">
+        <h3>Audit detail</h3>
+        {selectedLog ? (
+          <div className="detail-grid">
+            <div>
+              <span>Timestamp</span>
+              <strong>{formatDateTime(selectedLog.timestamp)}</strong>
+            </div>
+            <div>
+              <span>Action</span>
+              <strong>{formatAuditAction(selectedLog.action)}</strong>
+            </div>
+            <div>
+              <span>Actor</span>
+              <strong>{formatActor(selectedLog.actorId)}</strong>
+            </div>
+            <div>
+              <span>Target Type</span>
+              <strong>{selectedLog.targetType || 'Unknown'}</strong>
+            </div>
+            <div>
+              <span>Target ID</span>
+              <strong>{selectedLog.targetId || '—'}</strong>
+            </div>
+            <div>
+              <span>Role</span>
+              <strong>{selectedLog.actorRole || 'Unknown'}</strong>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-state">Select a log entry to view its safe details.</div>
+        )}
+
+        {detailEntries.length > 0 ? (
+          <pre style={{ marginTop: '18px' }}>
+            {detailEntries.map(([key, value]) => `${key}: ${formatDetailValue(value)}`).join('\n')}
+          </pre>
+        ) : null}
+      </div>
+
+      <div className="panel">
+        <div className="toolbar audit-filter-toolbar">
           <select
             className="select-input"
+            aria-label="Filter by action"
             value={action}
             onChange={(event) => {
               setAction(event.target.value);
@@ -156,6 +220,7 @@ export default function AuditLogsPage() {
           <input
             className="search-input"
             type="text"
+            aria-label="Filter by target type"
             placeholder="Target type"
             value={targetType}
             onChange={(event) => {
@@ -167,6 +232,7 @@ export default function AuditLogsPage() {
           <input
             className="search-input"
             type="text"
+            aria-label="Filter by actor ID"
             placeholder="Actor ID"
             value={actorId}
             onChange={(event) => {
@@ -178,6 +244,7 @@ export default function AuditLogsPage() {
           <input
             className="select-input"
             type="date"
+            aria-label="Filter from date"
             value={fromDate}
             onChange={(event) => {
               setFromDate(event.target.value);
@@ -188,12 +255,16 @@ export default function AuditLogsPage() {
           <input
             className="select-input"
             type="date"
+            aria-label="Filter to date"
             value={toDate}
             onChange={(event) => {
               setToDate(event.target.value);
               setPage(1);
             }}
           />
+          <button type="button" className="secondary-button audit-clear-button" disabled={!hasActiveFilters} onClick={clearFilters}>
+            Clear filters
+          </button>
         </div>
 
         {error ? <div className="error-state">{error}</div> : null}
@@ -204,7 +275,12 @@ export default function AuditLogsPage() {
           <div className="empty-state">No audit records match the current filters.</div>
         ) : (
           <div className="table-wrap">
-            <table className="data-table">
+            <div className="audit-table-summary">
+              <span>Activity records</span>
+              <strong>{formatNumber(pagination.total)} total</strong>
+            </div>
+            <table className="data-table audit-table">
+              <caption className="visually-hidden">Administrative audit log records</caption>
               <thead>
                 <tr>
                   <th>Timestamp</th>
@@ -212,16 +288,27 @@ export default function AuditLogsPage() {
                   <th>Actor</th>
                   <th>Target Type</th>
                   <th>Target ID</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log._id} onClick={() => setSelectedLog(log)} style={{ cursor: 'pointer' }}>
+                  <tr key={log._id} className={selectedLog?._id === log._id ? 'audit-log-row selected' : 'audit-log-row'}>
                     <td>{formatDateTime(log.timestamp)}</td>
-                    <td>{log.action || 'Unknown'}</td>
+                    <td><span className="audit-action-badge">{formatAuditAction(log.action)}</span></td>
                     <td>{formatActor(log.actorId)}</td>
                     <td>{log.targetType || 'Unknown'}</td>
-                    <td>{log.targetId || '—'}</td>
+                    <td><code className="audit-target-id" title={log.targetId || ''}>{log.targetId || '—'}</code></td>
+                    <td>
+                      <button
+                        type="button"
+                        className="audit-detail-button"
+                        aria-pressed={selectedLog?._id === log._id}
+                        onClick={() => setSelectedLog(log)}
+                      >
+                        {selectedLog?._id === log._id ? 'Selected' : 'View'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -254,45 +341,6 @@ export default function AuditLogsPage() {
         ) : null}
       </div>
 
-      <div className="panel">
-        <h3>Audit detail</h3>
-        {selectedLog ? (
-          <div className="detail-grid">
-            <div>
-              <span>Timestamp</span>
-              <strong>{formatDateTime(selectedLog.timestamp)}</strong>
-            </div>
-            <div>
-              <span>Action</span>
-              <strong>{selectedLog.action || 'Unknown'}</strong>
-            </div>
-            <div>
-              <span>Actor</span>
-              <strong>{formatActor(selectedLog.actorId)}</strong>
-            </div>
-            <div>
-              <span>Target Type</span>
-              <strong>{selectedLog.targetType || 'Unknown'}</strong>
-            </div>
-            <div>
-              <span>Target ID</span>
-              <strong>{selectedLog.targetId || '—'}</strong>
-            </div>
-            <div>
-              <span>Role</span>
-              <strong>{selectedLog.actorRole || 'Unknown'}</strong>
-            </div>
-          </div>
-        ) : (
-          <div className="empty-state">Select a log entry to view its safe details.</div>
-        )}
-
-        {detailEntries.length > 0 ? (
-          <pre style={{ marginTop: '18px' }}>
-            {detailEntries.map(([key, value]) => `${key}: ${formatDetailValue(value)}`).join('\n')}
-          </pre>
-        ) : null}
-      </div>
     </div>
   );
 }

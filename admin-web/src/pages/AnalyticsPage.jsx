@@ -21,9 +21,12 @@ const toPercent = (value) => {
 const formatPercent = (value) => `${toPercent(value)}%`;
 const formatNumber = (value) => Number(value || 0).toLocaleString();
 
-const DashboardCard = ({ title, children }) => (
+const DashboardCard = ({ title, meta, children }) => (
   <div className="panel chart-panel">
-    <h3>{title}</h3>
+    <div className="chart-panel-heading">
+      <h3>{title}</h3>
+      {meta ? <span className="chart-panel-meta">{meta}</span> : null}
+    </div>
     {children}
   </div>
 );
@@ -32,113 +35,172 @@ const EmptyState = ({ message }) => <div className="empty-state">{message}</div>
 const LoadingState = ({ label = 'Loading...' }) => <div className="loading-state">{label}</div>;
 const ErrorState = ({ message }) => <div className="error-state">{message}</div>;
 
-const SimpleBarChart = ({ data, color = '#2F6690', valueKey = 'count', labelKey = 'name', height = 260, vertical = false }) => {
+const getChartValue = (item, valueKey) => {
+  const value = Number(item?.[valueKey]);
+  return Number.isFinite(value) ? Math.max(value, 0) : 0;
+};
+
+const SimpleBarChart = ({ data, color = '#2F6690', valueKey = 'count', labelKey = 'name', valueSuffix = '' }) => {
   if (!Array.isArray(data) || data.length === 0) {
     return <EmptyState message="No data available." />;
   }
 
-  const maxValue = Math.max(...data.map((item) => Number(item[valueKey] || 0)), 1);
-  const chartHeight = height;
-  const chartWidth = 420;
-  const padding = 26;
-  const innerWidth = chartWidth - padding * 2;
-  const innerHeight = chartHeight - padding * 2;
+  const maxValue = Math.max(...data.map((item) => getChartValue(item, valueKey)), 1);
 
   return (
-    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} width="100%" height={height} role="img" aria-label="Bar chart">
+    <div className="bar-chart" role="list">
       {data.map((item, index) => {
-        const value = Number(item[valueKey] || 0);
-        const ratio = value / maxValue;
-        const barWidth = vertical ? innerWidth / data.length - 12 : Math.min(42, innerWidth / data.length - 10);
-        const barHeight = vertical ? innerHeight * ratio : innerHeight / data.length - 12;
-        const x = vertical ? padding + index * (innerWidth / data.length) + 6 : padding;
-        const y = vertical ? chartHeight - padding - barHeight : padding + index * (innerHeight / data.length) + 6;
+        const value = getChartValue(item, valueKey);
+        const percentage = (value / maxValue) * 100;
+        const label = String(item[labelKey] ?? 'Unknown');
 
         return (
-          <g key={`${item[labelKey]}-${index}`}>
-            <rect x={vertical ? x : padding} y={vertical ? y : y} width={vertical ? Math.max(18, barWidth) : Math.max(18, barWidth * (value / maxValue) * 1.6)} height={vertical ? Math.max(18, barHeight) : Math.max(18, barHeight)} rx="8" fill={color} opacity={0.9} />
-            <text x={vertical ? x + barWidth / 2 : padding + 6} y={vertical ? chartHeight - 8 : y + 16} fill="#475569" fontSize="10" textAnchor="middle">{String(item[labelKey]).slice(0, 12)}</text>
-            <text x={vertical ? x + barWidth / 2 : padding + 6} y={vertical ? y - 6 : y + 16} fill="#1e2a4a" fontSize="10" textAnchor="middle">{value}</text>
+          <div className="bar-chart-row" key={`${label}-${index}`} role="listitem">
+            <div className="bar-chart-heading">
+              <span className="bar-chart-label" title={label}>{label}</span>
+              <strong>{formatNumber(value)}{valueSuffix}</strong>
+            </div>
+            <div
+              className="bar-chart-track"
+              role="progressbar"
+              aria-label={label}
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={Math.round(percentage)}
+              aria-valuetext={`${formatNumber(value)}${valueSuffix}`}
+            >
+              <span className="bar-chart-fill" style={{ width: `${percentage}%`, backgroundColor: color }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const SimpleLineChart = ({ data, valueKey = 'adherence', labelKey = 'day', color = '#2F6690' }) => {
+  if (!Array.isArray(data) || data.length === 0) {
+    return <EmptyState message="No data available." />;
+  }
+
+  const width = 640;
+  const height = 300;
+  const padding = { top: 18, right: 20, bottom: 44, left: 42 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const values = data.map((item) => Math.min(100, getChartValue(item, valueKey)));
+  const peakValue = Math.max(...values);
+  const points = values.map((value, index) => {
+    const x = padding.left + (index / Math.max(values.length - 1, 1)) * plotWidth;
+    const y = padding.top + ((100 - value) / 100) * plotHeight;
+    return { x, y, value, label: String(data[index][labelKey] ?? 'Unknown') };
+  });
+  const pointString = points.map(({ x, y }) => `${x},${y}`).join(' ');
+  const areaString = `${padding.left},${padding.top + plotHeight} ${pointString} ${padding.left + plotWidth},${padding.top + plotHeight}`;
+  const labelIndexes = [...new Set([0, 0.25, 0.5, 0.75, 1].map((position) => Math.round((data.length - 1) * position)))];
+
+  return (
+    <svg className="line-chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Adherence trend by date">
+      <title>Adherence trend by date</title>
+      {[0, 25, 50, 75, 100].map((tick) => {
+        const y = padding.top + ((100 - tick) / 100) * plotHeight;
+        return (
+          <g key={tick}>
+            <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} className="line-chart-gridline" />
+            <text x={padding.left - 8} y={y + 4} textAnchor="end" className="line-chart-axis-label line-chart-percentage-label">{tick}%</text>
           </g>
+        );
+      })}
+      <polygon points={areaString} fill={color} opacity="0.1" />
+      <polyline points={pointString} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((point, index) => (
+        <circle
+          key={`${point.label}-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={peakValue > 0 && point.value === peakValue ? 6 : data.length > 30 ? 2.5 : 4}
+          fill={color}
+          stroke={peakValue > 0 && point.value === peakValue ? '#ffffff' : 'none'}
+          strokeWidth="2"
+        >
+          <title>{`${point.label}: ${formatPercent(point.value)}`}</title>
+        </circle>
+      ))}
+      {labelIndexes.map((index) => {
+        const label = points[index].label;
+        const shortLabel = /^\d{4}-\d{2}-\d{2}/.test(label) ? label.slice(5, 10) : label.slice(0, 12);
+        return (
+          <text key={`${label}-${index}`} x={points[index].x} y={height - 12} textAnchor="middle" className="line-chart-axis-label line-chart-date-label">
+            {shortLabel}
+          </text>
         );
       })}
     </svg>
   );
 };
 
-const SimpleLineChart = ({ data, valueKey = 'adherence', labelKey = 'day', color = '#2F6690', height = 260 }) => {
+const SimpleDonutChart = ({ data, colorScale = CHART_COLORS, valueKey = 'value', labelKey = 'name' }) => {
   if (!Array.isArray(data) || data.length === 0) {
     return <EmptyState message="No data available." />;
   }
 
-  const max = Math.max(...data.map((item) => Number(item[valueKey] || 0)), 100);
-  const min = Math.min(...data.map((item) => Number(item[valueKey] || 0)), 0);
-  const width = 420;
-  const padding = 26;
-  const innerWidth = width - padding * 2;
-  const innerHeight = height - padding * 2;
-
-  const points = data.map((item, index) => {
-    const x = padding + (index / Math.max(data.length - 1, 1)) * innerWidth;
-    const y = height - padding - ((Number(item[valueKey]) - min) / Math.max(max - min || 1, 1)) * innerHeight;
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="Line chart">
-      {data.map((item, index) => {
-        const x = padding + (index / Math.max(data.length - 1, 1)) * innerWidth;
-        const y = height - padding - ((Number(item[valueKey]) - min) / Math.max(max - min || 1, 1)) * innerHeight;
-        return (
-          <g key={`${item[labelKey]}-${index}`}>
-            <circle cx={x} cy={y} r="4" fill={color} />
-            <text x={x} y={height - 8} fontSize="10" textAnchor="middle" fill="#475569">{String(item[labelKey]).slice(0, 8)}</text>
-          </g>
-        );
-      })}
-      <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-};
-
-const SimpleDonutChart = ({ data, colorScale = CHART_COLORS, valueKey = 'value', labelKey = 'name', height = 260 }) => {
-  if (!Array.isArray(data) || data.length === 0) {
-    return <EmptyState message="No data available." />;
+  const total = data.reduce((sum, item) => sum + getChartValue(item, valueKey), 0);
+  if (total <= 0) {
+    return <EmptyState message="No recorded values available." />;
   }
 
-  const total = data.reduce((sum, item) => sum + Number(item[valueKey] || 0), 0) || 1;
-  let cursor = 0;
+  const radius = 72;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
 
   return (
-    <svg viewBox="0 0 220 220" width="100%" height={height} role="img" aria-label="Donut chart">
-      {data.map((item, index) => {
-        const value = Number(item[valueKey] || 0);
-        const fraction = value / total;
-        const radius = 70;
-        const circumference = 2 * Math.PI * radius;
-        const dash = circumference * fraction;
-        const offset = circumference - cursor * circumference;
-        const strokeDasharray = `${dash} ${circumference - dash}`;
-        const rotation = cursor * 360;
-        cursor += fraction;
+    <div className="donut-chart">
+      <svg className="donut-chart-svg" viewBox="0 0 220 220" role="img" aria-label={`Distribution of ${formatNumber(total)} records`}>
+        <title>Record distribution</title>
+        <circle cx="110" cy="110" r={radius} fill="none" stroke="#e3e9ef" strokeWidth="24" />
+        {data.map((item, index) => {
+          const value = getChartValue(item, valueKey);
+          const segmentLength = (value / total) * circumference;
+          const segmentOffset = offset;
+          offset += segmentLength;
 
-        return (
-          <g key={`${item[labelKey]}-${index}`} transform="translate(110,110)">
-            <circle r={radius} fill="transparent" stroke="#edf2f7" strokeWidth="28" />
+          if (value === 0) return null;
+
+          return (
             <circle
+              key={`${item[labelKey]}-${index}`}
+              cx="110"
+              cy="110"
               r={radius}
-              fill="transparent"
+              fill="none"
               stroke={colorScale[index % colorScale.length]}
-              strokeWidth="28"
-              strokeDasharray={strokeDasharray}
-              strokeDashoffset={-offset}
-              transform="rotate(-90)"
-            />
-          </g>
-        );
-      })}
-      <text x="110" y="110" textAnchor="middle" fill="#1e2a4a" fontSize="18" fontWeight="700">{total}</text>
-    </svg>
+              strokeWidth="24"
+              strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+              strokeDashoffset={-segmentOffset}
+              transform="rotate(-90 110 110)"
+            >
+              <title>{`${String(item[labelKey] ?? 'Unknown')}: ${formatNumber(value)} (${Math.round((value / total) * 100)}%)`}</title>
+            </circle>
+          );
+        })}
+        <text x="110" y="106" textAnchor="middle" className="donut-chart-total">{formatNumber(total)}</text>
+        <text x="110" y="128" textAnchor="middle" className="donut-chart-caption">total</text>
+      </svg>
+      <ul className="donut-chart-legend">
+        {data.map((item, index) => {
+          const value = getChartValue(item, valueKey);
+          return (
+            <li key={`${item[labelKey]}-${index}`}>
+              <span className="donut-legend-name">
+                <span className="donut-legend-swatch" style={{ backgroundColor: colorScale[index % colorScale.length] }} aria-hidden="true" />
+                {String(item[labelKey] ?? 'Unknown')}
+              </span>
+              <strong>{formatNumber(value)} <span>{Math.round((value / total) * 100)}%</span></strong>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 };
 
@@ -220,7 +282,13 @@ export default function AnalyticsPage() {
     if (!data?.notifications?.data) return [];
     return data.notifications.data.map((item) => ({
       ...item,
-      name: item.type ? item.type.replace(/_/g, ' ') : 'Unknown',
+      name: item.type
+        ? String(item.type)
+          .replace(/[_-]+/g, ' ')
+          .trim()
+          .toLowerCase()
+          .replace(/\b[a-z]/g, (letter) => letter.toUpperCase())
+        : 'Unknown',
     }));
   }, [data]);
 
@@ -237,11 +305,12 @@ export default function AnalyticsPage() {
     const trend = trendChart.filter((item) => Number.isFinite(item.adherence));
     const latest = trend[trend.length - 1]?.adherence ?? 0;
     const first = trend[0]?.adherence ?? latest;
+    const peak = Math.max(...trend.map((item) => item.adherence), 0);
     const bestTime = [...timeOfDayChart].sort((a, b) => b.adherence - a.adherence)[0];
     const weakestRegimen = [...regimenChart].sort((a, b) => a.adherence - b.adherence)[0];
     const missed = doseChart.find((item) => item.status === 'Missed')?.count || 0;
 
-    return { latest, change: latest - first, bestTime, weakestRegimen, missed };
+    return { latest, peak, change: latest - first, bestTime, weakestRegimen, missed };
   }, [doseChart, regimenChart, timeOfDayChart, trendChart]);
 
   if (loading) {
@@ -324,7 +393,7 @@ export default function AnalyticsPage() {
           {doseChart.length > 0 ? <SimpleBarChart data={doseChart} color="#2F6690" /> : <EmptyState message="No dose outcome data available." />}
         </DashboardCard>
 
-        <DashboardCard title="Adherence Trend">
+        <DashboardCard title="Adherence Trend" meta={trendChart.length ? `Peak ${formatPercent(analyticsSummary.peak)}` : null}>
           {trendChart.length > 0 ? <SimpleLineChart data={trendChart} color="#2F6690" /> : <EmptyState message="No adherence data available." />}
         </DashboardCard>
 
@@ -340,8 +409,8 @@ export default function AnalyticsPage() {
           {userRoleChart.length > 0 ? <SimpleDonutChart data={userRoleChart} valueKey="count" /> : <EmptyState message="No user distribution data available." />}
         </DashboardCard>
 
-        <DashboardCard title="Notification Volume">
-          {notificationsChart.length > 0 ? <SimpleBarChart data={notificationsChart} color="#8BC34A" valueKey="count" vertical /> : <EmptyState message="No notification data available." />}
+        <DashboardCard title="Notifications by Type">
+          {notificationsChart.length > 0 ? <SimpleBarChart data={notificationsChart} color="#8BC34A" valueKey="count" /> : <EmptyState message="No notification data available." />}
         </DashboardCard>
 
         <DashboardCard title="Refill Analytics">

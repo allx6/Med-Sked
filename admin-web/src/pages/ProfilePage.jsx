@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const getStoredAuth = () => {
   try {
@@ -13,6 +16,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const auth = getStoredAuth();
   const user = auth?.user;
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('medsked-admin-auth');
@@ -45,9 +49,15 @@ export default function ProfilePage() {
         </div>
 
         <div style={{ marginTop: '20px' }}>
-          <button type="button" className="logout-button" onClick={handleLogout}>Logout</button>
+          <button type="button" className="logout-button" onClick={() => setLogoutDialogOpen(true)}>Logout</button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={logoutDialogOpen}
+        onCancel={() => setLogoutDialogOpen(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }
