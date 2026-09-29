@@ -155,7 +155,7 @@ export default function AuditLogsPage() {
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Security</p>
-          <h2>Audit Logs</h2>
+          <h2 className="audit-logs-page-title">Audit Logs</h2>
           <p className="page-intro">Review administrative events and relationship changes.</p>
         </div>
       </div>

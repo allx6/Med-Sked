@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
         <div className="panel page-header">
           <div>
             <p className="eyebrow">Overview</p>
-            <h2>Analytics</h2>
+            <h2 className="analytics-page-title">Analytics</h2>
           </div>
         </div>
         <LoadingState label="Loading analytics..." />
@@ -333,7 +333,7 @@ export default function AnalyticsPage() {
         <div className="panel page-header">
           <div>
             <p className="eyebrow">Overview</p>
-            <h2>Analytics</h2>
+            <h2 className="analytics-page-title">Analytics</h2>
           </div>
         </div>
         <ErrorState message={error} />
@@ -346,7 +346,7 @@ export default function AnalyticsPage() {
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Decision support</p>
-          <h2>Analytics</h2>
+          <h2 className="analytics-page-title">Analytics</h2>
           <p className="page-intro">Explore adherence and medication activity over the selected period.</p>
         </div>
         <div className="segmented-control">

@@ -107,7 +107,7 @@ export default function AdminDashboardPage() {
       <div className="page-header">
         <div>
           <p className="eyebrow">Operations • updated just now</p>
-          <h2>Good morning — here&apos;s where adherence stands</h2>
+          <h2 className="dashboard-page-title">Good morning — here&apos;s where adherence stands</h2>
           <p className="page-intro">
             {formatNumber(stats?.users?.patients ?? 0)} patients enrolled across {formatNumber(stats?.schedules?.enabled ?? 0)} active schedules. {decisionsNeeded ? `${formatNumber(decisionsNeeded)} things need a decision today.` : 'Everything is running smoothly today.'}
           </p>

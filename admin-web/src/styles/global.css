@@ -271,6 +271,19 @@ button:disabled {
   color: #edf4ff;
 }
 
+.page-header h2.analytics-page-title,
+.page-header h2.users-page-title,
+.page-header h2.relationships-page-title,
+.page-header h2.audit-logs-page-title,
+.page-header h2.profile-page-title,
+.page-header h2.dashboard-page-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
 .page-intro {
   margin: 8px 0 0;
   color: var(--color-text-secondary);
@@ -542,17 +555,21 @@ button:disabled {
 .summary-highlight {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 16px;
-  border-left: 3px solid #5ba4a4;
-  border-radius: 0 12px 12px 0;
-  background: #f8fafc;
+  gap: 4px;
+  min-height: 122px;
+  padding: 14px 20px;
+  border: 1px solid #29384a;
+  border-left: 3px solid #3b5f84;
+  border-radius: 8px;
+  background: #192636;
 }
 
-.summary-highlight > span { color: #64748b; font-size: 0.78rem; font-weight: 800; }
-.summary-highlight strong { color: #1e2a4a; font-size: 1.35rem; }
-.trend-positive { color: #15803d !important; }
-.trend-negative { color: #b91c1c !important; }
+.summary-highlight:nth-child(even) { border-left-color: #d79820; }
+.summary-highlight > span { color: #9bb9dc; font-size: 0.8rem; font-weight: 700; }
+.summary-highlight strong { color: #edf4ff; font-family: Georgia, 'Times New Roman', serif; font-size: 1.6rem; font-weight: 400; line-height: 1.25; }
+.summary-highlight small { color: #9bb9dc; font-size: 0.82rem; }
+.trend-positive { color: #65d6a2 !important; }
+.trend-negative { color: #ff8585 !important; }
 
 .auth-shell {
   min-height: 100vh;
@@ -1099,19 +1116,32 @@ button:disabled {
 
 .audit-table {
   min-width: 980px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #192636;
+}
+
+.audit-table th,
+.audit-table td {
+  border-bottom-color: #26384a;
 }
 
 .audit-table th {
-  padding-top: 13px;
-  padding-bottom: 13px;
-  background: #f8fafc;
-  color: #475569;
+  padding: 14px 16px;
+  background: #1b2938;
+  color: #9bb9dc;
+  font-size: 0.82rem;
+  text-transform: none;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
 .audit-table td {
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding: 14px 16px;
+  color: #d7e4f3;
 }
 
 .audit-log-row {
@@ -1328,33 +1358,57 @@ button:disabled {
 }
 
 .relationship-action-button {
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  font-weight: 800;
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 4px;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
 .relationship-details-button {
-  border-color: #c8dce9;
-  background: var(--color-primary-soft);
   color: var(--color-primary);
 }
 
 .relationship-details-button:hover {
-  border-color: #a9c8dc;
-  background: #dcecf5;
+  background: rgba(47, 102, 144, 0.1);
 }
 
 .relationship-revoke-button {
-  border-color: #fecaca;
-  background: #fee2e2;
   color: #b91c1c;
 }
 
 .relationship-revoke-button:hover {
-  border-color: #fca5a5;
-  background: #fecaca;
+  background: rgba(185, 28, 28, 0.08);
+}
+
+.relationship-action-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.relationship-status-badge {
+  min-width: 64px;
+  height: 28px;
+  padding: 4px 9px;
+  font-size: 0.78rem;
+}
+
+.relationship-status-badge.status-pending {
+  background: #302a1c;
+  color: #d5ad5c;
+}
+
+.relationship-status-badge.status-active {
+  background: #17342e;
+  color: #4bb79a;
+}
+
+.relationship-status-badge.status-revoked {
+  background: #38252a;
+  color: #d77c86;
 }
 
 .small {

@@ -178,7 +178,7 @@ export default function RelationshipsPage() {
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Management</p>
-          <h2>Relationships</h2>
+          <h2 className="relationships-page-title">Relationships</h2>
         </div>
       </div>
 
@@ -251,7 +251,7 @@ export default function RelationshipsPage() {
                     <td>{displayUser(relationship.caregiver)}</td>
                     <td>{displayUser(relationship.patient)}</td>
                     <td>
-                      <span className={`status-badge status-${relationship.status || 'unknown'}`}>
+                      <span className={`status-badge relationship-status-badge status-${relationship.status || 'unknown'}`}>
                         {relationship.status ? relationship.status.charAt(0).toUpperCase() + relationship.status.slice(1) : 'Unknown'}
                       </span>
                     </td>

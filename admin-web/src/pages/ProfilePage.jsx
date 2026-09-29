@@ -28,7 +28,7 @@ export default function ProfilePage() {
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Account</p>
-          <h2>Profile</h2>
+          <h2 className="profile-page-title">Profile</h2>
         </div>
       </div>
 
