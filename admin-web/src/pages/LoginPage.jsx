@@ -39,9 +39,13 @@ export default function LoginPage() {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="brand-mark large">M</div>
-          <h1>MedSked Admin</h1>
-          <p>Secure sign in</p>
+          <div className="auth-brand">
+            <div className="brand-mark">M</div>
+            <div className="auth-brand-copy">
+              <strong>MedSked Admin</strong>
+              <span>Secure sign in</span>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
