@@ -86,6 +86,8 @@ export default function AuditLogsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsClosing, setDetailsClosing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -118,7 +120,7 @@ export default function AuditLogsPage() {
           if (current && result?.data?.some((item) => item._id === current._id)) {
             return current;
           }
-          return result?.data?.[0] || null;
+          return null;
         });
       } catch (err) {
         setLogs([]);
@@ -150,6 +152,19 @@ export default function AuditLogsPage() {
     setPage(1);
   };
 
+  const closeAuditDetails = () => {
+    setDetailsClosing(true);
+  };
+
+  const finishClosingAuditDetails = (event) => {
+    if (event.target !== event.currentTarget || !detailsClosing) {
+      return;
+    }
+
+    setDetailsOpen(false);
+    setDetailsClosing(false);
+  };
+
   return (
     <div className="page-stack">
       <div className="panel page-header">
@@ -158,46 +173,6 @@ export default function AuditLogsPage() {
           <h2 className="audit-logs-page-title">Audit Logs</h2>
           <p className="page-intro">Review administrative events and relationship changes.</p>
         </div>
-      </div>
-
-      <div className="panel">
-        <h3>Audit detail</h3>
-        {selectedLog ? (
-          <div className="detail-grid">
-            <div>
-              <span>Timestamp</span>
-              <strong>{formatDateTime(selectedLog.timestamp)}</strong>
-            </div>
-            <div>
-              <span>Action</span>
-              <strong>{formatAuditAction(selectedLog.action)}</strong>
-            </div>
-            <div>
-              <span>Actor</span>
-              <strong>{formatActor(selectedLog.actorId)}</strong>
-            </div>
-            <div>
-              <span>Target Type</span>
-              <strong>{selectedLog.targetType || 'Unknown'}</strong>
-            </div>
-            <div>
-              <span>Target ID</span>
-              <strong>{selectedLog.targetId || '—'}</strong>
-            </div>
-            <div>
-              <span>Role</span>
-              <strong>{selectedLog.actorRole || 'Unknown'}</strong>
-            </div>
-          </div>
-        ) : (
-          <div className="empty-state">Select a log entry to view its safe details.</div>
-        )}
-
-        {detailEntries.length > 0 ? (
-          <pre style={{ marginTop: '18px' }}>
-            {detailEntries.map(([key, value]) => `${key}: ${formatDetailValue(value)}`).join('\n')}
-          </pre>
-        ) : null}
       </div>
 
       <div className="panel">
@@ -303,10 +278,15 @@ export default function AuditLogsPage() {
                       <button
                         type="button"
                         className="audit-detail-button"
-                        aria-pressed={selectedLog?._id === log._id}
-                        onClick={() => setSelectedLog(log)}
+                        aria-haspopup="dialog"
+                        aria-pressed={detailsOpen && selectedLog?._id === log._id}
+                        onClick={() => {
+                          setSelectedLog(log);
+                          setDetailsClosing(false);
+                          setDetailsOpen(true);
+                        }}
                       >
-                        {selectedLog?._id === log._id ? 'Selected' : 'View'}
+                        View
                       </button>
                     </td>
                   </tr>
@@ -340,6 +320,60 @@ export default function AuditLogsPage() {
           </div>
         ) : null}
       </div>
+
+      {detailsOpen && selectedLog ? (
+        <div
+          className={`modal-backdrop audit-details-backdrop${detailsClosing ? ' is-closing' : ''}`}
+          role="presentation"
+          onAnimationEnd={finishClosingAuditDetails}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeAuditDetails();
+          }}
+        >
+          <section className="modal-panel audit-details-modal" role="dialog" aria-modal="true" aria-labelledby="audit-detail-title">
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">Security</p>
+                <h3 id="audit-detail-title">Audit detail</h3>
+              </div>
+              <button type="button" className="modal-close" aria-label="Close audit details" onClick={closeAuditDetails}>
+                ×
+              </button>
+            </div>
+            <div className="detail-grid">
+              <div>
+                <span>Timestamp</span>
+                <strong>{formatDateTime(selectedLog.timestamp)}</strong>
+              </div>
+              <div>
+                <span>Action</span>
+                <strong>{formatAuditAction(selectedLog.action)}</strong>
+              </div>
+              <div>
+                <span>Actor</span>
+                <strong>{formatActor(selectedLog.actorId)}</strong>
+              </div>
+              <div>
+                <span>Target Type</span>
+                <strong>{selectedLog.targetType || 'Unknown'}</strong>
+              </div>
+              <div>
+                <span>Target ID</span>
+                <strong>{selectedLog.targetId || '—'}</strong>
+              </div>
+              <div>
+                <span>Role</span>
+                <strong>{selectedLog.actorRole || 'Unknown'}</strong>
+              </div>
+            </div>
+            {detailEntries.length > 0 ? (
+              <pre className="audit-detail-data">
+                {detailEntries.map(([key, value]) => `${key}: ${formatDetailValue(value)}`).join('\n')}
+              </pre>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
 
     </div>
   );

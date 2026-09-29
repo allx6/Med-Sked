@@ -290,6 +290,87 @@ button:disabled {
   font-size: 1.02rem;
 }
 
+.profile-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.profile-account-panel {
+  display: flex;
+  min-height: 256px;
+  flex-direction: column;
+}
+
+.profile-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.profile-fields > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profile-fields span {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.profile-fields strong {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.profile-logout-button {
+  align-self: flex-end;
+  max-width: 100%;
+  margin-top: auto;
+}
+
+.profile-activity-panel h3 {
+  margin-bottom: 16px;
+}
+
+.profile-activity-list {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.profile-activity-list li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 64px 10px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.profile-activity-list time {
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.profile-activity-marker {
+  width: 9px;
+  height: 9px;
+  border: 2px solid #8bcab9;
+  border-radius: 50%;
+  background: rgba(139, 202, 185, 0.18);
+}
+
+.profile-activity-list strong {
+  min-width: 0;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -681,16 +762,20 @@ button:disabled {
 
 .audit-filter-toolbar {
   display: grid;
-  grid-template-columns: minmax(145px, 1.1fr) minmax(125px, 0.9fr) minmax(150px, 1fr) repeat(2, minmax(140px, 0.85fr)) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
 }
 
-.audit-filter-toolbar .search-input {
+.audit-filter-toolbar .search-input,
+.audit-filter-toolbar .select-input {
+  min-width: 0;
   width: 100%;
+  max-width: 100%;
 }
 
 .audit-clear-button {
   min-height: 44px;
+  width: 100%;
   white-space: nowrap;
 }
 
@@ -719,6 +804,35 @@ button:disabled {
   background: rgba(30, 42, 74, 0.46);
 }
 
+.relationship-details-backdrop,
+.audit-details-backdrop {
+  animation: relationship-details-fade-in 180ms ease-out both;
+}
+
+.relationship-details-backdrop.is-closing,
+.audit-details-backdrop.is-closing {
+  animation: relationship-details-fade-out 180ms ease-in both;
+}
+
+@keyframes relationship-details-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes relationship-details-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .relationship-details-backdrop,
+  .relationship-details-backdrop.is-closing,
+  .audit-details-backdrop,
+  .audit-details-backdrop.is-closing {
+    animation-duration: 1ms;
+  }
+}
+
 .modal-panel {
   width: min(100%, 480px);
   max-height: calc(100vh - 40px);
@@ -728,6 +842,14 @@ button:disabled {
   border-radius: 18px;
   background: var(--color-surface);
   box-shadow: 0 20px 48px rgba(30, 42, 74, 0.2);
+}
+
+.audit-details-modal {
+  width: min(100%, 980px);
+}
+
+.audit-detail-data {
+  margin-top: 18px;
 }
 
 .confirm-dialog {
@@ -1185,10 +1307,10 @@ button:disabled {
 .audit-action-badge {
   display: inline-flex;
   padding: 6px 9px;
-  border: 1px solid #c8dce9;
+  border: 1px solid rgba(125, 185, 224, 0.34);
   border-radius: 999px;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: rgba(47, 102, 144, 0.24);
+  color: #b9def5;
   font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
@@ -1206,21 +1328,25 @@ button:disabled {
 }
 
 .audit-detail-button {
-  min-width: 70px;
-  padding: 7px 10px;
-  border: 1px solid #c8dce9;
-  border-radius: 10px;
-  background: #ffffff;
+  padding: 5px 2px;
+  border: 0;
+  background: transparent;
   color: var(--color-primary);
+  font: inherit;
   font-weight: 800;
   cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.audit-detail-button:hover,
-.audit-detail-button[aria-pressed='true'] {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: #ffffff;
+.audit-detail-button:hover {
+  text-decoration-thickness: 2px;
+}
+
+.audit-detail-button:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
 }
 
 .audit-table-summary {
@@ -1557,6 +1683,8 @@ pre {
 
   .attention-grid,
   .analytics-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .profile-overview-grid { grid-template-columns: minmax(0, 1fr); }
 
   .audit-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
