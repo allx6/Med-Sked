@@ -184,7 +184,7 @@ export default function UsersPage() {
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Management</p>
-          <h2>Users</h2>
+          <h2 className="users-page-title">Users</h2>
         </div>
         <button
           type="button"
