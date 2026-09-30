@@ -1697,7 +1697,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#87CEEB',
+      '#09161C',
   },
 
 
@@ -1713,7 +1713,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
 
     backgroundColor:
-      '#87CEEB',
+      '#09161C',
 
   },
 
@@ -1746,7 +1746,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#F2F5F1',
 
   },
 
@@ -1762,7 +1762,7 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
 
-    color: '#6B7280',
+    color: '#A9BAC0',
 
   },
 
@@ -1813,7 +1813,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '600',
 
-    color: '#6B7280',
+    color: '#A9BAC0',
 
   },
 
@@ -1825,7 +1825,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#F2F5F1',
 
   },
 
@@ -1837,7 +1837,7 @@ const styles = StyleSheet.create({
 
     lineHeight: 18,
 
-    color: '#6B7280',
+    color: '#A9BAC0',
 
   },
 
@@ -2003,7 +2003,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#F2F5F1',
 
   },
 
@@ -2013,7 +2013,7 @@ const styles = StyleSheet.create({
 
     fontSize: 11,
 
-    color: '#7A8494',
+    color: '#A9BAC0',
 
   },
 
@@ -2025,7 +2025,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '800',
 
-    color: '#2F6690',
+    color: '#66D6C5',
 
   },
 

@@ -278,11 +278,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
   headerRow: { marginBottom: spacing.md },
-  backText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
-  pageTitle: { fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: 4 },
-  pageSubtitle: { fontSize: 14, color: colors.textSecondary, marginBottom: spacing.lg },
+  backText: { color: '#D8E6E3', fontWeight: '700', fontSize: 15 },
+  pageTitle: { fontSize: 28, fontWeight: '800', color: '#F2F5F1', marginBottom: 4 },
+  pageSubtitle: { fontSize: 14, color: '#A9BAC0', marginBottom: spacing.lg },
   section: { marginBottom: spacing.xl },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#F2F5F1', marginBottom: spacing.md },
   searchCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -368,5 +368,5 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.dangerText, fontWeight: '600' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.md, color: colors.textSecondary },
+  loadingText: { marginTop: spacing.md, color: '#A9BAC0' },
 });
