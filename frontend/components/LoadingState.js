@@ -24,12 +24,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 22,
     fontWeight: '800',
-    color: colors.text,
+    color: '#F2F5F1',
   },
   message: {
     marginTop: 8,
     fontSize: 14,
-    color: colors.textSecondary,
+    color: '#A9BAC0',
     textAlign: 'center',
   },
 });

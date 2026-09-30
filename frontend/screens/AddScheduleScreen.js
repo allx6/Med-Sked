@@ -988,7 +988,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   content: {
@@ -1005,7 +1005,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#2F6690',
+    color: '#D8E6E3',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -1013,19 +1013,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   subtitle: {
     marginTop: 5,
     fontSize: 14,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
     marginBottom: 8,
     marginTop: 18,
   },

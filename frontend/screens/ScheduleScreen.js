@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
     paddingHorizontal: 20,
   },
 
@@ -626,13 +626,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
 
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#D8E6E3',
   },
 
   headerTitleContainer: {
@@ -664,14 +664,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 25,
     fontWeight: '800',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   subtitle: {
     marginTop: 5,
     fontSize: 13,
     lineHeight: 19,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
 
@@ -770,12 +770,12 @@ const styles = StyleSheet.create({
   listTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   listCount: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
 
@@ -1000,7 +1000,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   emptyText: {
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   emptyButton: {

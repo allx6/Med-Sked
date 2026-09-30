@@ -873,7 +873,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   header: {
@@ -888,7 +888,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#2F6690',
+    color: '#D8E6E3',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -896,7 +896,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   scroll: {
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
     marginTop: 18,
     marginBottom: 8,
   },
