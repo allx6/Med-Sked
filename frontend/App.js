@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   View,
@@ -58,63 +58,37 @@ export default function App() {
   const [token, setToken] = useState('');
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
-  const lastUnreadCountTokenRef = useRef(null);
-  const unreadCountRequestRef = useRef(null);
+  const unreadCountRequestRef = useRef(0);
+
+  const refreshUnreadNotificationCount = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    const requestId = unreadCountRequestRef.current + 1;
+    unreadCountRequestRef.current = requestId;
+
+    try {
+      const result = await getUnreadNotificationCount(token);
+      if (unreadCountRequestRef.current === requestId) {
+        setUnreadNotificationCount(Number(result?.count) || 0);
+      }
+    } catch (error) {
+      // Keep the last known count when the API is temporarily unavailable.
+    }
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
-      lastUnreadCountTokenRef.current = null;
-      unreadCountRequestRef.current = null;
+      unreadCountRequestRef.current += 1;
       setUnreadNotificationCount(0);
-      return undefined;
+      return;
     }
 
-    if (unreadCountRequestRef.current?.token === token) {
-      return undefined;
+    if (['profile', 'caregiverProfile', 'notifications'].includes(screen)) {
+      refreshUnreadNotificationCount();
     }
-
-    if (lastUnreadCountTokenRef.current === token) {
-      return undefined;
-    }
-
-    let active = true;
-    const loadUnreadCount = async () => {
-      console.log('[App] Unread count started');
-      const start = performance.now();
-
-      try {
-        const result = await getUnreadNotificationCount(token);
-
-        if (!active) {
-          return;
-        }
-
-        const count = Number(result?.count) || 0;
-        setUnreadNotificationCount(count);
-        lastUnreadCountTokenRef.current = token;
-
-        console.log(`[App] Unread count finished: ${((performance.now() - start)).toFixed(0)} ms`);
-      } catch (error) {
-        if (active) {
-          setUnreadNotificationCount(0);
-        }
-      } finally {
-        if (active && unreadCountRequestRef.current?.token === token) {
-          unreadCountRequestRef.current = null;
-        }
-      }
-    };
-
-    unreadCountRequestRef.current = { token };
-    loadUnreadCount();
-
-    return () => {
-      active = false;
-      if (unreadCountRequestRef.current?.token === token) {
-        unreadCountRequestRef.current = null;
-      }
-    };
-  }, [token, screen]);
+  }, [token, screen, refreshUnreadNotificationCount]);
 
 
   // =====================================================
@@ -899,6 +873,8 @@ export default function App() {
         user && (
           <NotificationsScreen
             token={token}
+            unreadNotificationCount={unreadNotificationCount}
+            onUnreadCountChange={refreshUnreadNotificationCount}
             onBack={() => setScreen(user.role === 'caregiver' ? 'caregiverProfile' : 'profile')}
           />
         )}

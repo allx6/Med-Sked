@@ -23,7 +23,7 @@ const formatNotificationTime = (value) => {
   return date.toLocaleString();
 };
 
-export default function NotificationsScreen({ token, onBack }) {
+export default function NotificationsScreen({ token, onBack, unreadNotificationCount = 0, onUnreadCountChange }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,13 +37,16 @@ export default function NotificationsScreen({ token, onBack }) {
       setError('');
       const data = await getNotifications(token);
       setNotifications(Array.isArray(data) ? data : []);
+      if (isRefresh) {
+        await onUnreadCountChange();
+      }
     } catch (requestError) {
       setError(requestError.message || 'Unable to load notifications.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, onUnreadCountChange]);
 
   useEffect(() => {
     loadNotifications();
@@ -56,6 +59,7 @@ export default function NotificationsScreen({ token, onBack }) {
       setNotifications((current) => current.map((notification) => (
         notification._id === notificationId ? updated : notification
       )));
+      await onUnreadCountChange();
     } catch (requestError) {
       setError(requestError.message || 'Unable to mark notification as read.');
     } finally {
@@ -68,6 +72,7 @@ export default function NotificationsScreen({ token, onBack }) {
       setWorkingId('all');
       await markAllNotificationsRead(token);
       setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+      await onUnreadCountChange();
     } catch (requestError) {
       setError(requestError.message || 'Unable to mark notifications as read.');
     } finally {
@@ -84,8 +89,6 @@ export default function NotificationsScreen({ token, onBack }) {
     );
   }
 
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
-
   return (
     <View style={styles.container}>
       <ScrollView
@@ -100,9 +103,9 @@ export default function NotificationsScreen({ token, onBack }) {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.title}>Notifications</Text>
-            <Text style={styles.subtitle}>{unreadCount} unread</Text>
+            <Text style={styles.subtitle}>{unreadNotificationCount} unread</Text>
           </View>
-          {unreadCount > 0 ? (
+          {unreadNotificationCount > 0 ? (
             <Pressable onPress={markAllRead} disabled={workingId === 'all'}>
               <Text style={styles.markAllText}>{workingId === 'all' ? 'Working...' : 'Mark all read'}</Text>
             </Pressable>

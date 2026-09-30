@@ -60,7 +60,7 @@ router.put('/:notificationId/read', authMiddleware, async (req, res) => {
       return res.status(404).json({ message: 'Notification not found' });
     }
 
-    res.json(notification);
+    res.json(sanitizeNotification(notification));
   } catch (error) {
     console.error('Mark notification read error:', error);
     res.status(500).json({ message: 'Failed to mark notification as read' });
