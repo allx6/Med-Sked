@@ -12,6 +12,8 @@ import {
 
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import LandingScreen from './screens/LandingScreen';
+import HowItWorksScreen from './screens/HowItWorksScreen';
 
 import DashboardScreen from './screens/DashboardScreen';
 import MedicationsScreen from './screens/MedicationsScreen';
@@ -46,7 +48,7 @@ export default function App() {
   // CURRENT SCREEN
   // =====================================================
 
-  const [screen, setScreen] = useState('login');
+  const [screen, setScreen] = useState('landing');
 
 
   // =====================================================
@@ -405,6 +407,20 @@ export default function App() {
         style={styles.container}
       >
 
+      {screen === 'landing' && !user && (
+        <LandingScreen
+          onSignIn={() => setScreen('login')}
+          onGetStarted={() => setScreen('register')}
+          onHowItWorks={() => setScreen('howItWorks')}
+        />
+      )}
+
+      {screen === 'howItWorks' && !user && (
+        <HowItWorksScreen
+          onBack={() => setScreen('landing')}
+        />
+      )}
+
       {/* =================================================
           LOGIN
       ================================================= */}
@@ -413,6 +429,7 @@ export default function App() {
 
         <LoginScreen
           onLogin={handleLogin}
+          onNavigateLanding={() => setScreen('landing')}
 
           onNavigateRegister={() =>
             setScreen('register')
@@ -430,6 +447,7 @@ export default function App() {
 
         <RegisterScreen
           onRegister={handleRegister}
+          onNavigateLanding={() => setScreen('landing')}
 
           onNavigateLogin={() =>
             setScreen('login')

@@ -25,6 +25,7 @@ const medSkedLogo = require('../assets/medsked.png');
 
 export default function RegisterScreen({
   onRegister,
+  onNavigateLanding,
   onNavigateLogin,
 }) {
 
@@ -220,13 +221,14 @@ export default function RegisterScreen({
           <View style={styles.topSection}>
 
             <Pressable
-              onPress={onNavigateLogin}
+              accessibilityRole="button"
+              onPress={onNavigateLanding}
               style={styles.backButton}
               hitSlop={10}
             >
 
               <Text style={styles.backText}>
-                Back to Login
+                Back
               </Text>
 
             </Pressable>

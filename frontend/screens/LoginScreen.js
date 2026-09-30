@@ -26,6 +26,7 @@ const medSkedLogo = require('../assets/medsked.png');
 
 export default function LoginScreen({
   onLogin,
+  onNavigateLanding,
   onNavigateRegister,
 }) {
   const [username, setUsername] = useState('');
@@ -118,6 +119,15 @@ export default function LoginScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={onNavigateLanding}
+            style={styles.backButton}
+            hitSlop={10}
+          >
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
 
           {/* LOGO */}
 
@@ -236,6 +246,20 @@ export default function LoginScreen({
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignSelf: 'flex-start',
+    minHeight: 42,
+    justifyContent: 'center',
+    marginBottom: 18,
+    paddingHorizontal: 4,
+  },
+
+  backText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2F6690',
+  },
+
   safeArea: {
     flex: 1,
     backgroundColor: '#87CEEB',
