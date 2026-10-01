@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#87CEEB',
+      '#09161C',
   },
 
 
@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor:
-      '#87CEEB',
+      '#09161C',
   },
 
   loadingText: {
@@ -1078,14 +1078,14 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 30,
     fontWeight: '300',
-    color: '#2F6690',
+    color: '#D8E6E3',
   },
 
   backText: {
     marginLeft: 4,
     fontSize: 13,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#D8E6E3',
   },
 
   headerContent: {
@@ -1095,14 +1095,14 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 27,
     fontWeight: '900',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   pageSubtitle: {
     marginTop: 5,
     fontSize: 13,
     lineHeight: 19,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   headerAddButton: {

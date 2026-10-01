@@ -25,6 +25,7 @@ const medSkedLogo = require('../assets/medsked.png');
 
 export default function RegisterScreen({
   onRegister,
+  onNavigateLanding,
   onNavigateLogin,
 }) {
 
@@ -220,13 +221,14 @@ export default function RegisterScreen({
           <View style={styles.topSection}>
 
             <Pressable
-              onPress={onNavigateLogin}
+              accessibilityRole="button"
+              onPress={onNavigateLanding}
               style={styles.backButton}
               hitSlop={10}
             >
 
               <Text style={styles.backText}>
-                Back to Login
+                Back
               </Text>
 
             </Pressable>
@@ -504,12 +506,12 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#09161C',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#09161C',
   },
 
   scrollContent: {
@@ -556,7 +558,7 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#D8E6E3',
   },
 
   logoCircle: {
@@ -581,7 +583,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   tagline: {
@@ -590,7 +592,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   card: {

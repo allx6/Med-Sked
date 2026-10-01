@@ -149,7 +149,7 @@ const getTodayDate = () => {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 };
 
-const validateScheduleFields = (payload) => {
+const validateScheduleFields = (payload, { allowPastStartDate = false } = {}) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return 'Invalid schedule payload';
   }
@@ -193,7 +193,7 @@ const validateScheduleFields = (payload) => {
   }
 
   const startDate = parseLocalDate(payload.startDate);
-  if (startDate < getTodayDate()) {
+  if (!allowPastStartDate && startDate < getTodayDate()) {
     return 'Start date cannot be earlier than today.';
   }
 

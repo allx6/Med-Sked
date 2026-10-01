@@ -552,14 +552,14 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   loadingLogo: {
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 23,
     fontWeight: '900',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   loadingIndicator: {
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     fontSize: 12,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   scrollContent: {
@@ -699,13 +699,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   sectionSubtitle: {
     marginTop: 3,
     fontSize: 11,
-    color: '#7A8494',
+    color: '#A9BAC0',
     lineHeight: 16,
   },
 

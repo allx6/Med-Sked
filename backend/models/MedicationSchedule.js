@@ -107,6 +107,10 @@ const medicationScheduleSchema =
     }
   );
 
+  medicationScheduleSchema.index(
+    { medicationId: 1 },
+    { unique: true }
+  );
 
 module.exports =
   mongoose.model(

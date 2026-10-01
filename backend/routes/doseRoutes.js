@@ -7,7 +7,7 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
-const { createNotification } = require('../services/notificationService');
+const { createMedicationNotifications } = require('../services/notificationService');
 
 const {
   generateTodayDoses,
@@ -440,10 +440,11 @@ router.put(
         updatedMedication.quantityOnHand <= updatedMedication.refillThreshold &&
         !updatedMedication.lowRefillNotified
       ) {
-        await createNotification({
-          recipient: updatedMedication.userId,
+        await createMedicationNotifications({
+          patientId: updatedMedication.userId,
           type: 'low_refill',
-          message: `${updatedMedication.name} is low on refill stock.`,
+          patientMessage: `${updatedMedication.name} is low on refill stock.`,
+          caregiverMessage: (patientName) => `${patientName}'s ${updatedMedication.name} is low on refill stock.`,
           relatedEntityType: 'Medication',
           relatedEntityId: updatedMedication._id,
           dedupeKey: `low_refill:${updatedMedication._id}`,

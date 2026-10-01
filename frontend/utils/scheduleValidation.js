@@ -38,7 +38,7 @@ export const parseLocalDate = (value) => {
   return new Date(year, month - 1, day);
 };
 
-export const validateScheduleFields = (schedule) => {
+export const validateScheduleFields = (schedule, { allowPastStartDate = false } = {}) => {
   if (!schedule?.medicationId) {
     return 'Please select a medication.';
   }
@@ -64,7 +64,7 @@ export const validateScheduleFields = (schedule) => {
     return 'Please select a valid start date.';
   }
 
-  if (parseLocalDate(schedule.startDate) < getTodayDate()) {
+  if (!allowPastStartDate && parseLocalDate(schedule.startDate) < getTodayDate()) {
     return 'Start date cannot be earlier than today.';
   }
 

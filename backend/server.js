@@ -16,7 +16,6 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const aiRoutes = require('./routes/aiRoutes');
-const { detectMissedDoses } = require('./services/missedDoseService');
 const { validateEncryptionKey } = require('./services/encryptionService');
 
 const app = express();
@@ -167,20 +166,6 @@ mongoose
         console.log(
           `Server running at http://localhost:${PORT}`
         );
-
-        const runMissedDoseDetection = async () => {
-          try {
-            const result = await detectMissedDoses();
-            if (result.markedMissed > 0) {
-              console.log('Missed-dose detection:', result);
-            }
-          } catch (error) {
-            console.error('Missed-dose detection error:', error);
-          }
-        };
-
-        runMissedDoseDetection();
-        setInterval(runMissedDoseDetection, 60 * 1000);
 
       }
     );

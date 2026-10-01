@@ -26,6 +26,7 @@ const medSkedLogo = require('../assets/medsked.png');
 
 export default function LoginScreen({
   onLogin,
+  onNavigateLanding,
   onNavigateRegister,
 }) {
   const [username, setUsername] = useState('');
@@ -119,6 +120,15 @@ export default function LoginScreen({
           showsVerticalScrollIndicator={false}
         >
 
+          <Pressable
+            accessibilityRole="button"
+            onPress={onNavigateLanding}
+            style={styles.backButton}
+            hitSlop={10}
+          >
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+
           {/* LOGO */}
 
           <View style={styles.logoSection}>
@@ -186,6 +196,10 @@ export default function LoginScreen({
               editable={!loading}
             />
 
+            <Text style={styles.forgotPasswordText}>
+              Forgot password?
+            </Text>
+
             {authError ? (
               <Text style={styles.authError}>{authError}</Text>
             ) : null}
@@ -236,14 +250,28 @@ export default function LoginScreen({
 }
 
 const styles = StyleSheet.create({
+  backButton: {
+    alignSelf: 'flex-start',
+    minHeight: 42,
+    justifyContent: 'center',
+    marginBottom: 18,
+    paddingHorizontal: 4,
+  },
+
+  backText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#D8E6E3',
+  },
+
   safeArea: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
   },
 
   scrollContent: {
@@ -302,7 +330,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#F2F5F1',
 
     letterSpacing: -0.5,
   },
@@ -312,7 +340,7 @@ const styles = StyleSheet.create({
 
     fontSize: 13,
 
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   card: {
@@ -400,6 +428,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     marginTop: -4,
+  },
+
+  forgotPasswordText: {
+    alignSelf: 'flex-end',
+    color: '#2F6690',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: -10,
+    marginBottom: 10,
   },
 
   loginButton: {

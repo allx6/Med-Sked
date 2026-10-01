@@ -73,8 +73,11 @@ export default function RelationshipsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsClosing, setDetailsClosing] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedRelationship, setSelectedRelationship] = useState(null);
+  const [detailsError, setDetailsError] = useState('');
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
 
@@ -124,20 +127,40 @@ export default function RelationshipsPage() {
     const auth = getStoredAuth();
 
     if (!auth?.token) {
-      setError('Authentication is required.');
+      setDetailsError('Authentication is required.');
+      setDetailsClosing(false);
+      setDetailsOpen(true);
       return;
     }
 
+    setDetailsClosing(false);
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    setSelectedRelationship(null);
+    setDetailsError('');
     try {
-      setDetailsLoading(true);
-      setError('');
       const result = await getRelationship(auth.token, relationshipId);
       setSelectedRelationship(result?.relationship || null);
     } catch (err) {
-      setError(err.message || 'Unable to load relationship details.');
+      setDetailsError(err.message || 'Unable to load relationship details.');
     } finally {
       setDetailsLoading(false);
     }
+  };
+
+  const closeRelationshipDetails = () => {
+    setDetailsClosing(true);
+  };
+
+  const finishClosingRelationshipDetails = (event) => {
+    if (event.target !== event.currentTarget || !detailsClosing) {
+      return;
+    }
+
+    setDetailsOpen(false);
+    setDetailsClosing(false);
+    setSelectedRelationship(null);
+    setDetailsError('');
   };
 
   const handleRevoke = async (relationship) => {
@@ -178,7 +201,7 @@ export default function RelationshipsPage() {
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Management</p>
-          <h2>Relationships</h2>
+          <h2 className="relationships-page-title">Relationships</h2>
         </div>
       </div>
 
@@ -200,7 +223,7 @@ export default function RelationshipsPage() {
               setPage(1);
             }}
           >
-            <option value="">All statuses</option>
+            <option value="">All status</option>
             <option value="pending">Pending</option>
             <option value="active">Active</option>
             <option value="revoked">Revoked</option>
@@ -233,7 +256,7 @@ export default function RelationshipsPage() {
                     <td>{displayUser(relationship.caregiver)}</td>
                     <td>{displayUser(relationship.patient)}</td>
                     <td>
-                      <span className={`status-badge status-${relationship.status || 'unknown'}`}>
+                      <span className={`status-badge relationship-status-badge status-${relationship.status || 'unknown'}`}>
                         {relationship.status ? relationship.status.charAt(0).toUpperCase() + relationship.status.slice(1) : 'Unknown'}
                       </span>
                     </td>
@@ -242,7 +265,7 @@ export default function RelationshipsPage() {
                     <td className="actions-cell">
                       <button
                         type="button"
-                        className="secondary-button small"
+                        className="relationship-action-button relationship-details-button small"
                         onClick={() => openRelationshipDetails(relationship._id)}
                       >
                         Details
@@ -250,7 +273,7 @@ export default function RelationshipsPage() {
                       {relationship.status !== 'revoked' ? (
                         <button
                           type="button"
-                          className="logout-button small"
+                          className="relationship-action-button relationship-revoke-button small"
                           onClick={() => handleRevoke(relationship)}
                         >
                           Revoke
@@ -289,23 +312,45 @@ export default function RelationshipsPage() {
         ) : null}
       </div>
 
-      <div className="panel">
-        <h3>Relationship details</h3>
-        {detailsLoading ? (
-          <div className="loading-state">Loading relationship details…</div>
-        ) : selectedRelationship ? (
-          <div className="detail-grid">
-            <div><span>Caregiver</span><strong>{displayUser(selectedRelationship.caregiver)}</strong></div>
-            <div><span>Patient</span><strong>{displayUser(selectedRelationship.patient)}</strong></div>
-            <div><span>Status</span><strong>{selectedRelationship.status || 'Unknown'}</strong></div>
-            <div><span>Permission</span><strong>{formatPermission(selectedRelationship.permission)}</strong></div>
-            <div><span>Created</span><strong>{formatDate(selectedRelationship.createdAt)}</strong></div>
-            <div><span>Updated</span><strong>{formatDate(selectedRelationship.updatedAt)}</strong></div>
-          </div>
-        ) : (
-          <div className="empty-state">Select a relationship to inspect its details.</div>
-        )}
-      </div>
+      {detailsOpen ? (
+        <div
+          className={`modal-backdrop relationship-details-backdrop${detailsClosing ? ' is-closing' : ''}`}
+          role="presentation"
+          onAnimationEnd={finishClosingRelationshipDetails}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeRelationshipDetails();
+          }}
+        >
+          <section className="modal-panel relationship-details-modal" role="dialog" aria-modal="true" aria-labelledby="relationship-details-title">
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">Relationship</p>
+                <h3 id="relationship-details-title">Relationship details</h3>
+              </div>
+              <button type="button" className="modal-close" aria-label="Close relationship details" onClick={closeRelationshipDetails}>
+                ×
+              </button>
+            </div>
+            {detailsLoading ? (
+              <div className="loading-state">Loading relationship details…</div>
+            ) : detailsError ? (
+              <div className="error-state" role="alert">{detailsError}</div>
+            ) : selectedRelationship ? (
+              <div className="detail-grid">
+                <div><span>Caregiver</span><strong>{displayUser(selectedRelationship.caregiver)}</strong></div>
+                <div><span>Patient</span><strong>{displayUser(selectedRelationship.patient)}</strong></div>
+                <div><span>Status</span><strong>{selectedRelationship.status || 'Unknown'}</strong></div>
+                <div><span>Permission</span><strong>{formatPermission(selectedRelationship.permission)}</strong></div>
+                <div><span>Created</span><strong>{formatDate(selectedRelationship.createdAt)}</strong></div>
+                <div><span>Updated</span><strong>{formatDate(selectedRelationship.updatedAt)}</strong></div>
+              </div>
+            ) : (
+              <div className="empty-state">Relationship details are unavailable.</div>
+            )}
+          </section>
+        </div>
+      ) : null}
+
     </div>
   );
 }

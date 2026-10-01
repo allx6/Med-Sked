@@ -1171,7 +1171,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#09161C',
     width: '100%',
     maxWidth: 760,
     alignSelf: 'center',
@@ -1201,7 +1201,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#2F6690',
+    color: '#D8E6E3',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1218,7 +1218,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   compactTitle: {
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create({
 
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#A9BAC0',
     marginTop: 2,
   },
 
@@ -1279,7 +1279,7 @@ const styles = StyleSheet.create({
   filterTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#374151',
+    color: '#F2F5F1',
     marginBottom: 7,
   },
 
@@ -1321,7 +1321,7 @@ const styles = StyleSheet.create({
   resultCount: {
     marginTop: 10,
     fontSize: 12,
-    color: '#6B7280',
+    color: '#A9BAC0',
     textAlign: 'center',
   },
 
@@ -1337,7 +1337,7 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 10,
-    color: '#6B7280',
+    color: '#A9BAC0',
     fontSize: 14,
   },
 
@@ -1374,12 +1374,12 @@ const styles = StyleSheet.create({
   dateHeaderText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
   },
 
   dateCount: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#A9BAC0',
   },
 
   // =================================================
@@ -1394,13 +1394,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#F2F5F1',
     marginBottom: 6,
   },
 
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#A9BAC0',
     textAlign: 'center',
     lineHeight: 20,
   },

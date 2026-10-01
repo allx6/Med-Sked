@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   AI_SYSTEM_INSTRUCTION,
   calculateAdherence,
+  getMedicationDefinitionIntent,
 } = require('../services/aiService');
 const {
   MAX_MESSAGE_LENGTH,
@@ -68,6 +69,23 @@ test('AI system instruction contains the medication safety boundaries', () => {
   assert.match(AI_SYSTEM_INSTRUCTION, /Do not diagnose/i);
   assert.match(AI_SYSTEM_INSTRUCTION, /double a missed dose/i);
   assert.match(AI_SYSTEM_INSTRUCTION, /untrusted input/i);
+});
+
+test('AI system instruction distinguishes general medication definitions from MedSked patient data', () => {
+  assert.match(AI_SYSTEM_INSTRUCTION, /general medication information/i);
+  assert.match(AI_SYSTEM_INSTRUCTION, /MedSked patient (?:context|data)/i);
+  assert.match(AI_SYSTEM_INSTRUCTION, /What is metformin\?/i);
+  assert.match(AI_SYSTEM_INSTRUCTION, /What dosage of metformin do I have\?/i);
+});
+
+test('general medication-definition intent is detected without relying on MedSked data', () => {
+  assert.equal(getMedicationDefinitionIntent('What is metformin?'), true);
+  assert.equal(getMedicationDefinitionIntent('What is amoxicillin?'), true);
+  assert.equal(getMedicationDefinitionIntent('What is metformin used for?'), true);
+  assert.equal(getMedicationDefinitionIntent('What type of medicine is metformin?'), true);
+  assert.equal(getMedicationDefinitionIntent('What dosage of metformin do I have?'), false);
+  assert.equal(getMedicationDefinitionIntent('When do I take metformin?'), false);
+  assert.equal(getMedicationDefinitionIntent('How is my medication adherence?'), false);
 });
 
 test('patient AI scope comes from the JWT and returns only the answer', async () => {

@@ -1,5 +1,5 @@
 const DoseRecord = require('../models/DoseRecord');
-const { createNotification } = require('./notificationService');
+const { createMedicationNotifications } = require('./notificationService');
 
 // A pending dose becomes missed 15 minutes after its scheduled local time.
 const MISSED_DOSE_GRACE_MINUTES = 15;
@@ -104,10 +104,14 @@ const detectMissedDoses = async (now = new Date()) => {
 
     markedMissed += 1;
 
-    const notification = await createNotification({
-      recipient: transitioned.userId,
+    const medicationName = dose.medicationId?.name;
+    const notification = await createMedicationNotifications({
+      patientId: transitioned.userId,
       type: 'missed_dose',
-      message: `You missed ${dose.medicationId?.name || 'a scheduled medication dose'} at ${transitioned.scheduledTime}.`,
+      patientMessage: `You missed ${medicationName || 'a scheduled medication dose'} at ${transitioned.scheduledTime}.`,
+      caregiverMessage: (patientName) => medicationName
+        ? `${patientName} missed their ${medicationName} dose at ${transitioned.scheduledTime}.`
+        : `${patientName} missed a scheduled medication dose at ${transitioned.scheduledTime}.`,
       relatedEntityType: 'DoseRecord',
       relatedEntityId: transitioned._id,
       dedupeKey: `missed_dose:${transitioned._id}`,
