@@ -196,6 +196,10 @@ export default function LoginScreen({
               editable={!loading}
             />
 
+            <Text style={styles.forgotPasswordText}>
+              Forgot password?
+            </Text>
+
             {authError ? (
               <Text style={styles.authError}>{authError}</Text>
             ) : null}
@@ -424,6 +428,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     marginTop: -4,
+  },
+
+  forgotPasswordText: {
+    alignSelf: 'flex-end',
+    color: '#2F6690',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: -10,
+    marginBottom: 10,
   },
 
   loginButton: {

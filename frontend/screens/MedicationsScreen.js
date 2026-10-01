@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor:
-      '#87CEEB',
+      '#09161C',
   },
 
   loadingText: {

@@ -25,6 +25,8 @@ import {
 import {
   getMedications,
   getPatientMedications,
+  getSchedules,
+  getPatientSchedules,
   createSchedule,
 } from '../services/api';
 import { validateScheduleFields } from '../utils/scheduleValidation';
@@ -45,6 +47,8 @@ export default function AddScheduleScreen({
   const [medications, setMedications] = useState([]);
   const [loadingMedications, setLoadingMedications] =
     useState(true);
+  const [hasScheduledMedications, setHasScheduledMedications] =
+    useState(false);
 
   const [selectedMedication, setSelectedMedication] =
     useState(null);
@@ -134,14 +138,31 @@ export default function AddScheduleScreen({
 
         setLoadingMedications(true);
 
-        const data = patientId
-          ? await getPatientMedications(token, patientId)
-          : await getMedications(token);
+        const [data, schedules] = await Promise.all([
+          patientId
+            ? getPatientMedications(token, patientId)
+            : getMedications(token),
+          patientId
+            ? getPatientSchedules(token, patientId)
+            : getSchedules(token),
+        ]);
+
+        const allMedications = Array.isArray(data)
+          ? data
+          : data?.medications || [];
+        const scheduledMedicationIds = new Set(
+          (Array.isArray(schedules) ? schedules : [])
+            .map((schedule) => schedule.medicationId?._id || schedule.medicationId)
+            .filter(Boolean)
+            .map(String)
+        );
+
+        setHasScheduledMedications(scheduledMedicationIds.size > 0);
 
         setMedications(
-          Array.isArray(data)
-            ? data
-            : data?.medications || []
+          allMedications.filter(
+            (medication) => !scheduledMedicationIds.has(String(medication._id))
+          )
         );
 
       } catch (error) {
@@ -510,12 +531,15 @@ export default function AddScheduleScreen({
         <View style={styles.emptyBox}>
 
           <Text style={styles.emptyTitle}>
-            No medications available
+            {hasScheduledMedications
+              ? 'No unscheduled medications'
+              : 'No medications available'}
           </Text>
 
           <Text style={styles.emptyText}>
-            Add a medication first before creating
-            a schedule.
+            {hasScheduledMedications
+              ? 'Each medication can have only one schedule.'
+              : 'Add a medication first before creating a schedule.'}
           </Text>
 
         </View>
