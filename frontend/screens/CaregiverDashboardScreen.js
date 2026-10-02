@@ -140,7 +140,7 @@ export default function CaregiverDashboardScreen({
 
         <ActivityIndicator
           size="small"
-          color="#2F6690"
+          color="#0B4F59"
           style={styles.loadingIndicator}
         />
 
@@ -168,7 +168,7 @@ export default function CaregiverDashboardScreen({
             onRefresh={() =>
               loadPatients(true)
             }
-            tintColor="#2F6690"
+            tintColor="#0B4F59"
           />
         }
         contentContainerStyle={
@@ -552,14 +552,14 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   loadingLogo: {
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 21,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   loadingLogoText: {
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 23,
     fontWeight: '900',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   loadingIndicator: {
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     fontSize: 12,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   scrollContent: {
@@ -699,13 +699,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   sectionSubtitle: {
     marginTop: 3,
     fontSize: 11,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
     lineHeight: 16,
   },
 
@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 9,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   patientPermission: {

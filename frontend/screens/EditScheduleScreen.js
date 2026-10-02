@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   header: {
@@ -775,7 +775,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#D8E6E3',
+    color: '#D8F0F2',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -783,7 +783,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   scroll: {
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
     marginTop: 18,
     marginBottom: 8,
   },
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
   },
 
   selectedOption: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
     backgroundColor: '#EAF3F8',
   },
 
@@ -833,7 +833,7 @@ const styles = StyleSheet.create({
   },
 
   selectedOptionText: {
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   emptyMedication: {
@@ -925,8 +925,8 @@ const styles = StyleSheet.create({
   },
 
   selectedDay: {
-    backgroundColor: '#2F6690',
-    borderColor: '#2F6690',
+    backgroundColor: '#0B4F59',
+    borderColor: '#0B4F59',
   },
 
   dayText: {
@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
 
   enabledButton: {
     backgroundColor: '#EAF3F8',
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
   },
 
   statusText: {
@@ -960,11 +960,11 @@ const styles = StyleSheet.create({
   },
 
   enabledText: {
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   updateButton: {
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: 'center',

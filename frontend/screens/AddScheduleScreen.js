@@ -1012,7 +1012,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   content: {
@@ -1029,7 +1029,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#D8E6E3',
+    color: '#D8F0F2',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -1037,19 +1037,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   subtitle: {
     marginTop: 5,
     fontSize: 14,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
     marginBottom: 8,
     marginTop: 18,
   },
@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
   },
 
   medicationOptionSelected: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
     backgroundColor: '#EEF6FA',
   },
 
@@ -1122,7 +1122,7 @@ const styles = StyleSheet.create({
   },
 
   selectedText: {
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   selectedSubText: {
@@ -1141,14 +1141,14 @@ const styles = StyleSheet.create({
   },
 
   radioSelected: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
   },
 
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   inputButton: {
@@ -1236,8 +1236,8 @@ const styles = StyleSheet.create({
   },
 
   dayButtonSelected: {
-    backgroundColor: '#2F6690',
-    borderColor: '#2F6690',
+    backgroundColor: '#0B4F59',
+    borderColor: '#0B4F59',
   },
 
   dayText: {
@@ -1292,7 +1292,7 @@ const styles = StyleSheet.create({
 
   saveButton: {
     marginTop: 25,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
     borderRadius: 12,
     minHeight: 52,
     alignItems: 'center',

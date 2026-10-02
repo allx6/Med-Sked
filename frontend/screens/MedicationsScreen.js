@@ -687,7 +687,7 @@ export default function MedicationsScreen({
 
         <ActivityIndicator
           size="large"
-          color="#2F6690"
+          color="#0B4F59"
         />
 
         <Text
@@ -866,7 +866,7 @@ export default function MedicationsScreen({
                   true
                 )
               }
-              tintColor="#2F6690"
+              tintColor="#0B4F59"
             />
           }
 
@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#09161C',
+      '#116F7A',
   },
 
 
@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor:
-      '#09161C',
+      '#116F7A',
   },
 
   loadingText: {
@@ -1078,14 +1078,14 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 30,
     fontWeight: '300',
-    color: '#D8E6E3',
+    color: '#D8F0F2',
   },
 
   backText: {
     marginLeft: 4,
     fontSize: 13,
     fontWeight: '700',
-    color: '#D8E6E3',
+    color: '#D8F0F2',
   },
 
   headerContent: {
@@ -1095,14 +1095,14 @@ const styles = StyleSheet.create({
   pageTitle: {
     fontSize: 27,
     fontWeight: '900',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   pageSubtitle: {
     marginTop: 5,
     fontSize: 13,
     lineHeight: 19,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   headerAddButton: {
@@ -1115,9 +1115,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 15,
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
     shadowColor:
-      '#2F6690',
+      '#0B4F59',
     shadowOpacity: 0.18,
     shadowRadius: 10,
     shadowOffset: {
@@ -1246,7 +1246,7 @@ const styles = StyleSheet.create({
   editButtonText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   deleteMedicationButton: {
@@ -1382,7 +1382,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
 
@@ -1488,7 +1488,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 13,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
 
@@ -1546,7 +1546,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 12,
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
   },
 
   emptyButtonText: {

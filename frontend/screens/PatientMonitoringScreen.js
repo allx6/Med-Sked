@@ -432,9 +432,9 @@ export default function PatientMonitoringScreen({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  backText: { color: '#D8E6E3', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
-  pageTitle: { fontSize: 28, fontWeight: '800', color: '#F2F5F1' },
-  pageSubtitle: { fontSize: 14, color: '#A9BAC0', marginBottom: spacing.lg },
+  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
+  pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },
+  pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   analyticsButton: { alignSelf: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14, marginBottom: spacing.lg },
   analyticsButtonText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
   aiButton: {
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   todayDoseStatus: { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#F2F5F1', marginBottom: spacing.md },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.md },
   sectionFilter: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   sectionFilterButton: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.card },
   sectionFilterButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -556,5 +556,5 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.dangerText, fontWeight: '600' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.md, color: '#A9BAC0' },
+  loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
 });

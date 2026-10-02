@@ -370,7 +370,7 @@ export default function ScheduleScreen({
 
         <ActivityIndicator
           size="large"
-          color="#2F6690"
+          color="#0B4F59"
         />
 
         <Text style={styles.loadingText}>
@@ -503,7 +503,7 @@ export default function ScheduleScreen({
             onRefresh={() =>
               loadSchedules(true)
             }
-            tintColor="#2F6690"
+            tintColor="#0B4F59"
           />
         }
 
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
     paddingHorizontal: 20,
   },
 
@@ -626,13 +626,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
 
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#D8E6E3',
+    color: '#D8F0F2',
   },
 
   headerTitleContainer: {
@@ -664,14 +664,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 25,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   subtitle: {
     marginTop: 5,
     fontSize: 13,
     lineHeight: 19,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
 
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     padding: 15,
     borderRadius: 14,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   addButtonIcon: {
@@ -770,12 +770,12 @@ const styles = StyleSheet.create({
   listTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   listCount: {
     fontSize: 12,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
 
@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontSize: 22,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
 
@@ -955,7 +955,7 @@ const styles = StyleSheet.create({
   editText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   deleteButton: {
@@ -1000,7 +1000,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   emptyText: {
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   emptyButton: {
@@ -1017,7 +1017,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 11,
     borderRadius: 9,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   emptyButtonText: {

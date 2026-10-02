@@ -10,15 +10,18 @@ export default function PasswordInput({
   error,
   hint,
   editable = true,
+  inputStyle,
+  labelStyle,
+  rowStyle,
 }) {
   const [visible, setVisible] = useState(false);
 
   return (
     <View style={styles.group}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-      <View style={[styles.row, error && styles.rowError]}>
+      {label ? <Text style={[styles.label, labelStyle]}>{label}</Text> : null}
+      <View style={[styles.row, error && styles.rowError, rowStyle]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -45,18 +48,18 @@ export default function PasswordInput({
 }
 
 const styles = StyleSheet.create({
-  group: { marginBottom: 14 },
+  group: { marginBottom: 10 },
   label: {
-    marginBottom: 7,
-    fontSize: 14,
+    marginBottom: 5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#374151',
   },
   row: {
-    minHeight: 52,
+    minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     backgroundColor: colors.inputFill,
@@ -67,18 +70,18 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    minHeight: 52,
-    paddingHorizontal: 15,
-    fontSize: 16,
+    minHeight: 40,
+    paddingHorizontal: 11,
+    fontSize: 14,
     color: colors.text,
   },
   toggle: {
-    paddingHorizontal: 14,
-    minHeight: 44,
+    paddingHorizontal: 10,
+    minHeight: 38,
     justifyContent: 'center',
   },
   toggleText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
     color: colors.primary,
   },

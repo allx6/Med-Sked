@@ -654,7 +654,7 @@ export default function DashboardScreen({
 
         <ActivityIndicator
           size="small"
-          color="#2F6690"
+          color="#0B4F59"
           style={
             styles.loadingIndicator
           }
@@ -704,7 +704,7 @@ export default function DashboardScreen({
               loadDashboard(true)
             }
 
-            tintColor="#2F6690"
+            tintColor="#0B4F59"
 
           />
 
@@ -1697,7 +1697,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#09161C',
+      '#116F7A',
   },
 
 
@@ -1713,7 +1713,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
 
     backgroundColor:
-      '#09161C',
+      '#116F7A',
 
   },
 
@@ -1728,7 +1728,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -1746,7 +1746,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#F2F5F1',
+    color: '#FFFFFF',
 
   },
 
@@ -1762,7 +1762,7 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
 
-    color: '#A9BAC0',
+    color: '#A7CDD0',
 
   },
 
@@ -1813,7 +1813,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '600',
 
-    color: '#A9BAC0',
+    color: '#A7CDD0',
 
   },
 
@@ -1825,7 +1825,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#F2F5F1',
+    color: '#FFFFFF',
 
   },
 
@@ -1837,7 +1837,7 @@ const styles = StyleSheet.create({
 
     lineHeight: 18,
 
-    color: '#A9BAC0',
+    color: '#A7CDD0',
 
   },
 
@@ -1948,7 +1948,7 @@ const styles = StyleSheet.create({
   aiIconText: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
   aiTextWrap: {
     flex: 1,
@@ -2003,7 +2003,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#F2F5F1',
+    color: '#FFFFFF',
 
   },
 
@@ -2013,7 +2013,7 @@ const styles = StyleSheet.create({
 
     fontSize: 11,
 
-    color: '#A9BAC0',
+    color: '#A7CDD0',
 
   },
 
@@ -2025,7 +2025,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '800',
 
-    color: '#66D6C5',
+    color: '#83DBDE',
 
   },
 
@@ -2122,7 +2122,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#2F6690',
+    color: '#0B4F59',
 
   },
 
@@ -2162,7 +2162,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -2263,7 +2263,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '800',
 
-    color: '#2F6690',
+    color: '#0B4F59',
 
   },
 
@@ -2332,7 +2332,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#2F6690',
+    color: '#0B4F59',
 
   },
 
@@ -2434,7 +2434,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -2545,7 +2545,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -2661,7 +2661,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '800',
 
-    color: '#2F6690',
+    color: '#0B4F59',
 
   },
 

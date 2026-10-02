@@ -10,9 +10,29 @@ import {
 
 const medSkedLogo = require('../assets/medsked.png');
 
+const steps = [
+  {
+    number: '1',
+    title: 'Add your medications',
+    description: 'Enter dosage, frequency, and how many you have on hand. It takes under a minute.',
+  },
+  {
+    number: '2',
+    title: 'Set your schedule',
+    description: 'Pick the days and times, and MedSked handles reminders across your devices.',
+  },
+  {
+    number: '3',
+    title: 'Stay on track',
+    description: 'Log doses in one tap, follow your adherence, and see when a refill is due.',
+  },
+];
+
 export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) {
   return (
     <View style={styles.container}>
+      <View style={styles.decorRight} />
+      <View style={styles.decorLeft} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -66,6 +86,21 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
           </View>
         </View>
 
+        <View style={styles.stepsSection}>
+          <Text style={styles.stepsTitle}>Three steps to a routine that sticks.</Text>
+          <View style={styles.steps}>
+            {steps.map((step) => (
+              <View key={step.number} style={styles.step}>
+                <View style={styles.numberCircle}>
+                  <Text style={styles.number}>{step.number}</Text>
+                </View>
+                <Text style={styles.stepTitle}>{step.title}</Text>
+                <Text style={styles.stepDescription}>{step.description}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.bottomRule} />
       </ScrollView>
     </View>
@@ -73,24 +108,34 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09161C' },
+  container: { flex: 1, overflow: 'hidden', backgroundColor: '#116F7A' },
   scrollContent: { flexGrow: 1, width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 28 },
-  header: { minHeight: 88, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#20343B' },
+  header: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logo: { width: 42, height: 42 },
-  brandName: { color: '#F2F6F2', fontSize: 20, fontWeight: '700' },
-  signInButton: { minWidth: 88, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderWidth: 1, borderColor: '#365158', borderRadius: 6 },
-  signInText: { color: '#E5EFEC', fontSize: 14, fontWeight: '600' },
-  hero: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 74, paddingBottom: 92 },
-  eyebrow: { color: '#66D6C5', fontSize: 12, fontWeight: '700', textAlign: 'center', marginBottom: 24 },
-  title: { maxWidth: 860, color: '#F2F5F1', fontFamily: 'Georgia', fontSize: 48, lineHeight: 59, textAlign: 'center' },
-  highlight: { color: '#54D4C0' },
-  description: { maxWidth: 590, color: '#A9BAC0', fontSize: 17, lineHeight: 27, textAlign: 'center', marginTop: 23 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 34 },
-  primaryButton: { minWidth: 174, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 22, borderRadius: 6, backgroundColor: '#3CC9B5' },
-  primaryButtonText: { color: '#08201F', fontSize: 15, fontWeight: '700' },
-  secondaryButton: { minWidth: 190, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 22, borderWidth: 1, borderColor: '#365158', borderRadius: 6, backgroundColor: '#0D1D23' },
-  secondaryButtonText: { color: '#E5EFEC', fontSize: 15, fontWeight: '600' },
+  brandName: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+  signInButton: { minWidth: 82, minHeight: 36, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: '#0B4F59', borderRadius: 6, backgroundColor: '#0B4F59' },
+  signInText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  hero: { minHeight: 320, alignItems: 'center', justifyContent: 'center', paddingTop: 36, paddingBottom: 50 },
+  eyebrow: { color: '#83DBDE', fontSize: 11, fontWeight: '700', textAlign: 'center', marginBottom: 18 },
+  title: { maxWidth: 780, color: '#FFFFFF', fontSize: 34, lineHeight: 39, fontWeight: '800', textAlign: 'center' },
+  highlight: { color: '#78D6F3' },
+  description: { maxWidth: 590, color: '#A7CDD0', fontSize: 16, lineHeight: 22, textAlign: 'center', marginTop: 16 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 25 },
+  primaryButton: { minWidth: 150, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderRadius: 6, backgroundColor: '#0B4F59' },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  secondaryButton: { minWidth: 162, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderWidth: 1, borderColor: '#0B4F59', borderRadius: 6, backgroundColor: 'transparent' },
+  secondaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  stepsSection: { borderTopWidth: 1, borderTopColor: '#3A858D', paddingTop: 56, paddingBottom: 78 },
+  stepsTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', marginBottom: 44 },
+  steps: { flexDirection: 'row', flexWrap: 'wrap', gap: 28 },
+  step: { flexGrow: 1, flexBasis: 200, maxWidth: 330, minWidth: 0 },
+  numberCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#237F89', marginBottom: 12 },
+  number: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  stepTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  stepDescription: { color: '#A7CDD0', fontSize: 13, lineHeight: 18 },
+  decorRight: { position: 'absolute', zIndex: 1, pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', top: 314, right: -44 },
+  decorLeft: { position: 'absolute', zIndex: 1, pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', bottom: -54, left: -76 },
   pressed: { opacity: 0.78 },
-  bottomRule: { height: 1, backgroundColor: '#20343B' },
+  bottomRule: { height: 1, backgroundColor: '#3A858D' },
 });

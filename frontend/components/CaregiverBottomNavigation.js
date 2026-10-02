@@ -66,10 +66,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 7,
     borderRadius: radius.xl,
-    backgroundColor: colors.card,
+    backgroundColor: colors.navigation,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#1E2A4A',
+    shadowColor: '#17313A',
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: -2 },
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   navItemActive: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.navigationActive,
   },
   navItemPressed: {
     opacity: 0.8,
@@ -91,19 +91,19 @@ const styles = StyleSheet.create({
   navIcon: {
     fontSize: 18,
     marginBottom: 2,
-    color: colors.textSecondary,
+    color: colors.navigationText,
   },
   navIconActive: {
-    color: colors.primary,
+    color: colors.white,
   },
   navLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: colors.navigationText,
     textAlign: 'center',
   },
   navLabelActive: {
-    color: colors.primary,
+    color: colors.white,
     fontWeight: '800',
   },
 });

@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
 
   wrapper: {
     flex: 1,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   scroll: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
 
   unitChipSelected: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
     backgroundColor: '#EAF3F9',
   },
 
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
 
   unitChipTextSelected: {
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   title: {
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
     borderRadius: 10,
 
     paddingVertical: 14,

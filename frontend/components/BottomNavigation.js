@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
 
     backgroundColor:
-      colors.card,
+      colors.navigation,
 
     borderWidth: 1,
 
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   navItemActive: {
 
     backgroundColor:
-      colors.primarySoft,
+      colors.navigationActive,
   },
 
 
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
 
     lineHeight: 23,
 
-    color: colors.textSecondary,
+    color: colors.navigationText,
 
     textAlign: 'center',
   },
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
 
   navIconActive: {
 
-    color: colors.primary,
+    color: colors.white,
   },
 
 
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '600',
 
-    color: colors.textSecondary,
+    color: colors.navigationText,
 
     textAlign: 'center',
   },
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
 
   navLabelActive: {
 
-    color: colors.primary,
+    color: colors.white,
 
     fontWeight: '800',
   },

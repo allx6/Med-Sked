@@ -1171,7 +1171,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
     width: '100%',
     maxWidth: 760,
     alignSelf: 'center',
@@ -1201,7 +1201,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#D8E6E3',
+    color: '#D8F0F2',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1218,7 +1218,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   compactTitle: {
@@ -1227,7 +1227,7 @@ const styles = StyleSheet.create({
 
   subtitle: {
     fontSize: 14,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
     marginTop: 2,
   },
 
@@ -1273,13 +1273,13 @@ const styles = StyleSheet.create({
   filterSection: {
     marginBottom: 12,
     width: '100%',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   },
 
   filterTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
     marginBottom: 7,
   },
 
@@ -1304,8 +1304,8 @@ const styles = StyleSheet.create({
   },
 
   activeFilterChip: {
-    backgroundColor: '#2F6690',
-    borderColor: '#2F6690',
+    backgroundColor: '#0B4F59',
+    borderColor: '#0B4F59',
   },
 
   filterChipText: {
@@ -1321,7 +1321,7 @@ const styles = StyleSheet.create({
   resultCount: {
     marginTop: 10,
     fontSize: 12,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
     textAlign: 'center',
   },
 
@@ -1337,7 +1337,7 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 10,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
     fontSize: 14,
   },
 
@@ -1374,12 +1374,12 @@ const styles = StyleSheet.create({
   dateHeaderText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   dateCount: {
     fontSize: 12,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   // =================================================
@@ -1394,13 +1394,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
     marginBottom: 6,
   },
 
   emptyText: {
     fontSize: 14,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -1539,7 +1539,7 @@ const styles = StyleSheet.create({
   takeButton: {
     flex: 1,
     minWidth: 120,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
     borderRadius: 8,
     paddingVertical: 11,
     alignItems: 'center',

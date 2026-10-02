@@ -323,11 +323,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
   headerRow: { marginBottom: spacing.md },
-  backText: { color: '#D8E6E3', fontWeight: '700', fontSize: 15 },
-  pageTitle: { fontSize: 28, fontWeight: '800', color: '#F2F5F1', marginBottom: 4 },
-  pageSubtitle: { fontSize: 14, color: '#A9BAC0', marginBottom: spacing.lg },
+  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15 },
+  pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
+  pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   section: { marginBottom: spacing.xl },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#F2F5F1', marginBottom: spacing.md },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.md },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -421,5 +421,5 @@ const styles = StyleSheet.create({
   confirmationConfirm: { backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 8, paddingHorizontal: 12 },
   confirmationConfirmText: { color: colors.white, fontWeight: '800' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.md, color: '#A9BAC0' },
+  loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
 });

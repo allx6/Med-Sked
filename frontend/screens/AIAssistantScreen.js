@@ -271,14 +271,14 @@ const styles = StyleSheet.create({
     width: 56,
   },
   backText: {
-    color: '#D8E6E3',
+    color: '#D8F0F2',
     fontSize: 15,
     fontWeight: '700',
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
   chatArea: {
     flex: 1,

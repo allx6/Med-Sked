@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   editText: {
 
     color:
-      '#2F6690',
+      '#0B4F59',
 
     fontSize: 13,
 
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   scheduleText: {
 
     color:
-      '#2F6690',
+      '#0B4F59',
 
     fontSize: 13,
 
