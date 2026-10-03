@@ -301,13 +301,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 18,
   },
 
   logoImage: {
-    width: 28,
-    height: 28,
-    marginRight: 7,
+    width: 48,
+    height: 48,
+    marginRight: 10,
   },
 
   logoCircle: {
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
 
   logoText: {
-    fontSize: 13,
+    fontSize: 20,
 
     fontWeight: '600',
 
@@ -355,12 +355,12 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
 
-    maxWidth: 276,
+    maxWidth: 420,
 
     alignSelf: 'center',
 
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 30,
+    paddingHorizontal: 32,
 
     borderRadius: 12,
 
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 14,
+    fontSize: 20,
 
     fontWeight: '900',
 
@@ -390,33 +390,33 @@ const styles = StyleSheet.create({
   },
 
   subtitle: {
-    marginTop: 5,
+    marginTop: 8,
 
-    marginBottom: 14,
+    marginBottom: 20,
 
-    fontSize: 9,
+    fontSize: 13,
 
-    lineHeight: 13,
+    lineHeight: 19,
 
     color: '#6B7280',
     textAlign: 'center',
   },
 
   authLabel: {
-    fontSize: 9,
-    marginBottom: 4,
+    fontSize: 13,
+    marginBottom: 6,
   },
 
   authInput: {
-    minHeight: 29,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    fontSize: 11,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontSize: 14,
   },
 
   authPasswordRow: {
-    minHeight: 29,
-    borderRadius: 5,
+    minHeight: 44,
+    borderRadius: 7,
   },
 
   inputGroup: {
@@ -462,14 +462,14 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     alignSelf: 'flex-end',
     color: '#0B4F59',
-    fontSize: 8,
+    fontSize: 12,
     fontWeight: '700',
-    marginTop: -10,
-    marginBottom: 8,
+    marginTop: -6,
+    marginBottom: 12,
   },
 
   loginButton: {
-    minHeight: 32,
+    minHeight: 46,
 
     marginTop: 5,
 
@@ -512,8 +512,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 18,
+    marginBottom: 12,
   },
 
   dividerLine: {
@@ -523,20 +523,20 @@ const styles = StyleSheet.create({
   },
 
   registerText: {
-    fontSize: 8,
+    fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
   },
 
   registerLink: {
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '700',
     color: '#0B4F59',
     textAlign: 'center',
   },
 
   createAccountButton: {
-    minHeight: 29,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

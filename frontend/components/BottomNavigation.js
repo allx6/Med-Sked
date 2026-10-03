@@ -5,10 +5,10 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  Platform,
 } from 'react-native';
 
-import { colors, radius } from '../theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { colors } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BottomNavigation({
@@ -37,6 +37,8 @@ export default function BottomNavigation({
 
     return (
       <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
         onPress={onPress}
         hitSlop={6}
         style={({ pressed }) => [
@@ -52,16 +54,16 @@ export default function BottomNavigation({
 
         {/* ICON */}
 
-        <Text
+        <MaterialCommunityIcons
+          name={icon}
+          size={22}
           style={[
             styles.navIcon,
 
             active &&
               styles.navIconActive,
           ]}
-        >
-          {icon}
-        </Text>
+        />
 
 
         {/* LABEL */}
@@ -99,7 +101,7 @@ export default function BottomNavigation({
         {/* HOME */}
 
         <NavItem
-          icon="⌂"
+          icon="home-outline"
           label="Home"
           screen="dashboard"
           onPress={onHome}
@@ -109,7 +111,7 @@ export default function BottomNavigation({
         {/* MEDICATIONS */}
 
         <NavItem
-          icon="💊"
+          icon="pill"
           label="Meds"
           screen="medications"
           onPress={onMedications}
@@ -119,7 +121,7 @@ export default function BottomNavigation({
         {/* SCHEDULE */}
 
         <NavItem
-          icon="🗓"
+          icon="calendar-month-outline"
           label="Schedule"
           screen="schedules"
           onPress={onSchedules}
@@ -129,14 +131,14 @@ export default function BottomNavigation({
         {/* HISTORY */}
 
         <NavItem
-          icon="▤"
+          icon="history"
           label="History"
           screen="doseHistory"
           onPress={onHistory}
         />
 
         <NavItem
-          icon="⚙"
+          icon="account-outline"
           label="Profile"
           screen="profile"
           onPress={onProfile}
@@ -160,27 +162,15 @@ const styles = StyleSheet.create({
   // ===================================================
 
   outerContainer: {
-
-    /*
-     * IMPORTANT:
-     * This is intentionally NOT absolute.
-     *
-     * The navigation now occupies its own space
-     * instead of covering the screen content.
-     */
-
     width: '100%',
 
     backgroundColor: colors.background,
 
-    paddingHorizontal: 12,
+    paddingHorizontal: 2,
 
-    paddingTop: 8,
+    paddingTop: 1,
 
-    paddingBottom:
-      Platform.OS === 'ios'
-        ? 18
-        : 10,
+    paddingBottom: 10,
   },
 
 
@@ -203,33 +193,15 @@ const styles = StyleSheet.create({
     justifyContent:
       'space-around',
 
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
 
-    paddingVertical: 7,
+    paddingVertical: 5,
 
-    borderRadius: radius.xl,
+    borderRadius: 12,
 
     backgroundColor:
       colors.navigation,
 
-    borderWidth: 1,
-
-    borderColor:
-      colors.border,
-
-    shadowColor:
-      colors.text,
-
-    shadowOpacity: 0.06,
-
-    shadowRadius: 10,
-
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-
-    elevation: 3,
   },
 
 
@@ -241,18 +213,18 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    minHeight: 55,
+    minHeight: 50,
 
     alignItems: 'center',
 
     justifyContent:
       'center',
 
-    paddingVertical: 5,
+    paddingVertical: 3,
 
     paddingHorizontal: 3,
 
-    borderRadius: radius.md,
+    borderRadius: 12,
   },
 
 
@@ -282,14 +254,7 @@ const styles = StyleSheet.create({
   // ===================================================
 
   navIcon: {
-
-    fontSize: 20,
-
-    lineHeight: 23,
-
-    color: colors.navigationText,
-
-    textAlign: 'center',
+    color: '#E8F3EF',
   },
 
 
@@ -309,13 +274,13 @@ const styles = StyleSheet.create({
 
   navLabel: {
 
-    marginTop: 3,
+    marginTop: 2,
 
-    fontSize: 10,
+    fontSize: 9,
 
     fontWeight: '600',
 
-    color: colors.navigationText,
+    color: '#E8F3EF',
 
     textAlign: 'center',
   },

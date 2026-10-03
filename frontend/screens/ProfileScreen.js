@@ -5,7 +5,7 @@ import { getCaregiverRequestsForPatient } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 
-export default function ProfileScreen({ user, token, unreadNotificationCount = 0, onOpenNotifications, onOpenAnalytics, onLogout, onBack, onOpenCaregiverRequests, onOpenPatientConnections }) {
+export default function ProfileScreen({ user, token, unreadNotificationCount = 0, onOpenNotifications, onOpenAnalytics, onLogout, onOpenCaregiverRequests, onOpenPatientConnections }) {
   const patientId = user?.patientId || 'Not assigned';
   const [pendingRequestCount, setPendingRequestCount] = useState(null);
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
@@ -48,14 +48,6 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.headerRow}>
-          {onBack ? (
-            <Pressable onPress={onBack} hitSlop={8}>
-              <Text style={styles.backText}>Back</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
         <View style={styles.titleRow}>
           <View>
             <Text style={styles.pageTitle}>Profile</Text>

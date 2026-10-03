@@ -80,9 +80,11 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAnalytics(true)} tintColor={colors.primary} />}
       >
-        <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+        {onBack ? (
+          <Pressable onPress={onBack} hitSlop={8}>
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+        ) : null}
         <Text style={styles.title}>Adherence Analytics</Text>
         <Text style={styles.subtitle}>Real dose outcomes for the selected period.</Text>
 

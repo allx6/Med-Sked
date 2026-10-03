@@ -93,8 +93,8 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   secondaryButton: { width: 160, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderWidth: 1, borderColor: '#0B4F59', borderRadius: 6, backgroundColor: 'transparent' },
   secondaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  decorRight: { position: 'absolute', zIndex: 1, pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', top: 314, right: -44 },
-  decorLeft: { position: 'absolute', zIndex: 1, pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', bottom: -54, left: -76 },
+  decorRight: { position: 'absolute', pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', top: 314, right: -44 },
+  decorLeft: { position: 'absolute', pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', bottom: -54, left: -76 },
   pressed: { opacity: 0.78 },
   bottomRule: { height: 1, backgroundColor: '#3A858D' },
 });
