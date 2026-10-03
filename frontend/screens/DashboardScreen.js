@@ -2094,7 +2094,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#0B4F59',
+    color: '#FFFFFF',
 
   },
 
