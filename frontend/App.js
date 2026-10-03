@@ -895,7 +895,7 @@ export default function App() {
             token={token}
             userRole={user.role}
             patientId={user.role === 'caregiver' ? selectedPatient?._id : null}
-            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : undefined}
+            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : () => setScreen('dashboard')}
           />
         )}
 
