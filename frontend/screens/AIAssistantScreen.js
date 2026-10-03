@@ -148,8 +148,13 @@ export default function AIAssistantScreen({
     >
       <View style={styles.header}>
         {onBack ? (
-          <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>Back</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={onBack}
+            hitSlop={8}
+          >
+            <Text style={styles.backText}>←</Text>
           </Pressable>
         ) : (
           <View style={styles.headerSpacer} />
@@ -272,7 +277,8 @@ const styles = StyleSheet.create({
   },
   backText: {
     color: '#D8F0F2',
-    fontSize: 15,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: '700',
   },
   title: {

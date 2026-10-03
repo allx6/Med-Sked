@@ -22,7 +22,7 @@ import {
 
 import { colors, radius, spacing, shadow } from '../theme';
 
-export default function CaregiverConnectionsScreen({ token, onBack, onOpenPatientMonitoring }) {
+export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitoring }) {
   const [connectedPatients, setConnectedPatients] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [email, setEmail] = useState('');
@@ -184,12 +184,6 @@ export default function CaregiverConnectionsScreen({ token, onBack, onOpenPatien
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadConnections(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.headerRow}>
-          <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-        </View>
-
         <Text style={styles.pageTitle}>Caregiver Connections</Text>
         <Text style={styles.pageSubtitle}>Search for a patient and manage current requests.</Text>
 
@@ -277,8 +271,6 @@ export default function CaregiverConnectionsScreen({ token, onBack, onOpenPatien
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  headerRow: { marginBottom: spacing.md },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15 },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
   pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   section: { marginBottom: spacing.xl },

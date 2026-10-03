@@ -80,8 +80,13 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAnalytics(true)} tintColor={colors.primary} />}
       >
-        <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>Back</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={onBack}
+          hitSlop={8}
+        >
+          <Text style={styles.backText}>←</Text>
         </Pressable>
         <Text style={styles.title}>Adherence Analytics</Text>
         <Text style={styles.subtitle}>Real dose outcomes for the selected period.</Text>
@@ -155,7 +160,7 @@ const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: spacing.lg, paddingBottom: 32 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
+  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 30, lineHeight: 36, marginBottom: spacing.md },
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
   subtitle: { color: '#A7CDD0', fontSize: 14, marginTop: 4, marginBottom: spacing.lg },
   rangeRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.lg },

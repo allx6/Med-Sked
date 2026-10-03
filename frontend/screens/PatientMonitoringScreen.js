@@ -196,8 +196,13 @@ export default function PatientMonitoringScreen({
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadOverview(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
-        <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>Back</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={onBack}
+          hitSlop={8}
+        >
+          <Text style={styles.backText}>←</Text>
         </Pressable>
 
         <Text style={styles.pageTitle}>{patientName}</Text>
@@ -466,7 +471,7 @@ export default function PatientMonitoringScreen({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
+  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 30, lineHeight: 36, marginBottom: spacing.md },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },
   pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   analyticsButton: { alignSelf: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14, marginBottom: spacing.lg },

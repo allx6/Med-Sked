@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Refre
 import { getMyPatients } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
 
-export default function CaregiverPatientsScreen({ token, onBack, onSelectPatient, onOpenConnections }) {
+export default function CaregiverPatientsScreen({ token, onSelectPatient, onOpenConnections }) {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,12 +47,6 @@ export default function CaregiverPatientsScreen({ token, onBack, onSelectPatient
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadPatients(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.headerRow}>
-          <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-        </View>
-
         <Text style={styles.pageTitle}>My Patients</Text>
         <Text style={styles.pageSubtitle}>Select a patient to review their medication routine.</Text>
 
@@ -113,8 +107,6 @@ export default function CaregiverPatientsScreen({ token, onBack, onSelectPatient
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  headerRow: { marginBottom: spacing.md },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15 },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },
   pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   errorBox: { backgroundColor: colors.dangerSoft, borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger, padding: spacing.md, marginBottom: spacing.md },
