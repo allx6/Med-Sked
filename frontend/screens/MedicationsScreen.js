@@ -1079,6 +1079,9 @@ const styles = StyleSheet.create({
   // ===================================================
 
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 36,
     paddingTop: 28,
     paddingBottom: 12,
@@ -1108,11 +1111,13 @@ const styles = StyleSheet.create({
   },
 
   headerContent: {
-    paddingRight: 104,
+    flex: 1,
+    minWidth: 0,
   },
 
   pageTitleRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
   },
@@ -1138,9 +1143,8 @@ const styles = StyleSheet.create({
   },
 
   headerAddButton: {
-    position: 'absolute',
-    right: 36,
-    bottom: 27,
+    flexShrink: 0,
+    marginLeft: 12,
     minWidth: 80,
     height: 28,
     alignItems: 'center',

@@ -876,7 +876,7 @@ export default function App() {
             token={token}
             unreadNotificationCount={unreadNotificationCount}
             onUnreadCountChange={refreshUnreadNotificationCount}
-            onBack={user.role === 'caregiver' ? () => setScreen('caregiverProfile') : undefined}
+            onBack={() => setScreen(user.role === 'caregiver' ? 'caregiverProfile' : 'profile')}
           />
         )}
 

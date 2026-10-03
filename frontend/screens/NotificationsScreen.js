@@ -96,16 +96,22 @@ export default function NotificationsScreen({ token, onBack, unreadNotificationC
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />}
       >
-        {onBack ? (
-          <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-        ) : null}
-
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Notifications</Text>
-            <Text style={styles.subtitle}>{unreadNotificationCount} unread</Text>
+          <View style={styles.headingGroup}>
+            {onBack ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                onPress={onBack}
+                hitSlop={8}
+              >
+                <Text style={styles.backText}>←</Text>
+              </Pressable>
+            ) : null}
+            <View>
+              <Text style={styles.title}>Notifications</Text>
+              <Text style={styles.subtitle}>{unreadNotificationCount} unread</Text>
+            </View>
           </View>
           {unreadNotificationCount > 0 ? (
             <Pressable onPress={markAllRead} disabled={workingId === 'all'}>
@@ -157,7 +163,8 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
+  headingGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 30, lineHeight: 36 },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.lg },
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
   subtitle: { color: '#A7CDD0', fontSize: 14, marginTop: 4 },
