@@ -1,5 +1,6 @@
 const DoseRecord = require('../models/DoseRecord');
 const { createMedicationNotifications } = require('./notificationService');
+const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 
 // A pending dose becomes missed 15 minutes after its scheduled local time.
 const MISSED_DOSE_GRACE_MINUTES = 15;
@@ -62,13 +63,17 @@ const parseScheduledDateTime = (scheduledDate, scheduledTime) => {
 
 const detectMissedDoses = async (now = new Date()) => {
   const pendingDoses = await DoseRecord.find({ status: 'pending' })
-    .populate('medicationId', 'name')
+    .populate('medicationId', 'name expirationDate')
     .lean();
 
   let markedMissed = 0;
   let notificationsCreated = 0;
 
   for (const dose of pendingDoses) {
+    if (isDoseDateAfterExpiration(dose.scheduledDate, dose.medicationId?.expirationDate)) {
+      continue;
+    }
+
     const scheduledAt = parseScheduledDateTime(
       dose.scheduledDate,
       dose.scheduledTime

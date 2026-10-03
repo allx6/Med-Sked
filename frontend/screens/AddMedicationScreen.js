@@ -15,7 +15,10 @@ import { createMedication } from '../services/api';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
-import { validateMedicationFields } from '../utils/medicationValidation';
+import {
+  getSafeUserErrorMessage,
+  validateMedicationFields,
+} from '../utils/medicationValidation';
 
 
 export default function AddMedicationScreen({
@@ -31,6 +34,7 @@ export default function AddMedicationScreen({
   const [frequencyUnit, setFrequencyUnit] = useState('hours');
   const [quantityOnHand, setQuantityOnHand] = useState('0');
   const [refillThreshold, setRefillThreshold] = useState('0');
+  const [expirationDate, setExpirationDate] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,7 +50,7 @@ export default function AddMedicationScreen({
 
     const dosage = `${dosageAmount.trim()} ${dosageUnit}`;
     const frequency = `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
-    const medicationError = validateMedicationFields({ name, dosage, frequency });
+    const medicationError = validateMedicationFields({ name, dosage, frequency, expirationDate });
 
     if (medicationError) {
       setError(medicationError);
@@ -60,6 +64,7 @@ export default function AddMedicationScreen({
         name: name.trim(),
         dosage,
         frequency,
+        expirationDate: expirationDate.trim() || null,
         quantityOnHand: Number(quantityOnHand),
         refillThreshold: Number(refillThreshold),
       };
@@ -79,8 +84,10 @@ export default function AddMedicationScreen({
       );
 
       setError(
-        error.message ||
-        'Failed to create medication.'
+        getSafeUserErrorMessage(
+          error,
+          'Unable to save the medication. Please check your connection and try again.'
+        )
       );
 
     } finally {
@@ -166,6 +173,16 @@ export default function AddMedicationScreen({
           />
 
           <TextField
+            label="Expiration date (required)"
+            placeholder="YYYY-MM-DD"
+            value={expirationDate}
+            onChangeText={setExpirationDate}
+            keyboardType="default"
+            editable={!loading}
+            maxLength={10}
+          />
+
+          <TextField
             label="Frequency interval"
             placeholder="e.g. 8"
             value={frequencyAmount}
@@ -228,9 +245,16 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
+
     flexGrow: 1,
+
     justifyContent: 'center',
+
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
     padding: 24,
+
   },
 
   card: {

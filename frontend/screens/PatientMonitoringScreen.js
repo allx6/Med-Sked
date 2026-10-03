@@ -19,6 +19,11 @@ import {
 } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import {
+  getMedicationExpirationState,
+  getSafeUserErrorMessage,
+} from '../utils/medicationValidation';
+import { getDoseActionErrorMessage } from '../utils/doseErrors';
 
 export default function PatientMonitoringScreen({
   token,
@@ -54,7 +59,12 @@ export default function PatientMonitoringScreen({
       setOverview(data || null);
     } catch (err) {
       console.error('Patient overview error:', err);
-      setError(err.message || 'Failed to load patient overview.');
+      setError(
+        getSafeUserErrorMessage(
+          err,
+          'Unable to load patient overview. Please check your connection and try again.'
+        )
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -107,6 +117,7 @@ export default function PatientMonitoringScreen({
         const pending = nextTodayDoses.filter((dose) => dose.status === 'pending').length;
         const missed = nextTodayDoses.filter((dose) => dose.status === 'missed').length;
         const skipped = nextTodayDoses.filter((dose) => dose.status === 'skipped').length;
+        const eligible = taken + missed + skipped;
 
         return {
           ...current,
@@ -119,13 +130,13 @@ export default function PatientMonitoringScreen({
             pending,
             missed,
             skipped,
-            percentage: total > 0 ? Math.round((taken / total) * 100) : 0,
+            percentage: eligible > 0 ? Math.round((taken / eligible) * 100) : 0,
           },
         };
       });
 
     } catch (err) {
-      Alert.alert('Dose update failed', err.message || 'Unable to update this dose.');
+      Alert.alert('Dose update failed', getDoseActionErrorMessage(err));
     } finally {
       setActionId(null);
     }
@@ -137,7 +148,12 @@ export default function PatientMonitoringScreen({
       await deleteMedication(token, medication._id, patient?._id);
       await loadOverview(true);
     } catch (err) {
-      setError(err.message || 'Unable to delete this medication.');
+      setError(
+        getSafeUserErrorMessage(
+          err,
+          'Unable to delete this medication. Please try again.'
+        )
+      );
     } finally {
       setActionId(null);
     }
@@ -149,7 +165,12 @@ export default function PatientMonitoringScreen({
       await deleteSchedule(token, schedule._id, patient?._id);
       await loadOverview(true);
     } catch (err) {
-      setError(err.message || 'Unable to delete this schedule.');
+      setError(
+        getSafeUserErrorMessage(
+          err,
+          'Unable to delete this schedule. Please try again.'
+        )
+      );
     } finally {
       setActionId(null);
     }
@@ -282,12 +303,20 @@ export default function PatientMonitoringScreen({
             </View>
           ) : (
             medications.map((medication) => {
+              const expirationState = getMedicationExpirationState(medication?.expirationDate);
+              const isExpired = expirationState.expired;
+
               return (
                 <View key={medication._id || medication.id} style={styles.doseCardContainer}>
                   <View style={styles.doseCard}>
                     <View style={styles.doseInfo}>
                       <Text style={styles.doseName}>{medication.name || 'Medication'}</Text>
                       <Text style={styles.doseMeta}>{medication.dosage || 'Dose not specified'} • {medication.frequency || 'Frequency not specified'}</Text>
+                      {isExpired ? (
+                        <Text style={[styles.doseMeta, styles.expiredMeta]}>Expired • {expirationState.expirationDate}</Text>
+                      ) : expirationState.expirationDate ? (
+                        <Text style={styles.doseMeta}>Expires: {expirationState.expirationDate}</Text>
+                      ) : null}
                       <Text style={styles.doseMeta}>
                         Refill: {Number(medication.quantityOnHand ?? 0) <= 0 ? 'Out of stock' : Number(medication.quantityOnHand ?? 0) <= Number(medication.refillThreshold ?? 0) ? 'Low stock' : 'In stock'} ({Number(medication.quantityOnHand ?? 0)} on hand, threshold {Number(medication.refillThreshold ?? 0)})
                       </Text>
@@ -376,7 +405,12 @@ export default function PatientMonitoringScreen({
             </View>
           ) : (
             schedules.map((schedule) => {
-              const medication = schedule.medicationId || {};
+              const scheduleMedication = schedule.medicationId || {};
+              const scheduleMedicationId = scheduleMedication._id || scheduleMedication;
+              const medication = medications.find((item) => (
+                String(item._id || item.id) === String(scheduleMedicationId)
+              )) || scheduleMedication;
+              const medicationExpired = getMedicationExpirationState(medication?.expirationDate).expired;
               const days = Array.isArray(schedule.days) && schedule.days.length > 0
                 ? schedule.days.join(', ')
                 : 'Days not specified';
@@ -388,8 +422,8 @@ export default function PatientMonitoringScreen({
                     <Text style={styles.doseMeta}>{schedule.time || schedule.scheduledTime || 'Time not specified'}</Text>
                     <Text style={styles.doseMeta}>{days}</Text>
                   </View>
-                  <Text style={[styles.statusText, schedule.enabled === false ? styles.skipped : styles.success]}>
-                    {schedule.enabled === false ? 'Inactive' : 'Active'}
+                  <Text style={[styles.statusText, medicationExpired ? styles.expiredSchedule : schedule.enabled === false ? styles.skipped : styles.success]}>
+                    {medicationExpired ? 'Expired' : schedule.enabled === false ? 'Inactive' : 'Active'}
                   </Text>
                   {canSupportAdherence ? (
                     <View style={styles.resourceActions}>
@@ -506,6 +540,7 @@ const styles = StyleSheet.create({
   doseInfo: { flex: 1 },
   doseName: { fontSize: 15, fontWeight: '700', color: colors.text },
   doseMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  expiredMeta: { color: colors.dangerText, fontWeight: '700' },
   doseDate: { fontSize: 14, color: colors.textSecondary, marginTop: 3 },
   resourceActions: { marginLeft: spacing.sm, gap: 5 },
   inlineAction: { paddingVertical: 4, paddingHorizontal: 5 },
@@ -523,6 +558,7 @@ const styles = StyleSheet.create({
   confirmDeleteButton: { backgroundColor: colors.danger, borderRadius: radius.sm, paddingVertical: 8, paddingHorizontal: 12 },
   confirmDeleteText: { color: colors.white, fontWeight: '800' },
   statusText: { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
+  expiredSchedule: { color: colors.dangerText },
   statusInDetails: { marginTop: 4 },
   success: { color: colors.success },
   skipped: { color: colors.skipped },

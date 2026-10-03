@@ -10,24 +10,6 @@ import {
 
 const medSkedLogo = require('../assets/medsked.png');
 
-const steps = [
-  {
-    number: '1',
-    title: 'Add your medications',
-    description: 'Enter dosage, frequency, and how many you have on hand. It takes under a minute.',
-  },
-  {
-    number: '2',
-    title: 'Set your schedule',
-    description: 'Pick the days and times, and MedSked handles reminders across your devices.',
-  },
-  {
-    number: '3',
-    title: 'Stay on track',
-    description: 'Log doses in one tap, follow your adherence, and see when a refill is due.',
-  },
-];
-
 export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) {
   return (
     <View style={styles.container}>
@@ -86,21 +68,6 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
           </View>
         </View>
 
-        <View style={styles.stepsSection}>
-          <Text style={styles.stepsTitle}>Three steps to a routine that sticks.</Text>
-          <View style={styles.steps}>
-            {steps.map((step) => (
-              <View key={step.number} style={styles.step}>
-                <View style={styles.numberCircle}>
-                  <Text style={styles.number}>{step.number}</Text>
-                </View>
-                <Text style={styles.stepTitle}>{step.title}</Text>
-                <Text style={styles.stepDescription}>{step.description}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
         <View style={styles.bottomRule} />
       </ScrollView>
     </View>
@@ -122,18 +89,10 @@ const styles = StyleSheet.create({
   highlight: { color: '#78D6F3' },
   description: { maxWidth: 590, color: '#A7CDD0', fontSize: 16, lineHeight: 22, textAlign: 'center', marginTop: 16 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 25 },
-  primaryButton: { minWidth: 150, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderRadius: 6, backgroundColor: '#0B4F59' },
+  primaryButton: { width: 160, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderRadius: 6, backgroundColor: '#0B4F59' },
   primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  secondaryButton: { minWidth: 162, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderWidth: 1, borderColor: '#0B4F59', borderRadius: 6, backgroundColor: 'transparent' },
-  secondaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-  stepsSection: { borderTopWidth: 1, borderTopColor: '#3A858D', paddingTop: 56, paddingBottom: 78 },
-  stepsTitle: { color: '#FFFFFF', fontSize: 21, fontWeight: '800', marginBottom: 44 },
-  steps: { flexDirection: 'row', flexWrap: 'wrap', gap: 28 },
-  step: { flexGrow: 1, flexBasis: 200, maxWidth: 330, minWidth: 0 },
-  numberCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#237F89', marginBottom: 12 },
-  number: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
-  stepTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', marginBottom: 6 },
-  stepDescription: { color: '#A7CDD0', fontSize: 13, lineHeight: 18 },
+  secondaryButton: { width: 160, minHeight: 42, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: '#0B4F59', borderRadius: 6, backgroundColor: 'transparent' },
+  secondaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   decorRight: { position: 'absolute', zIndex: 1, pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', top: 314, right: -44 },
   decorLeft: { position: 'absolute', zIndex: 1, pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', bottom: -54, left: -76 },
   pressed: { opacity: 0.78 },

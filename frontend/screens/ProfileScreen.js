@@ -171,7 +171,7 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 32 },
+  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: spacing.lg, paddingBottom: 32 },
   headerRow: { marginBottom: spacing.md },
   backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15 },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },

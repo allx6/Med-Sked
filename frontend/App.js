@@ -637,6 +637,7 @@ export default function App() {
           token={token}
           patientId={selectedPatient._id}
           schedule={caregiverSchedule}
+          autoReturnOnSuccess
           onScheduleUpdated={() => setScreen('patientMonitoring')}
           onCancel={() => setScreen('patientMonitoring')}
         />

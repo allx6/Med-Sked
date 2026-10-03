@@ -389,6 +389,7 @@ export default function ScheduleScreen({
   return (
 
     <View style={styles.container}>
+      <View style={styles.content}>
 
       {/* =================================================
           HEADER
@@ -579,6 +580,8 @@ export default function ScheduleScreen({
         }
       />
 
+      </View>
+
       <ConfirmationDialog
         visible={showDeleteConfirm}
         title="Delete schedule?"
@@ -614,6 +617,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#116F7A',
+  },
+
+  content: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
     paddingHorizontal: 20,
   },
 

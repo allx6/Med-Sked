@@ -199,20 +199,6 @@ export default function CaregiverDashboardScreen({
 
           </View>
 
-          <Pressable
-            onPress={onLogout}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.logoutButton,
-              pressed &&
-                styles.buttonPressed,
-            ]}
-          >
-            <Text style={styles.logoutText}>
-              Logout
-            </Text>
-          </Pressable>
-
         </View>
 
         {/* =================================================
@@ -644,23 +630,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: '#6B7280',
-  },
-
-  logoutButton: {
-    minHeight: 42,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E4EAF0',
-  },
-
-  logoutText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#DC2626',
   },
 
   errorBox: {

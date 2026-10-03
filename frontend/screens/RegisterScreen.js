@@ -20,6 +20,7 @@ import {
 import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
+import { getSafeUserErrorMessage } from '../utils/medicationValidation';
 
 const medSkedLogo = require('../assets/medsked.png');
 
@@ -162,9 +163,10 @@ export default function RegisterScreen({
 
 
     } catch (error) {
-      const message =
-        error?.message ||
-        'Unable to create your account.';
+      const message = getSafeUserErrorMessage(
+        error,
+        'Unable to create your account.'
+      );
 
       setAuthError(message);
     } finally {

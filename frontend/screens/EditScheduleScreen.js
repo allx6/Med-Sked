@@ -27,6 +27,7 @@ import {
   updateSchedule,
 } from '../services/api';
 import {
+  getScheduleSubmissionErrorMessage,
   parseLocalDate,
   validateScheduleFields,
 } from '../utils/scheduleValidation';
@@ -108,6 +109,7 @@ export default function EditScheduleScreen({
     useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const weekDays = [
     'Monday',
@@ -321,6 +323,8 @@ export default function EditScheduleScreen({
   // =====================================================
 
   const handleUpdate = async () => {
+    setFormError('');
+
     const editableFields = {
       time: timeSelection
         ? to24HourTime(
@@ -339,9 +343,14 @@ export default function EditScheduleScreen({
       dose: (schedule?.dose || selectedMedication?.dosage || dose || '').trim(),
       startDate: schedule?.startDate || formatDate(startDate),
       ...editableFields,
-    }, { allowPastStartDate: true });
+    }, {
+      allowPastStartDate: true,
+      medicationExpirationDate: selectedMedication?.expirationDate,
+      validateStartDateExpiration: false,
+      validateEndDateExpiration: true,
+    });
     if (scheduleError) {
-      Alert.alert('Invalid Schedule', scheduleError);
+      setFormError(scheduleError);
       return;
     }
 
@@ -397,11 +406,7 @@ export default function EditScheduleScreen({
         error
       );
 
-      Alert.alert(
-        'Error',
-        error.message ||
-          'Failed to update schedule.'
-      );
+      setFormError(getScheduleSubmissionErrorMessage(error));
     } finally {
       setSaving(false);
     }
@@ -451,6 +456,12 @@ export default function EditScheduleScreen({
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
       >
+
+        {formError ? (
+          <View style={styles.errorBox} accessibilityRole="alert">
+            <Text style={styles.errorText}>{formError}</Text>
+          </View>
+        ) : null}
 
         {/* =================================================
             MEDICATION
@@ -527,35 +538,40 @@ export default function EditScheduleScreen({
         </Text>
 
         <View style={styles.daysContainer}>
-
-          {weekDays.map(day => (
-            <Pressable
-              key={day}
-              style={[
-                styles.dayButton,
-
-                days.includes(day) &&
-                  styles.selectedDay,
-              ]}
-              onPress={() =>
-                toggleDay(day)
-              }
-            >
-
-              <Text
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.daysScrollContent}
+            style={styles.daysScrollWrap}
+          >
+            {weekDays.map(day => (
+              <Pressable
+                key={day}
                 style={[
-                  styles.dayText,
+                  styles.dayButton,
 
                   days.includes(day) &&
-                    styles.selectedDayText,
+                    styles.selectedDay,
                 ]}
+                onPress={() =>
+                  toggleDay(day)
+                }
               >
-                {day.substring(0, 3)}
-              </Text>
 
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    styles.dayText,
 
+                    days.includes(day) &&
+                      styles.selectedDayText,
+                  ]}
+                >
+                  {day.substring(0, 3)}
+                </Text>
+
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
 
         {/* =================================================
@@ -581,6 +597,12 @@ export default function EditScheduleScreen({
         <Text style={styles.label}>
           End Date
         </Text>
+
+        {selectedMedication?.expirationDate ? (
+          <Text style={styles.expirationHint}>
+            End date is required because this medication expires on {selectedMedication.expirationDate}.
+          </Text>
+        ) : null}
 
         {isWeb ? (
           <input
@@ -767,6 +789,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 15,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
 
   backButton: {
@@ -793,6 +818,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 50,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
 
   label: {
@@ -801,6 +829,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginTop: 18,
     marginBottom: 8,
+  },
+
+  errorBox: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  expirationHint: {
+    marginTop: -3,
+    marginBottom: 8,
+    color: '#D8F0F2',
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   medicationList: {
@@ -909,9 +960,20 @@ const styles = StyleSheet.create({
   },
 
   daysContainer: {
+    width: '100%',
+    maxWidth: '100%',
+  },
+
+  daysScrollWrap: {
+    maxWidth: '100%',
+  },
+
+  daysScrollContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
+    paddingRight: 8,
+    paddingVertical: 2,
   },
 
   dayButton: {
@@ -922,6 +984,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D9DEE8',
     alignItems: 'center',
+    minWidth: 55,
   },
 
   selectedDay: {

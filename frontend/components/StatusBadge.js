@@ -7,6 +7,7 @@ const STATUS = {
   pending: { label: 'Pending', bg: colors.pendingSoft, text: colors.pending },
   skipped: { label: 'Skipped', bg: colors.skippedSoft, text: colors.skipped },
   missed: { label: 'Missed', bg: colors.missedSoft, text: colors.missed },
+  expired: { label: 'Expired', bg: colors.dangerSoft, text: colors.danger },
   active: { label: 'Active', bg: colors.successSoft, text: colors.success },
   connected: { label: 'Connected', bg: colors.successSoft, text: colors.success },
   disabled: { label: 'Disabled', bg: colors.skippedSoft, text: colors.skipped },

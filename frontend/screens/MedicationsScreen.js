@@ -22,6 +22,10 @@ import {
 } from '../services/api';
 
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import {
+  getMedicationExpirationState,
+  getSafeUserErrorMessage,
+} from '../utils/medicationValidation';
 
 
 // =====================================================
@@ -125,8 +129,10 @@ export default function MedicationsScreen({
         );
 
         setError(
-          err.message ||
-            'Failed to load medications.'
+          getSafeUserErrorMessage(
+            err,
+            'Unable to load medications. Please check your connection and try again.'
+          )
         );
 
       } finally {
@@ -202,7 +208,10 @@ export default function MedicationsScreen({
     } catch (deleteError) {
       Alert.alert(
         'Delete failed',
-        deleteError.message || 'Failed to delete medication.'
+        getSafeUserErrorMessage(
+          deleteError,
+          'Unable to delete this medication. Please try again.'
+        )
       );
     }
   };
@@ -288,6 +297,9 @@ export default function MedicationsScreen({
     item,
   }) => {
 
+    const expirationState = getMedicationExpirationState(item?.expirationDate);
+    const isExpired = expirationState.expired;
+
     const medicationSchedules =
       getMedicationSchedules(
         item._id
@@ -360,6 +372,12 @@ export default function MedicationsScreen({
                 {item.frequency}
               </Text>
 
+            ) : null}
+
+            {isExpired ? (
+              <Text style={styles.expiredInlineBadge}>Expired</Text>
+            ) : expirationState.expirationDate ? (
+              <Text style={styles.expirationText}>Expires: {expirationState.expirationDate}</Text>
             ) : null}
 
           </View>
@@ -464,10 +482,10 @@ export default function MedicationsScreen({
 
             <Text
               style={
-                styles.activeStatus
+                isExpired ? styles.expiredStatus : styles.activeStatus
               }
             >
-              Active
+              {isExpired ? 'Expired' : 'Active'}
             </Text>
 
           </View>
@@ -635,19 +653,23 @@ export default function MedicationsScreen({
                     <View
                       style={[
                         styles.enabledBadge,
-                        !schedule.enabled &&
-                          styles.disabledBadge,
+                        isExpired
+                          ? styles.expiredBadge
+                          : !schedule.enabled && styles.disabledBadge,
                       ]}
                     >
 
                       <Text
                         style={[
                           styles.enabledText,
-                          !schedule.enabled &&
-                            styles.disabledText,
+                          isExpired
+                            ? styles.expiredBadgeText
+                            : !schedule.enabled && styles.disabledText,
                         ]}
                       >
-                        {schedule.enabled
+                        {isExpired
+                          ? 'EXPIRED'
+                          : schedule.enabled
                           ? 'ON'
                           : 'OFF'}
                       </Text>
@@ -716,6 +738,7 @@ export default function MedicationsScreen({
         styles.container
       }
     >
+      <View style={styles.content}>
 
       {/* HEADER */}
 
@@ -990,6 +1013,8 @@ export default function MedicationsScreen({
 
       )}
 
+      </View>
+
       <ConfirmationDialog
         visible={showDeleteConfirm}
         title="Delete medication?"
@@ -1029,6 +1054,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor:
       '#116F7A',
+  },
+
+  content: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
 
 
@@ -1227,6 +1259,25 @@ const styles = StyleSheet.create({
     color: '#8A94A3',
   },
 
+  expiredInlineBadge: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#B91C1C',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+
+  expirationText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#0B4F59',
+    fontWeight: '600',
+  },
+
 
   // ===================================================
   // EDIT BUTTON
@@ -1309,6 +1360,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#15803D',
+  },
+
+  expiredStatus: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#B91C1C',
   },
 
   lowStock: { color: '#B91C1C' },
@@ -1431,8 +1489,16 @@ const styles = StyleSheet.create({
       '#F3F4F6',
   },
 
+  expiredBadge: {
+    backgroundColor: '#FEE2E2',
+  },
+
   disabledText: {
     color: '#6B7280',
+  },
+
+  expiredBadgeText: {
+    color: '#B91C1C',
   },
 
 

@@ -21,6 +21,7 @@ import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { colors, radius, spacing, shadow, type } from '../theme';
+import { getSafeUserErrorMessage } from '../utils/medicationValidation';
 
 const medSkedLogo = require('../assets/medsked.png');
 
@@ -92,9 +93,10 @@ export default function LoginScreen({
       );
 
     } catch (error) {
-      const message =
-        error?.message ||
-        'Unable to log in. Please check your credentials.';
+      const message = getSafeUserErrorMessage(
+        error,
+        'Unable to log in. Please check your credentials.'
+      );
 
       setAuthError(message);
     } finally {

@@ -23,7 +23,11 @@ import {
   takeDose,
   skipDose,
 } from '../services/api';
-import ConfirmationDialog from '../components/ConfirmationDialog';
+import {
+  filterDoseRecordsByMedicationExpiration,
+  getSafeUserErrorMessage,
+} from '../utils/medicationValidation';
+import { getDoseActionErrorMessage } from '../utils/doseErrors';
 
 
 export default function DashboardScreen({
@@ -54,8 +58,6 @@ export default function DashboardScreen({
     doses,
     setDoses,
   ] = useState([]);
-
-  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
   const [
     loading,
@@ -132,8 +134,10 @@ export default function DashboardScreen({
           );
 
           setError(
-            err.message ||
-              'Failed to load dashboard.'
+            getSafeUserErrorMessage(
+              err,
+              'Unable to load the dashboard. Please check your connection and try again.'
+            )
           );
 
         } finally {
@@ -195,12 +199,11 @@ export default function DashboardScreen({
       const today =
         getTodayString();
 
-      return doses
+      return filterDoseRecordsByMedicationExpiration(doses
 
         .filter(
           dose =>
-            dose.scheduledDate ===
-            today
+            dose.scheduledDate === today
         )
 
         .sort(
@@ -211,9 +214,9 @@ export default function DashboardScreen({
             convertTimeToMinutes(
               b.scheduledTime
             )
-        );
+        ), medications);
 
-    }, [doses]);
+    }, [doses, medications]);
 
 
   // =====================================================
@@ -241,6 +244,13 @@ export default function DashboardScreen({
     ).length;
 
 
+  const skippedCount =
+    todayDoses.filter(
+      dose =>
+        dose.status === 'skipped'
+    ).length;
+
+
   const medicationCount =
     medications.length;
 
@@ -249,12 +259,17 @@ export default function DashboardScreen({
   // ADHERENCE
   // =====================================================
 
+  const eligibleCount =
+    takenCount +
+    missedCount +
+    skippedCount;
+
   const adherence =
-    todayDoses.length > 0
+    eligibleCount > 0
       ? Math.round(
           (
             takenCount /
-            todayDoses.length
+            eligibleCount
           ) * 100
         )
       : 0;
@@ -289,8 +304,7 @@ export default function DashboardScreen({
 
         Alert.alert(
           'Error',
-          err.message ||
-            'Failed to mark dose as taken.'
+          getDoseActionErrorMessage(err)
         );
 
       }
@@ -349,8 +363,7 @@ export default function DashboardScreen({
 
                   Alert.alert(
                     'Error',
-                    err.message ||
-                      'Failed to skip dose.'
+                    getDoseActionErrorMessage(err)
                   );
 
                 }
@@ -760,49 +773,7 @@ export default function DashboardScreen({
 
           </View>
 
-
-          <Pressable
-
-            onPress={() => setShowLogoutConfirmation(true)}
-
-            hitSlop={8}
-
-            style={({ pressed }) => [
-
-              styles.logoutButton,
-
-              pressed &&
-                styles.buttonPressed,
-
-            ]}
-
-          >
-
-            <Text
-              style={
-                styles.logoutText
-              }
-            >
-              Logout
-            </Text>
-
-          </Pressable>
-
         </View>
-
-        <ConfirmationDialog
-          visible={showLogoutConfirmation}
-          title="Log out?"
-          message="Are you sure you want to log out of MedSked?"
-          confirmLabel="Log Out"
-          cancelLabel="Cancel"
-          danger
-          onConfirm={() => {
-            setShowLogoutConfirmation(false);
-            onLogout();
-          }}
-          onCancel={() => setShowLogoutConfirmation(false)}
-        />
 
 
         {/* ERROR */}
@@ -1566,6 +1537,37 @@ export default function DashboardScreen({
                         }
                       </Text>
 
+                      {(() => {
+                        const rawDate = medication?.expirationDate;
+                        if (!rawDate || !String(rawDate).trim()) return null;
+
+                        const normalizedDate = String(rawDate).trim().split('T')[0];
+                        const [year, month, day] = normalizedDate.split('-').map(Number);
+                        if (![year, month, day].every(Number.isFinite)) {
+                          return null;
+                        }
+
+                        const parsedDate = new Date(year, month - 1, day);
+                        if (
+                          parsedDate.getFullYear() !== year ||
+                          parsedDate.getMonth() !== month - 1 ||
+                          parsedDate.getDate() !== day
+                        ) {
+                          return null;
+                        }
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const expiration = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+                        const expired = expiration < today;
+
+                        return (
+                          <Text style={expired ? styles.medicationExpirationExpired : styles.medicationExpiration}>
+                            {expired ? `Expired • ${normalizedDate}` : `Expires: ${normalizedDate}`}
+                          </Text>
+                        );
+                      })()}
+
                     </View>
 
 
@@ -1773,8 +1775,10 @@ const styles = StyleSheet.create({
 
   scrollContent: {
 
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
     paddingTop: 18,
-
     paddingBottom: 20,
 
   },
@@ -1840,38 +1844,6 @@ const styles = StyleSheet.create({
     color: '#A7CDD0',
 
   },
-
-  logoutButton: {
-
-    minHeight: 42,
-
-    paddingHorizontal: 12,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    borderRadius: 11,
-
-    backgroundColor:
-      '#FFFFFF',
-
-    borderWidth: 1,
-
-    borderColor:
-      '#E4EAF0',
-
-  },
-
-  logoutText: {
-
-    fontSize: 11,
-
-    fontWeight: '800',
-
-    color: '#DC2626',
-
-  },
-
 
   // ===================================================
   // ERROR
@@ -2637,6 +2609,20 @@ const styles = StyleSheet.create({
 
     color: '#8A94A3',
 
+  },
+
+  medicationExpiration: {
+    marginTop: 5,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0B4F59',
+  },
+
+  medicationExpirationExpired: {
+    marginTop: 5,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B91C1C',
   },
 
   editMedication: {

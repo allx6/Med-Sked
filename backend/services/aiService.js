@@ -3,6 +3,7 @@ const { GoogleGenAI } = require('@google/genai');
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const DoseRecord = require('../models/DoseRecord');
+const { calculateCanonicalAdherence } = require('../utils/adherence');
 
 const GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const MAX_CONTEXT_RECORDS = 100;
@@ -79,9 +80,28 @@ const calculateAdherence = (doses) => {
   };
 
   for (const dose of doses) {
-    if (Object.prototype.hasOwnProperty.call(counts, dose.status)) {
-      counts[dose.status] += 1;
+    const status = String(dose?.status || '').toLowerCase();
+    if (!['taken', 'skipped', 'missed', 'pending'].includes(status)) {
+      continue;
     }
+
+    const scheduledDate = dose?.scheduledDate;
+    const nowDate = new Date();
+    if (scheduledDate && new Date(`${scheduledDate}T00:00:00`) > nowDate) {
+      continue;
+    }
+
+    const medicationExpiration = dose?.medicationId?.expirationDate || dose?.medication?.expirationDate;
+    if (scheduledDate && medicationExpiration && scheduledDate > medicationExpiration) {
+      continue;
+    }
+
+    if (status === 'pending') {
+      counts.pending += 1;
+      continue;
+    }
+
+    counts[status] += 1;
   }
 
   const eligible = counts.taken + counts.skipped + counts.missed;

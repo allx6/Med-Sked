@@ -27,6 +27,8 @@ import {
 
 import StatusBadge from '../components/StatusBadge';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import { getDoseActionErrorMessage } from '../utils/doseErrors';
+import { getSafeUserErrorMessage } from '../utils/medicationValidation';
 
 export default function DoseHistoryScreen({
   token,
@@ -85,8 +87,10 @@ export default function DoseHistoryScreen({
       );
 
       setError(
-        error.message ||
-          'Failed to load dose history.'
+        getSafeUserErrorMessage(
+          error,
+          'Unable to load dose history. Please check your connection and try again.'
+        )
       );
     } finally {
       setLoading(false);
@@ -260,8 +264,7 @@ export default function DoseHistoryScreen({
 
       Alert.alert(
         'Error',
-        error.message ||
-          'Failed to mark dose as taken.'
+        getDoseActionErrorMessage(error)
       );
     }
   };
@@ -292,8 +295,7 @@ export default function DoseHistoryScreen({
 
       Alert.alert(
         'Error',
-        error.message ||
-          'Failed to skip dose.'
+        getDoseActionErrorMessage(error)
       );
     }
   };
@@ -355,8 +357,9 @@ export default function DoseHistoryScreen({
 
       Alert.alert(
         'Error',
-        error.message ||
-          'Unable to complete this dose action.'
+        action === 'delete'
+          ? error.message || 'Unable to delete the dose. Please try again.'
+          : getDoseActionErrorMessage(error)
       );
     }
   };
@@ -705,31 +708,33 @@ export default function DoseHistoryScreen({
         >
           <Text style={styles.filterTitle}>Date</Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScroll}
-          >
-            {availableDates.map((date) => (
-              <Pressable
-                key={date}
-                style={[
-                  styles.filterChip,
-                  selectedDate === date && styles.activeFilterChip,
-                ]}
-                onPress={() => setSelectedDate(date)}
-              >
-                <Text
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
+            >
+              {availableDates.map((date) => (
+                <Pressable
+                  key={date}
                   style={[
-                    styles.filterChipText,
-                    selectedDate === date && styles.activeFilterChipText,
+                    styles.filterChip,
+                    selectedDate === date && styles.activeFilterChip,
                   ]}
+                  onPress={() => setSelectedDate(date)}
                 >
-                  {getDateLabel(date)}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selectedDate === date && styles.activeFilterChipText,
+                    ]}
+                  >
+                    {getDateLabel(date)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* MEDICATION FILTER */}
 
@@ -739,78 +744,50 @@ export default function DoseHistoryScreen({
             Medication
           </Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-            contentContainerStyle={
-              styles.filterScroll
-            }
-          >
-            {/* ALL */}
-
-            <Pressable
-              style={[
-                styles.filterChip,
-
-                selectedMedication ===
-                  'all' &&
-                  styles.activeFilterChip,
-              ]}
-              onPress={() =>
-                setSelectedMedication(
-                  'all'
-                )
-              }
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
             >
-              <Text
+              <Pressable
                 style={[
-                  styles.filterChipText,
-
-                  selectedMedication ===
-                    'all' &&
-                    styles.activeFilterChipText,
+                  styles.filterChip,
+                  selectedMedication === 'all' && styles.activeFilterChip,
                 ]}
+                onPress={() => setSelectedMedication('all')}
               >
-                All Medications
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    selectedMedication === 'all' && styles.activeFilterChipText,
+                  ]}
+                >
+                  All Medications
+                </Text>
+              </Pressable>
 
-            {/* MEDICATIONS */}
-
-            {medications.map(
-              (medication) => (
+              {medications.map((medication) => (
                 <Pressable
                   key={medication.id}
                   style={[
                     styles.filterChip,
-
-                    selectedMedication ===
-                      medication.id &&
-                      styles.activeFilterChip,
+                    selectedMedication === medication.id && styles.activeFilterChip,
                   ]}
-                  onPress={() =>
-                    setSelectedMedication(
-                      medication.id
-                    )
-                  }
+                  onPress={() => setSelectedMedication(medication.id)}
                 >
                   <Text
                     style={[
                       styles.filterChipText,
-
-                      selectedMedication ===
-                        medication.id &&
-                        styles.activeFilterChipText,
+                      selectedMedication === medication.id && styles.activeFilterChipText,
                     ]}
                   >
                     {medication.name}
                   </Text>
                 </Pressable>
-              )
-            )}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* STATUS FILTER */}
 
@@ -823,68 +800,39 @@ export default function DoseHistoryScreen({
             Status
           </Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-            contentContainerStyle={
-              styles.filterScroll
-            }
-          >
-            {[
-              {
-                key: 'all',
-                label: 'All',
-              },
-              {
-                key: 'pending',
-                label: 'Pending',
-              },
-              {
-                key: 'taken',
-                label: 'Taken',
-              },
-              {
-                key: 'skipped',
-                label: 'Skipped',
-              },
-              {
-                key: 'missed',
-                label: 'Missed',
-              },
-            ].map((status) => (
-              <Pressable
-                key={status.key}
-                style={[
-                  styles.filterChip,
-
-                  selectedStatus ===
-                    status.key &&
-                    styles.activeFilterChip,
-                ]}
-                onPress={() =>
-                  setSelectedStatus(
-                    status.key
-                  )
-                }
-              >
-                <Text
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
+            >
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'pending', label: 'Pending' },
+                { key: 'taken', label: 'Taken' },
+                { key: 'skipped', label: 'Skipped' },
+                { key: 'missed', label: 'Missed' },
+              ].map((status) => (
+                <Pressable
+                  key={status.key}
                   style={[
-                    styles.filterChipText,
-
-                    selectedStatus ===
-                      status.key &&
-                      styles.activeFilterChipText,
+                    styles.filterChip,
+                    selectedStatus === status.key && styles.activeFilterChip,
                   ]}
+                  onPress={() => setSelectedStatus(status.key)}
                 >
-                  {status.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          {/* RESULT COUNT */}
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selectedStatus === status.key && styles.activeFilterChipText,
+                    ]}
+                  >
+                    {status.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           <Text
             style={styles.resultCount}
@@ -919,39 +867,20 @@ export default function DoseHistoryScreen({
       ) : (
         <FlatList
           data={groupedDoses}
-          keyExtractor={(item) =>
-            item.date
-          }
-          renderItem={
-            renderDateGroup
-          }
+          keyExtractor={(item) => item.date}
+          renderItem={renderDateGroup}
+          style={styles.flatList}
           contentContainerStyle={
             groupedDoses.length === 0
               ? styles.emptyList
               : styles.list
           }
           ListEmptyComponent={
-            <View
-              style={
-                styles.emptyContainer
-              }
-            >
-              <Text
-                style={
-                  styles.emptyTitle
-                }
-              >
-                No matching doses
-              </Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No matching doses</Text>
 
-              <Text
-                style={
-                  styles.emptyText
-                }
-              >
-                Try changing your
-                medication or status
-                filters.
+              <Text style={styles.emptyText}>
+                Try changing your medication or status filters.
               </Text>
             </View>
           }
@@ -1170,15 +1099,19 @@ const parseTimeForSorting = (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 0,
     backgroundColor: '#116F7A',
     width: '100%',
     maxWidth: 760,
     alignSelf: 'center',
+    overflow: 'hidden',
   },
 
   compactContainer: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
   },
 
   // =================================================
@@ -1188,11 +1121,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'column',
     alignItems: 'stretch',
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   compactHeader: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   backButton: {
@@ -1211,28 +1144,28 @@ const styles = StyleSheet.create({
   },
 
   headerTitleContainer: {
-    marginTop: 4,
+    marginTop: 2,
     alignItems: 'flex-start',
   },
 
   title: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
 
   compactTitle: {
-    fontSize: 20,
+    fontSize: 18,
   },
 
   subtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#A7CDD0',
     marginTop: 2,
   },
 
   compactSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
   },
 
   // =================================================
@@ -1276,6 +1209,11 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
 
+  filterRow: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+
   filterTitle: {
     fontSize: 12,
     fontWeight: '800',
@@ -1291,7 +1229,10 @@ const styles = StyleSheet.create({
     gap: 8,
     flexGrow: 1,
     justifyContent: 'flex-start',
-    paddingRight: 10,
+    paddingRight: 8,
+    maxWidth: '100%',
+    minWidth: 0,
+    paddingBottom: 2,
   },
 
   filterChip: {
@@ -1345,10 +1286,16 @@ const styles = StyleSheet.create({
   // LIST
   // =================================================
 
+  flatList: {
+    flex: 1,
+    width: '100%',
+  },
+
   list: {
     paddingBottom: 30,
     width: '100%',
     alignSelf: 'center',
+    flexGrow: 1,
   },
 
   emptyList: {

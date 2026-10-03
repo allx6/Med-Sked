@@ -11,12 +11,18 @@ import {
   Alert,
 } from 'react-native';
 
-import { updateMedication } from '../services/api';
+import { refillMedication, updateMedication } from '../services/api';
 
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
-import { validateMedicationFields } from '../utils/medicationValidation';
+import {
+  getMedicationExpirationState,
+  getSafeUserErrorMessage,
+  validateMedicationFields,
+  validateRefillAmount,
+} from '../utils/medicationValidation';
+import { getRefillErrorMessage } from '../utils/refillErrors';
 
 const dosageUnits = ['mg', 'mcg', 'g', 'mL', 'tablet'];
 const frequencyUnits = ['hours', 'days'];
@@ -52,6 +58,8 @@ export default function EditMedicationScreen({
   const [frequencyUnit, setFrequencyUnit] = useState(parsedFrequency?.unit || 'hours');
   const [quantityOnHand, setQuantityOnHand] = useState(String(medication.quantityOnHand ?? 0));
   const [refillThreshold, setRefillThreshold] = useState(String(medication.refillThreshold ?? 0));
+  const [refillAmount, setRefillAmount] = useState('');
+  const [expirationDate, setExpirationDate] = useState(medication.expirationDate || '');
   const [legacyDosage, setLegacyDosage] = useState(parsedDosage ? '' : medication.dosage || '');
   const [legacyFrequency, setLegacyFrequency] = useState(parsedFrequency ? '' : medication.frequency || '');
 
@@ -60,6 +68,10 @@ export default function EditMedicationScreen({
 
   const [loading, setLoading] =
     useState(false);
+
+  const [refilling, setRefilling] = useState(false);
+  const [refillError, setRefillError] = useState('');
+  const [refillSuccess, setRefillSuccess] = useState('');
 
 
   // =====================================================
@@ -75,7 +87,7 @@ export default function EditMedicationScreen({
 
     const dosage = legacyDosage.trim() || `${dosageAmount.trim()} ${dosageUnit}`;
     const frequency = legacyFrequency.trim() || `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
-    const medicationError = validateMedicationFields({ name, dosage, frequency });
+    const medicationError = validateMedicationFields({ name, dosage, frequency, expirationDate });
 
     if (medicationError) {
       setError(medicationError);
@@ -97,6 +109,8 @@ export default function EditMedicationScreen({
         dosage,
 
         frequency,
+
+        expirationDate: expirationDate.trim() || null,
 
         quantityOnHand: Number(quantityOnHand),
         refillThreshold: Number(refillThreshold),
@@ -132,8 +146,10 @@ export default function EditMedicationScreen({
       );
 
       setError(
-        error.message ||
-        'Failed to update medication.'
+        getSafeUserErrorMessage(
+          error,
+          'Unable to save the medication. Please check your connection and try again.'
+        )
       );
 
     } finally {
@@ -142,6 +158,40 @@ export default function EditMedicationScreen({
 
     }
 
+  };
+
+  const handleRefill = async () => {
+    setRefillError('');
+    setRefillSuccess('');
+
+    const amountError = validateRefillAmount(refillAmount);
+    if (amountError) {
+      setRefillError(amountError);
+      return;
+    }
+
+    if (getMedicationExpirationState(expirationDate).expired) {
+      setRefillError('Cannot refill an expired medication.');
+      return;
+    }
+
+    try {
+      setRefilling(true);
+      const updatedMedication = await refillMedication(
+        token,
+        medication._id,
+        Number(refillAmount),
+        patientId
+      );
+      const updatedQuantity = String(updatedMedication.quantityOnHand);
+      setQuantityOnHand(updatedQuantity);
+      setRefillAmount('');
+      setRefillSuccess(`Refill added. Quantity on hand: ${updatedQuantity}.`);
+    } catch (error) {
+      setRefillError(getRefillErrorMessage(error));
+    } finally {
+      setRefilling(false);
+    }
   };
 
 
@@ -258,8 +308,37 @@ export default function EditMedicationScreen({
             value={quantityOnHand}
             onChangeText={setQuantityOnHand}
             keyboardType="decimal-pad"
-            editable={!loading}
+            editable={!loading && !refilling}
           />
+
+          <TextField
+            label="Refill amount"
+            placeholder="Enter amount to add"
+            value={refillAmount}
+            onChangeText={(value) => {
+              setRefillAmount(value);
+              setRefillError('');
+              setRefillSuccess('');
+            }}
+            keyboardType="decimal-pad"
+            editable={!loading && !refilling}
+          />
+
+          <PrimaryButton
+            label="Add refill"
+            onPress={handleRefill}
+            loading={refilling}
+            disabled={loading}
+            style={styles.refillButton}
+          />
+
+          {refillError ? (
+            <Text style={styles.error} accessibilityRole="alert">{refillError}</Text>
+          ) : null}
+
+          {refillSuccess ? (
+            <Text style={styles.refillSuccess} accessibilityRole="status">{refillSuccess}</Text>
+          ) : null}
 
           <TextField
             label="Refill threshold"
@@ -267,7 +346,17 @@ export default function EditMedicationScreen({
             value={refillThreshold}
             onChangeText={setRefillThreshold}
             keyboardType="decimal-pad"
+            editable={!loading && !refilling}
+          />
+
+          <TextField
+            label="Expiration date (required)"
+            placeholder="YYYY-MM-DD"
+            value={expirationDate}
+            onChangeText={setExpirationDate}
+            keyboardType="default"
             editable={!loading}
+            maxLength={10}
           />
 
 
@@ -288,6 +377,7 @@ export default function EditMedicationScreen({
             label="Save Changes"
             onPress={handleSubmit}
             loading={loading}
+            disabled={refilling}
             style={styles.button}
           />
 
@@ -331,6 +421,9 @@ const styles = StyleSheet.create({
 
     justifyContent: 'center',
 
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
     padding: 24,
 
   },
@@ -462,6 +555,16 @@ const styles = StyleSheet.create({
 
     marginTop: 12,
 
+  },
+
+  refillButton: {
+    marginTop: 4,
+  },
+
+  refillSuccess: {
+    color: '#15803D',
+    fontSize: 13,
+    marginTop: 10,
   },
 
 

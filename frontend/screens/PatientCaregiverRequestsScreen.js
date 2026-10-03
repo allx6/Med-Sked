@@ -147,7 +147,7 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 32 },
+  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: spacing.lg, paddingBottom: 32 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
   backButton: { minHeight: 40, justifyContent: 'center', marginBottom: spacing.sm },

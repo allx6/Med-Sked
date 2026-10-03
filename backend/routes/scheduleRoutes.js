@@ -189,13 +189,6 @@ router.post(
         return respondWithError(res, error);
       }
 
-      const validationError = validateScheduleFields(payload);
-      if (validationError) {
-        const error = new Error(validationError);
-        error.statusCode = 400;
-        return respondWithError(res, error);
-      }
-
       const {
         medicationId,
         time,
@@ -273,6 +266,17 @@ router.post(
             'Medication not found',
         });
 
+      }
+
+      const validationError = validateScheduleFields(payload, {
+        medicationExpirationDate: medication.expirationDate,
+        rejectExpiredMedication: true,
+      });
+
+      if (validationError) {
+        const error = new Error(validationError);
+        error.statusCode = 400;
+        return respondWithError(res, error);
       }
 
       const existingMedicationSchedule =
@@ -519,7 +523,12 @@ router.put(
         startDate: existingSchedule.startDate,
         endDate: updateFields.endDate,
         enabled: updateFields.enabled,
-      }, { allowPastStartDate: true });
+      }, {
+        allowPastStartDate: true,
+        medicationExpirationDate: medication.expirationDate,
+        validateStartDateExpiration: false,
+        validateEndDateExpiration: true,
+      });
 
       if (validationError) {
         const error = new Error(validationError);

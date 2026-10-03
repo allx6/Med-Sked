@@ -29,7 +29,10 @@ import {
   getPatientSchedules,
   createSchedule,
 } from '../services/api';
-import { validateScheduleFields } from '../utils/scheduleValidation';
+import {
+  getScheduleSubmissionErrorMessage,
+  validateScheduleFields,
+} from '../utils/scheduleValidation';
 
 
 export default function AddScheduleScreen({
@@ -124,6 +127,7 @@ export default function AddScheduleScreen({
 
   const [saving, setSaving] =
     useState(false);
+  const [formError, setFormError] = useState('');
 
 
   // =====================================================
@@ -350,6 +354,7 @@ export default function AddScheduleScreen({
   // =====================================================
 
   const handleSave = async () => {
+    setFormError('');
 
     const medicationDose =
       (selectedMedication?.dosage || dose || '').trim();
@@ -384,9 +389,12 @@ export default function AddScheduleScreen({
 
       };
 
-    const scheduleError = validateScheduleFields(schedule);
+    const scheduleError = validateScheduleFields(schedule, {
+      medicationExpirationDate: selectedMedication?.expirationDate,
+      rejectExpiredMedication: true,
+    });
     if (scheduleError) {
-      Alert.alert('Invalid Schedule', scheduleError);
+      setFormError(scheduleError);
       return;
     }
 
@@ -442,11 +450,7 @@ export default function AddScheduleScreen({
         error
       );
 
-      Alert.alert(
-        'Error',
-        error.message ||
-          'Failed to create schedule.'
-      );
+      setFormError(getScheduleSubmissionErrorMessage(error));
 
     } finally {
 
@@ -504,6 +508,12 @@ export default function AddScheduleScreen({
         </Text>
 
       </View>
+
+      {formError ? (
+        <View style={styles.errorBox} accessibilityRole="alert">
+          <Text style={styles.errorText}>{formError}</Text>
+        </View>
+      ) : null}
 
 
       {/* =================================================
@@ -679,47 +689,52 @@ export default function AddScheduleScreen({
       </Text>
 
       <View style={styles.daysContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.daysScrollContent}
+          style={styles.daysScrollWrap}
+        >
+          {daysOfWeek.map(
+            (day) => {
 
-        {daysOfWeek.map(
-          (day) => {
+              const selected =
+                selectedDays.includes(day);
 
-            const selected =
-              selectedDays.includes(day);
+              const shortDay =
+                day.substring(0, 3);
 
-            const shortDay =
-              day.substring(0, 3);
+              return (
 
-            return (
-
-              <Pressable
-                key={day}
-                style={[
-                  styles.dayButton,
-                  selected &&
-                    styles.dayButtonSelected,
-                ]}
-                onPress={() =>
-                  toggleDay(day)
-                }
-              >
-
-                <Text
+                <Pressable
+                  key={day}
                   style={[
-                    styles.dayText,
+                    styles.dayButton,
                     selected &&
-                      styles.dayTextSelected,
+                      styles.dayButtonSelected,
                   ]}
+                  onPress={() =>
+                    toggleDay(day)
+                  }
                 >
-                  {shortDay}
-                </Text>
 
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.dayText,
+                      selected &&
+                        styles.dayTextSelected,
+                    ]}
+                  >
+                    {shortDay}
+                  </Text>
 
-            );
+                </Pressable>
 
-          }
-        )}
+              );
 
+            }
+          )}
+        </ScrollView>
       </View>
 
 
@@ -826,6 +841,12 @@ export default function AddScheduleScreen({
         </View>
 
       </View>
+
+      {selectedMedication?.expirationDate ? (
+        <Text style={styles.expirationHint}>
+          End date is required because this medication expires on {selectedMedication.expirationDate}.
+        </Text>
+      ) : null}
 
 
       {hasEndDate && (
@@ -1018,6 +1039,9 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 40,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
 
   header: {
@@ -1044,6 +1068,28 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 14,
     color: '#A7CDD0',
+  },
+
+  errorBox: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  expirationHint: {
+    marginTop: 4,
+    color: '#D8F0F2',
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   label: {
@@ -1219,9 +1265,20 @@ const styles = StyleSheet.create({
   },
 
   daysContainer: {
+    width: '100%',
+    maxWidth: '100%',
+  },
+
+  daysScrollWrap: {
+    maxWidth: '100%',
+  },
+
+  daysScrollContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
+    paddingRight: 8,
+    paddingVertical: 2,
   },
 
   dayButton: {
@@ -1233,6 +1290,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 44,
   },
 
   dayButtonSelected: {

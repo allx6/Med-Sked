@@ -3,6 +3,7 @@
 // =====================================================
 
 import { API_URL } from './config';
+import { getRefillErrorMessage } from '../utils/refillErrors';
 
 
 // =====================================================
@@ -33,6 +34,12 @@ const handleResponse = async (response, options = {}) => {
     }
 
     if (response.status >= 500) {
+      if (options.preserveSafeServerMessage) {
+        throw new Error(getRefillErrorMessage({
+          message: data.message || data.error || `Request failed with status ${response.status}`,
+        }));
+      }
+
       throw new Error('Unable to connect to the Med-Sked server. Check that the backend is running and that your device is on the same network.');
     }
 
@@ -242,6 +249,37 @@ export const updateMedication = async (
   );
 
   return handleResponse(response);
+};
+
+
+// -----------------------------------------------------
+// REFILL MEDICATION
+// POST /api/medications/:medicationId/refill
+// -----------------------------------------------------
+
+export const refillMedication = async (
+  token,
+  medicationId,
+  refillAmount,
+  patientId
+) => {
+  const patientQuery = patientId
+    ? `?patientId=${encodeURIComponent(patientId)}`
+    : '';
+
+  const response = await fetch(
+    `${API_URL}/api/medications/${medicationId}/refill${patientQuery}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders(token),
+      },
+      body: JSON.stringify({ refillAmount }),
+    }
+  );
+
+  return handleResponse(response, { preserveSafeServerMessage: true });
 };
 
 
