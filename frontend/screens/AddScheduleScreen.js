@@ -488,17 +488,6 @@ export default function AddScheduleScreen({
 
       <View style={styles.header}>
 
-        <Pressable
-          onPress={onCancel}
-          style={styles.backButton}
-        >
-
-          <Text style={styles.backText}>
-            Back
-          </Text>
-
-        </Pressable>
-
         <Text style={styles.title}>
           Add Schedule
         </Text>

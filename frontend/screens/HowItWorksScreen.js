@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Animated,
   Image,
   Pressable,
   ScrollView,
@@ -29,6 +30,32 @@ const steps = [
 ];
 
 export default function HowItWorksScreen({ onBack }) {
+  const entranceProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(entranceProgress, {
+      toValue: 1,
+      duration: 360,
+      useNativeDriver: false,
+    });
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [entranceProgress]);
+
+  const entranceStyle = {
+    opacity: entranceProgress,
+    transform: [
+      {
+        translateY: entranceProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [14, 0],
+        }),
+      },
+    ],
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -55,7 +82,7 @@ export default function HowItWorksScreen({ onBack }) {
           </View>
         </View>
 
-        <View style={styles.content}>
+        <Animated.View style={[styles.content, entranceStyle]}>
           <Text style={styles.eyebrow}>HOW IT WORKS</Text>
           <Text style={styles.title}>Three steps to a routine that sticks.</Text>
 
@@ -70,7 +97,7 @@ export default function HowItWorksScreen({ onBack }) {
               </View>
             ))}
           </View>
-        </View>
+        </Animated.View>
         <View style={styles.bottomRule} />
       </ScrollView>
     </View>

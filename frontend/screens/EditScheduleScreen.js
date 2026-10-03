@@ -430,16 +430,6 @@ export default function EditScheduleScreen({
 
       <View style={styles.header}>
 
-        <Pressable
-          onPress={onCancel}
-          style={styles.backButton}
-          disabled={saving}
-        >
-          <Text style={styles.backText}>
-            Back
-          </Text>
-        </Pressable>
-
         <Text style={styles.title}>
           Edit Schedule
         </Text>

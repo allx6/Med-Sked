@@ -656,10 +656,6 @@ export default function App() {
 
             token={token}
 
-            onBack={() =>
-              setScreen('dashboard')
-            }
-
             onAddMedication={
               handleAddMedication
             }
@@ -743,10 +739,6 @@ export default function App() {
           <ScheduleScreen
 
             token={token}
-
-            onBack={() =>
-              setScreen('dashboard')
-            }
 
             onAddSchedule={
               handleAddSchedule
@@ -834,10 +826,6 @@ export default function App() {
 
             token={token}
 
-            onBack={() =>
-              setScreen('dashboard')
-            }
-
           />
 
         )}
@@ -855,10 +843,6 @@ export default function App() {
 
             token={token}
 
-            onBack={() =>
-              setScreen('profile')
-            }
-
           />
 
         )}
@@ -868,7 +852,6 @@ export default function App() {
         user.role !== 'caregiver' && (
           <PatientCaregiverRequestsScreen
             token={token}
-            onBack={() => setScreen('profile')}
           />
         )}
 
@@ -882,7 +865,6 @@ export default function App() {
             onOpenNotifications={handleNotifications}
             onOpenAnalytics={() => handleAnalytics()}
             onLogout={handleLogout}
-            onBack={() => setScreen('dashboard')}
             onOpenCaregiverRequests={handlePatientCaregiverRequests}
             onOpenPatientConnections={handlePatientConnections}
           />
@@ -894,7 +876,7 @@ export default function App() {
             token={token}
             unreadNotificationCount={unreadNotificationCount}
             onUnreadCountChange={refreshUnreadNotificationCount}
-            onBack={() => setScreen(user.role === 'caregiver' ? 'caregiverProfile' : 'profile')}
+            onBack={user.role === 'caregiver' ? () => setScreen('caregiverProfile') : undefined}
           />
         )}
 
@@ -903,7 +885,7 @@ export default function App() {
           <AnalyticsScreen
             token={token}
             patientId={analyticsPatientId}
-            onBack={() => setScreen(user.role === 'caregiver' ? 'patientMonitoring' : 'profile')}
+            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : undefined}
           />
         )}
 
@@ -913,7 +895,7 @@ export default function App() {
             token={token}
             userRole={user.role}
             patientId={user.role === 'caregiver' ? selectedPatient?._id : null}
-            onBack={() => setScreen(user.role === 'caregiver' ? 'patientMonitoring' : 'dashboard')}
+            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : undefined}
           />
         )}
 

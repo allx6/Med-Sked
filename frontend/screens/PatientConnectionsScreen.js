@@ -22,7 +22,7 @@ import {
 import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 
-export default function PatientConnectionsScreen({ token, onBack }) {
+export default function PatientConnectionsScreen({ token }) {
   const [caregivers, setCaregivers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -260,12 +260,6 @@ export default function PatientConnectionsScreen({ token, onBack }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadConnections(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.headerRow}>
-          <Pressable onPress={onBack} hitSlop={8}>
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-        </View>
-
         <Text style={styles.pageTitle}>Caregiver Connections</Text>
         <Text style={styles.pageSubtitle}>Manage who can view your medication routine.</Text>
 

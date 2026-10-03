@@ -17,7 +17,7 @@ import {
 
 import { colors, radius, spacing, shadow } from '../theme';
 
-export default function PatientCaregiverRequestsScreen({ token, onBack }) {
+export default function PatientCaregiverRequestsScreen({ token }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,10 +80,6 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadRequests(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
-        <Pressable onPress={onBack} hitSlop={8} style={styles.backButton}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-
         <Text style={styles.title}>Caregiver Requests</Text>
         <Text style={styles.subtitle}>Review who is asking to monitor your medication routine.</Text>
 

@@ -96,9 +96,11 @@ export default function NotificationsScreen({ token, onBack, unreadNotificationC
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />}
       >
-        <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+        {onBack ? (
+          <Pressable onPress={onBack} hitSlop={8}>
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.headerRow}>
           <View>
