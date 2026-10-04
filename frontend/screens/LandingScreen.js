@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   brandName: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   signInButton: { minWidth: 82, minHeight: 36, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderWidth: 1, borderColor: '#0B4F59', borderRadius: 6, backgroundColor: '#0B4F59' },
   signInText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
-  hero: { minHeight: 320, alignItems: 'center', justifyContent: 'center', paddingTop: 36, paddingBottom: 50, transform: [{ translateY: 50 }] },
+  hero: { minHeight: 320, alignItems: 'center', justifyContent: 'center', paddingTop: 36, paddingBottom: 50, transform: [{ translateY: 150 }] },
   eyebrow: { alignSelf: 'center', color: '#83DBDE', fontSize: 11, fontWeight: '700', textAlign: 'center', marginBottom: 18 },
   title: { width: '100%', maxWidth: 780, alignSelf: 'center', color: '#FFFFFF', fontSize: 34, lineHeight: 39, fontWeight: '800', textAlign: 'center' },
   highlight: { color: '#78D6F3' },
