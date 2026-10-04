@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   deleteMedication,
@@ -201,21 +202,29 @@ export default function PatientMonitoringScreen({
           accessibilityLabel="Go back"
           onPress={onBack}
           hitSlop={8}
+          style={styles.backButton}
         >
-          <Text style={styles.backText}>←</Text>
+          <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
         </Pressable>
 
         <Text style={styles.pageTitle}>{patientName}</Text>
         <Text style={styles.pageSubtitle}>Patient monitoring • {patientId}</Text>
 
         <Pressable onPress={onOpenAnalytics} style={styles.analyticsButton}>
+          <MaterialCommunityIcons name="chart-line" size={18} color={colors.primary} />
           <Text style={styles.analyticsButtonText}>View Adherence Analytics</Text>
         </Pressable>
 
         {patient?._id && onOpenAiAssistant ? (
           <Pressable onPress={() => onOpenAiAssistant?.()} style={styles.aiButton}>
-            <Text style={styles.aiButtonTitle}>Ask MedSked AI</Text>
-            <Text style={styles.aiButtonSubtitle}>Ask about this patient's medications, doses, adherence, or refills.</Text>
+            <View style={styles.aiIconWrap}>
+              <MaterialCommunityIcons name="robot-outline" size={21} color={colors.primary} />
+            </View>
+            <View style={styles.aiTextWrap}>
+              <Text style={styles.aiButtonTitle}>Ask MedSked AI</Text>
+              <Text style={styles.aiButtonSubtitle}>Ask about this patient's medications, doses, adherence, or refills.</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={23} color={colors.textMuted} />
           </Pressable>
         ) : null}
 
@@ -227,29 +236,46 @@ export default function PatientMonitoringScreen({
 
         <View style={styles.summaryGrid}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Adherence</Text>
-            <Text style={styles.summaryValue}>{adherence}%</Text>
+            <View style={styles.summaryIconWrap}><MaterialCommunityIcons name="chart-donut" size={19} color={colors.primary} /></View>
+            <View style={styles.summaryText}>
+              <Text style={styles.summaryLabel}>Adherence</Text>
+              <Text style={styles.summaryValue}>{adherence}%</Text>
+            </View>
           </View>
 
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Medications</Text>
-            <Text style={styles.summaryValue}>{medications.length}</Text>
+            <View style={styles.summaryIconWrap}><MaterialCommunityIcons name="pill" size={19} color={colors.primary} /></View>
+            <View style={styles.summaryText}>
+              <Text style={styles.summaryLabel}>Medications</Text>
+              <Text style={styles.summaryValue}>{medications.length}</Text>
+            </View>
           </View>
 
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Schedules</Text>
-            <Text style={styles.summaryValue}>{schedules.length}</Text>
+            <View style={styles.summaryIconWrap}><MaterialCommunityIcons name="calendar-month-outline" size={19} color={colors.primary} /></View>
+            <View style={styles.summaryText}>
+              <Text style={styles.summaryLabel}>Schedules</Text>
+              <Text style={styles.summaryValue}>{schedules.length}</Text>
+            </View>
           </View>
 
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Today</Text>
-            <Text style={styles.summaryValue}>{todayDoses.length}</Text>
+            <View style={styles.summaryIconWrap}><MaterialCommunityIcons name="clock-check-outline" size={19} color={colors.primary} /></View>
+            <View style={styles.summaryText}>
+              <Text style={styles.summaryLabel}>Today</Text>
+              <Text style={styles.summaryValue}>{todayDoses.length}</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.todayDosesBox}>
           <View style={styles.todayDosesHeader}>
-            <Text style={styles.todayDosesTitle}>Today's doses</Text>
+            <View style={styles.sectionHeading}>
+              <View style={styles.sectionIconWrap}>
+                <MaterialCommunityIcons name="clock-outline" size={18} color={colors.primary} />
+              </View>
+              <Text style={styles.todayDosesTitle}>Today's doses</Text>
+            </View>
             <Text style={styles.todayDosesCount}>{todayDoses.length}</Text>
           </View>
           {todayDoses.length === 0 ? (
@@ -275,15 +301,20 @@ export default function PatientMonitoringScreen({
 
         <View style={styles.sectionFilter}>
           {[
-            { key: 'medications', label: 'Medications' },
-            { key: 'schedules', label: 'Schedules' },
-            { key: 'doses', label: 'Doses' },
+            { key: 'medications', label: 'Medications', icon: 'pill' },
+            { key: 'schedules', label: 'Schedules', icon: 'calendar-month-outline' },
+            { key: 'doses', label: 'Doses', icon: 'history' },
           ].map((section) => (
             <Pressable
               key={section.key}
               onPress={() => setSelectedSection(section.key)}
               style={[styles.sectionFilterButton, selectedSection === section.key && styles.sectionFilterButtonActive]}
             >
+              <MaterialCommunityIcons
+                name={section.icon}
+                size={16}
+                style={[styles.sectionFilterIcon, selectedSection === section.key && styles.sectionFilterIconActive]}
+              />
               <Text style={[styles.sectionFilterText, selectedSection === section.key && styles.sectionFilterTextActive]}>
                 {section.label}
               </Text>
@@ -303,7 +334,9 @@ export default function PatientMonitoringScreen({
           </View>
           {medications.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>💊</Text>
+              <View style={styles.emptyIconWrap}>
+                <MaterialCommunityIcons name="pill" size={26} color={colors.primary} />
+              </View>
               <Text style={styles.emptyTitle}>No medications on file.</Text>
             </View>
           ) : (
@@ -405,7 +438,9 @@ export default function PatientMonitoringScreen({
           </View>
           {schedules.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🗓</Text>
+              <View style={styles.emptyIconWrap}>
+                <MaterialCommunityIcons name="calendar-month-outline" size={26} color={colors.primary} />
+              </View>
               <Text style={styles.emptyTitle}>No schedules on file.</Text>
             </View>
           ) : (
@@ -470,45 +505,56 @@ export default function PatientMonitoringScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 30, lineHeight: 36, marginBottom: spacing.md },
+  content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 1000, alignSelf: 'center' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', marginBottom: spacing.md },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF' },
   pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
-  analyticsButton: { alignSelf: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14, marginBottom: spacing.lg },
+  analyticsButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14, marginBottom: spacing.lg },
   analyticsButtonText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
   aiButton: {
-    backgroundColor: colors.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardTint,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.lg,
     ...shadow.card,
   },
+  aiIconWrap: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  aiTextWrap: { flex: 1 },
   aiButtonTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
   aiButtonSubtitle: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6 },
   summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.xl, gap: 10 },
   summaryCard: {
-    backgroundColor: colors.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     width: '47%',
     padding: spacing.md,
     ...shadow.card,
   },
+  summaryIconWrap: { width: 38, height: 38, borderRadius: 11, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  summaryText: { flex: 1 },
   summaryLabel: { fontSize: 12, color: colors.textSecondary },
   summaryValue: { fontSize: 24, color: colors.text, fontWeight: '800', marginTop: 6 },
   todayDosesBox: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     padding: spacing.md,
     marginBottom: spacing.lg,
     ...shadow.card,
   },
   todayDosesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionIconWrap: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   todayDosesTitle: { color: colors.text, fontSize: 16, fontWeight: '800' },
   todayDosesCount: { color: colors.primary, fontSize: 18, fontWeight: '800' },
   todayDosesEmpty: { color: colors.textSecondary, fontSize: 13 },
@@ -521,17 +567,19 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.md },
   sectionFilter: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
-  sectionFilterButton: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.card },
+  sectionFilterButton: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.cardTintBorder, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: colors.cardTint },
   sectionFilterButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   sectionFilterText: { color: colors.textSecondary, fontSize: 12, fontWeight: '800' },
   sectionFilterTextActive: { color: colors.white },
+  sectionFilterIcon: { color: colors.textSecondary },
+  sectionFilterIconActive: { color: colors.white },
   smallActionButton: { backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 7, paddingHorizontal: 12 },
   smallActionText: { color: colors.white, fontSize: 12, fontWeight: '800' },
   doseCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
@@ -539,7 +587,7 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   scheduleCard: { flexDirection: 'column', alignItems: 'stretch' },
-  historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.sm },
+  historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.cardTintBorder, padding: spacing.md, marginBottom: spacing.sm },
   historyRowWrapper: { marginBottom: spacing.sm },
   doseTime: { width: 72, fontSize: 14, fontWeight: '800', color: colors.primary },
   doseInfo: { flex: 1 },
@@ -577,15 +625,15 @@ const styles = StyleSheet.create({
   skipButtonText: { color: colors.dangerText, fontSize: 11, fontWeight: '800' },
   buttonDisabled: { opacity: 0.6 },
   emptyState: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     padding: spacing.xl,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     ...shadow.card,
   },
-  emptyIcon: { fontSize: 28, marginBottom: 8 },
+  emptyIconWrap: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
   emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.text },
   errorBox: {
     backgroundColor: colors.dangerSoft,

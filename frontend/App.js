@@ -542,7 +542,6 @@ export default function App() {
 
           <CaregiverPatientsScreen
             token={token}
-            onBack={() => setScreen('caregiverDashboard')}
             onSelectPatient={handleSelectPatient}
             onOpenConnections={handleCaregiverConnections}
           />
@@ -556,8 +555,6 @@ export default function App() {
           <CaregiverConnectionsScreen
 
             token={token}
-
-            onBack={() => setScreen('caregiverDashboard')}
 
             onOpenPatientMonitoring={
               handleSelectPatient
@@ -575,7 +572,6 @@ export default function App() {
             unreadNotificationCount={unreadNotificationCount}
             onOpenNotifications={handleNotifications}
             onLogout={handleLogout}
-            onBack={() => setScreen('caregiverDashboard')}
           />
         )}
 
@@ -842,6 +838,7 @@ export default function App() {
           <PatientConnectionsScreen
 
             token={token}
+            onBack={() => setScreen('profile')}
 
           />
 
@@ -852,6 +849,7 @@ export default function App() {
         user.role !== 'caregiver' && (
           <PatientCaregiverRequestsScreen
             token={token}
+            onBack={() => setScreen('profile')}
           />
         )}
 
@@ -885,7 +883,7 @@ export default function App() {
           <AnalyticsScreen
             token={token}
             patientId={analyticsPatientId}
-            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : undefined}
+            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : () => setScreen('profile')}
           />
         )}
 

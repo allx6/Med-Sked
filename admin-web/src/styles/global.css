@@ -1,21 +1,21 @@
 :root {
-  --color-primary: #2f6690;
-  --color-primary-dark: #244f70;
-  --color-primary-soft: #eaf3f9;
-  --color-background: #041a2b;
-  --color-background-deeper: #020f1b;
-  --color-surface: #0b1d2d;
-  --color-panel: #0e2335;
-  --color-text: #edf4ff;
-  --color-text-secondary: #9aaec0;
-  --color-text-soft: #c0d1e3;
-  --color-border: rgba(151, 177, 211, 0.13);
-  --color-input-border: rgba(156, 180, 206, 0.2);
-  --color-input-fill: rgba(255, 255, 255, 0.06);
+  --color-primary: #116f7a;
+  --color-primary-dark: #0b5962;
+  --color-primary-soft: #d9eff0;
+  --color-background: #116f7a;
+  --color-background-deeper: #073d45;
+  --color-surface: #0b2935;
+  --color-panel: #103642;
+  --color-text: #f2fbfc;
+  --color-text-secondary: #b6d4d7;
+  --color-text-soft: #d9eaeb;
+  --color-border: rgba(190, 225, 228, 0.16);
+  --color-input-border: rgba(190, 225, 228, 0.24);
+  --color-input-fill: rgba(5, 28, 35, 0.55);
   --radius-control: 12px;
   --radius-card: 16px;
   --radius-panel: 18px;
-  --shadow-card: 0 10px 22px rgba(5, 10, 18, 0.28);
+  --shadow-card: 0 14px 32px rgba(3, 32, 37, 0.22);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -40,7 +40,7 @@ html, body, #root {
 
 body {
   min-height: 100vh;
-  background: radial-gradient(circle at top, #0a2134 0%, #051827 32%, #020f1b 100%);
+  background: radial-gradient(circle at 50% 0%, #27838b 0%, #116f7a 48%, #0b5962 100%);
 }
 
 a {
@@ -80,8 +80,8 @@ button:disabled {
   min-height: 100vh;
   max-height: 100vh;
   overflow-y: auto;
-  background: rgba(8, 18, 28, 0.96);
-  border-right: 1px solid rgba(156, 180, 206, 0.14);
+  background: #082c37;
+  border-right: 1px solid rgba(190, 225, 228, 0.14);
   display: flex;
   flex-direction: column;
   padding: 18px 14px 18px;
@@ -116,6 +116,14 @@ button:disabled {
   font-size: 28px;
 }
 
+.brand-logo {
+  display: block;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
 .brand-title {
   font-size: 1.08rem;
   font-weight: 800;
@@ -144,13 +152,14 @@ button:disabled {
 }
 
 .nav-item.active {
-  background: rgba(115, 161, 194, 0.12);
-  color: #edf4ff;
+  background: rgba(96, 185, 190, 0.18);
+  color: #ffffff;
+  box-shadow: inset 3px 0 0 #76c7c9;
 }
 
 .nav-item:hover {
-  background: rgba(125, 155, 179, 0.08);
-  color: #edf4ff;
+  background: rgba(96, 185, 190, 0.1);
+  color: #ffffff;
 }
 
 .sidebar-footer {
@@ -205,19 +214,19 @@ button:disabled {
 
 .primary-button {
   min-height: 52px;
-  background: linear-gradient(180deg, #2d7fa6 0%, #1e5f87 100%);
-  color: #edf4ff;
+  background: linear-gradient(180deg, #17818a 0%, #116f7a 100%);
+  color: #ffffff;
 }
 
 .primary-button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #2b6f95 0%, #194d70 100%);
+  background: linear-gradient(180deg, #116f7a 0%, #0b5962 100%);
 }
 
 .content-panel {
   flex: 1;
   min-width: 0;
   padding: 30px 30px 32px;
-  background: linear-gradient(180deg, #031a2b 0%, #020f1b 100%);
+  background: linear-gradient(145deg, #116f7a 0%, #0d626d 100%);
 }
 
 .page-stack {
@@ -250,7 +259,7 @@ button:disabled {
 
 .eyebrow {
   margin: 0 0 6px;
-  color: #7b8ea8;
+  color: #c2e6e7;
   font-size: 0.77rem;
   text-transform: none;
   letter-spacing: 0;
@@ -268,7 +277,7 @@ button:disabled {
   letter-spacing: -0.06em;
   line-height: 1.1;
   font-weight: 800;
-  color: #edf4ff;
+  color: #ffffff;
 }
 
 .page-header h2.analytics-page-title,
@@ -476,7 +485,7 @@ button:disabled {
   margin-top: 18px;
 }
 
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(1) { --metric-accent: #ffb59d; --metric-tint: rgba(166, 96, 75, 0.18); }
+.dashboard-stat-grid > .dashboard-stat-card:nth-child(1) { --metric-accent: #b0f0e8; --metric-tint: rgba(76, 190, 181, 0.2); }
 .dashboard-stat-grid > .dashboard-stat-card:nth-child(2) { --metric-accent: #a0c3d8; --metric-tint: rgba(37, 92, 135, 0.20); }
 .dashboard-stat-grid > .dashboard-stat-card:nth-child(3) { --metric-accent: #a8c4d9; --metric-tint: rgba(67, 109, 156, 0.18); }
 .dashboard-stat-grid > .dashboard-stat-card:nth-child(4) { --metric-accent: #d5d9e1; --metric-tint: rgba(86, 106, 135, 0.18); }
@@ -488,8 +497,8 @@ button:disabled {
 .dashboard-stat-grid > .dashboard-stat-card:nth-child(10) { --metric-accent: #d9eeef; --metric-tint: rgba(43, 120, 131, 0.12); }
 
 .dashboard-stat-grid > .dashboard-stat-card:not(.stat-card-primary) {
-  border-color: rgba(152, 175, 202, 0.12);
-  background: linear-gradient(180deg, rgba(18, 35, 51, 0.9) 0%, rgba(12, 25, 36, 0.96) 100%);
+  border-color: rgba(177, 218, 220, 0.14);
+  background: linear-gradient(155deg, #123b48 0%, #0a2a36 100%);
 }
 
 .dashboard-stat-card .dashboard-stat-icon {
@@ -524,9 +533,9 @@ button:disabled {
 }
 
 .dashboard-stat-grid .stat-card-primary {
-  border-color: rgba(255, 187, 135, 0.06);
-  background: linear-gradient(180deg, rgba(127, 62, 44, 0.74) 0%, rgba(72, 44, 35, 0.88) 100%);
-  box-shadow: 0 12px 26px rgba(18, 14, 11, 0.36);
+  border-color: rgba(173, 230, 226, 0.24);
+  background: linear-gradient(155deg, #1a858b 0%, #0d5966 100%);
+  box-shadow: 0 12px 26px rgba(5, 42, 48, 0.28);
 }
 
 .dashboard-stat-grid .stat-card-primary > * {
@@ -657,29 +666,38 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-background);
-  padding: 24px;
+  background: radial-gradient(circle at 50% 0%, #27838b 0%, #116f7a 55%, #0b5962 100%);
+  padding: 32px 20px;
 }
 
 .auth-card {
-  width: min(100%, 420px);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 22px;
-  padding: 28px;
-  box-shadow: var(--shadow-card);
+  width: min(100%, 460px);
+  background: #fbfdfd;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  padding: 38px;
+  color: #17343a;
+  box-shadow: 0 26px 70px rgba(4, 38, 43, 0.28);
 }
 
 .auth-header {
-  text-align: left;
-  margin-bottom: 24px;
+  text-align: center;
+  margin-bottom: 26px;
 }
 
 .auth-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 34px;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.auth-logo {
+  display: block;
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
 }
 
 .auth-brand-copy {
@@ -689,26 +707,26 @@ button:disabled {
 }
 
 .auth-brand-copy strong {
-  color: var(--color-text);
-  font-size: 1rem;
+  color: #17343a;
+  font-size: 1.08rem;
 }
 
 .auth-brand-copy span {
-  color: var(--color-text-secondary);
+  color: #647b7e;
   font-size: 0.78rem;
 }
 
 .auth-header h1 {
-  margin: 0 0 8px;
-  color: var(--color-text);
-  font-family: Georgia, 'Times New Roman', serif;
+  margin: 0 0 7px;
+  color: #17343a;
   font-size: 1.75rem;
-  font-weight: 600;
+  font-weight: 750;
+  letter-spacing: -0.035em;
 }
 
 .auth-header p {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: #647b7e;
 }
 
 .auth-form {
@@ -721,7 +739,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: var(--color-text-soft);
+  color: #29464b;
   font-weight: 700;
 }
 
@@ -737,7 +755,14 @@ button:disabled {
 }
 
 .auth-form input {
-  background: var(--color-surface);
+  background: #ffffff;
+  border-color: #d1ddde;
+  color: #17343a;
+}
+
+.auth-form input:focus {
+  border-color: #116f7a;
+  outline: 3px solid rgba(17, 111, 122, 0.14);
 }
 
 .auth-form input::placeholder,
@@ -745,6 +770,10 @@ button:disabled {
 .user-form input::placeholder {
   color: var(--color-text-secondary);
   opacity: 1;
+}
+
+.auth-form input::placeholder {
+  color: #647b7e;
 }
 
 .select-input option {
@@ -1676,6 +1705,8 @@ pre {
     padding: 18px;
   }
 
+  .dashboard-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
   .page-header,
   .section-heading { align-items: flex-start; flex-direction: column; }
 
@@ -1690,6 +1721,7 @@ pre {
 }
 
 @media (min-width: 821px) and (max-width: 1100px) {
+  .dashboard-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .audit-filter-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .audit-filter-toolbar .search-input,
   .audit-filter-toolbar .select-input { min-width: 0; width: 100%; }
@@ -1704,7 +1736,12 @@ pre {
   .stat-card strong { font-size: 1.55rem; }
   .brand-subtitle { display: none; }
   .sidebar-footer .user-pill { max-width: 100px; }
+  .auth-card { padding: 28px 22px; }
 
   .audit-filter-toolbar { grid-template-columns: minmax(0, 1fr); }
   .audit-clear-button { width: 100%; }
+}
+
+@media (max-width: 360px) {
+  .dashboard-stat-grid { grid-template-columns: minmax(0, 1fr); }
 }

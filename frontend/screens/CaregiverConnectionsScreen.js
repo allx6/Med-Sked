@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getMyPatients,
@@ -124,7 +125,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       >
         <View style={styles.avatarWrap}>
-          <Text style={styles.avatarText}>👤</Text>
+          <MaterialCommunityIcons name="account-outline" size={23} color={colors.primary} />
         </View>
 
         <View style={styles.cardBody}>
@@ -136,7 +137,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
           </Text>
         </View>
 
-        <Text style={styles.arrow}>›</Text>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textMuted} />
       </Pressable>
     );
   };
@@ -149,7 +150,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
     return (
       <View key={request._id || request.relationshipId} style={styles.card}>
         <View style={styles.avatarWrap}>
-          <Text style={styles.avatarText}>⏳</Text>
+          <MaterialCommunityIcons name="clock-outline" size={22} color={colors.pending} />
         </View>
 
         <View style={styles.cardBody}>
@@ -196,6 +197,15 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Send Request</Text>
           <View style={styles.searchCard}>
+            <View style={styles.searchHeading}>
+              <View style={styles.searchIconWrap}>
+                <MaterialCommunityIcons name="account-search-outline" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.searchHeadingText}>
+                <Text style={styles.searchTitle}>Find a patient</Text>
+                <Text style={styles.searchSubtitle}>Search by their patient ID or email.</Text>
+              </View>
+            </View>
             <TextInput
               value={email}
               onChangeText={setEmail}
@@ -242,7 +252,9 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
           <Text style={styles.sectionTitle}>Pending Requests</Text>
           {pendingOnly.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📬</Text>
+              <View style={styles.emptyIconWrap}>
+                <MaterialCommunityIcons name="email-fast-outline" size={27} color={colors.primary} />
+              </View>
               <Text style={styles.emptyTitle}>No pending requests</Text>
               <Text style={styles.emptyText}>Requests you send to patients will appear here while they review them.</Text>
             </View>
@@ -255,7 +267,9 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
           <Text style={styles.sectionTitle}>Connected Patients</Text>
           {connectedPatients.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>👥</Text>
+              <View style={styles.emptyIconWrap}>
+                <MaterialCommunityIcons name="account-multiple-outline" size={27} color={colors.primary} />
+              </View>
               <Text style={styles.emptyTitle}>No patients connected yet.</Text>
               <Text style={styles.emptyText}>Use the search tool above to send a caregiver request.</Text>
             </View>
@@ -270,19 +284,24 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
+  content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 1000, alignSelf: 'center' },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
   pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   section: { marginBottom: spacing.xl },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.md },
   searchCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     ...shadow.card,
   },
+  searchHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  searchIconWrap: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  searchHeadingText: { flex: 1 },
+  searchTitle: { fontSize: 15, fontWeight: '800', color: colors.text },
+  searchSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   input: {
     backgroundColor: colors.inputFill,
     borderWidth: 1,
@@ -312,14 +331,14 @@ const styles = StyleSheet.create({
   permissionText: { marginTop: 5, fontSize: 11, color: colors.primary, fontWeight: '700' },
   pendingStatus: { color: colors.pending },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     ...shadow.card,
   },
   cardPressed: { opacity: 0.9 },
@@ -332,22 +351,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: spacing.md,
   },
-  avatarText: { fontSize: 18 },
   cardBody: { flex: 1 },
   cardTitle: { fontSize: 16, fontWeight: '800', color: colors.text },
   cardMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   statusText: { marginTop: 6, fontSize: 12, fontWeight: '800' },
-  arrow: { fontSize: 20, color: colors.textMuted },
   emptyState: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     padding: spacing.xl,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     ...shadow.card,
   },
-  emptyIcon: { fontSize: 28, marginBottom: 8 },
+  emptyIconWrap: { width: 52, height: 52, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 4 },
   emptyText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' },
   errorBox: {

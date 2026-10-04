@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getMyCaregivers,
@@ -22,7 +23,7 @@ import {
 import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 
-export default function PatientConnectionsScreen({ token }) {
+export default function PatientConnectionsScreen({ token, onBack }) {
   const [caregivers, setCaregivers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -260,6 +261,11 @@ export default function PatientConnectionsScreen({ token }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadConnections(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
+        {onBack ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} hitSlop={8} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
+          </Pressable>
+        ) : null}
         <Text style={styles.pageTitle}>Caregiver Connections</Text>
         <Text style={styles.pageSubtitle}>Manage who can view your medication routine.</Text>
 
@@ -316,20 +322,20 @@ export default function PatientConnectionsScreen({ token }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', marginBottom: spacing.sm },
   headerRow: { marginBottom: spacing.md },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 15 },
   pageTitle: { fontSize: 28, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 },
   pageSubtitle: { fontSize: 14, color: '#A7CDD0', marginBottom: spacing.lg },
   section: { marginBottom: spacing.xl },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.md },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     ...shadow.card,
   },
   avatarWrap: {
@@ -385,12 +391,12 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.85 },
   buttonDisabled: { opacity: 0.7 },
   emptyState: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
     padding: spacing.xl,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardTintBorder,
     ...shadow.card,
   },
   emptyIcon: { fontSize: 28, marginBottom: 8 },

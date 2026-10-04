@@ -10,7 +10,9 @@ const sanitizeNotification = (notification) => {
   const raw = notification?.toObject({ getters: false }) || {};
   return {
     ...raw,
-    message: safeReadNotificationMessage(raw.message),
+    message: safeReadNotificationMessage(raw.message, {
+      notificationId: raw._id,
+    }),
   };
 };
 

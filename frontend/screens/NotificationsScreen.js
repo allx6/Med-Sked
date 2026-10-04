@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getNotifications,
@@ -104,8 +105,9 @@ export default function NotificationsScreen({ token, onBack, unreadNotificationC
                 accessibilityLabel="Go back"
                 onPress={onBack}
                 hitSlop={8}
+                style={styles.backButton}
               >
-                <Text style={styles.backText}>←</Text>
+                <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
               </Pressable>
             ) : null}
             <View>
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
   headingGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  backText: { color: '#D8F0F2', fontWeight: '700', fontSize: 30, lineHeight: 36 },
+  backButton: { width: 40, height: 40, justifyContent: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.lg },
   title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
   subtitle: { color: '#A7CDD0', fontSize: 14, marginTop: 4 },

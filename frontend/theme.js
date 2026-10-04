@@ -7,6 +7,8 @@ export const colors = {
   textMuted: '#7B969D',
   background: '#116F7A',
   card: '#FFFFFF',
+  cardTint: '#D7EDF3',
+  cardTintBorder: '#B5D4DC',
   navigation: '#80B69D',
   navigationActive: '#3F8279',
   navigationText: '#1D716B',

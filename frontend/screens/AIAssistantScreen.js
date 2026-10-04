@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { askAiAssistant } from '../services/api';
@@ -24,6 +25,7 @@ const patientSuggestions = [
   'How is my adherence?',
   'Do I have any missed doses?',
   'Which medicines are low on supply?',
+  'What are my medication expiration dates?',
 ];
 
 const caregiverSuggestions = [
@@ -31,6 +33,7 @@ const caregiverSuggestions = [
   'How is this patient\'s adherence?',
   'Does this patient have missed doses?',
   'Which medicines have low supply?',
+  "What are this patient's medication expiration dates?",
 ];
 
 const formatAssistantMessage = (content) => {
@@ -154,7 +157,7 @@ export default function AIAssistantScreen({
             onPress={onBack}
             hitSlop={8}
           >
-            <Text style={styles.backText}>←</Text>
+            <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
           </Pressable>
         ) : (
           <View style={styles.headerSpacer} />
@@ -274,12 +277,6 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 56,
-  },
-  backText: {
-    color: '#D8F0F2',
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '700',
   },
   title: {
     fontSize: 26,

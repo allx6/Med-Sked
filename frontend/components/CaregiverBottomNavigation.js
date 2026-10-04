@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +26,11 @@ export default function CaregiverBottomNavigation({
           pressed && styles.navItemPressed,
         ]}
       >
-        <Text style={[styles.navIcon, active && styles.navIconActive]}>{icon}</Text>
+        <MaterialCommunityIcons
+          name={icon}
+          size={21}
+          style={[styles.navIcon, active && styles.navIconActive]}
+        />
         <Text style={[styles.navLabel, active && styles.navLabelActive]}>{label}</Text>
       </Pressable>
     );
@@ -39,10 +44,10 @@ export default function CaregiverBottomNavigation({
       ]}
     >
       <View style={styles.navigationBar}>
-        <NavItem icon="⌂" label="Home" screen="caregiverDashboard" onPress={onHome} />
-        <NavItem icon="👥" label="Patients" screen="caregiverPatients" onPress={onPatients} />
-        <NavItem icon="＋" label="Connect" screen="caregiverConnections" onPress={onConnections} />
-        <NavItem icon="⚙" label="Profile" screen="caregiverProfile" onPress={onProfile} />
+        <NavItem icon="home-outline" label="Home" screen="caregiverDashboard" onPress={onHome} />
+        <NavItem icon="account-multiple-outline" label="Patients" screen="caregiverPatients" onPress={onPatients} />
+        <NavItem icon="account-plus-outline" label="Connect" screen="caregiverConnections" onPress={onConnections} />
+        <NavItem icon="account-outline" label="Profile" screen="caregiverProfile" onPress={onProfile} />
       </View>
     </View>
   );
@@ -89,7 +94,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   navIcon: {
-    fontSize: 18,
     marginBottom: 2,
     color: colors.navigationText,
   },
