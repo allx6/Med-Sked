@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
+  Animated,
   View,
   Image,
   Text,
@@ -48,6 +49,31 @@ export default function RegisterScreen({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [authError, setAuthError] = useState('');
+  const entranceProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(entranceProgress, {
+      toValue: 1,
+      duration: 360,
+      useNativeDriver: true,
+    });
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [entranceProgress]);
+
+  const entranceStyle = {
+    opacity: entranceProgress,
+    transform: [
+      {
+        translateY: entranceProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [14, 0],
+        }),
+      },
+    ],
+  };
 
 
   // =====================================================
@@ -215,6 +241,7 @@ export default function RegisterScreen({
             style={styles.backgroundCircleTwo}
           />
 
+          <Animated.View style={[styles.content, entranceStyle]}>
 
           {/* =================================================
               TOP
@@ -491,6 +518,8 @@ export default function RegisterScreen({
             MedSked • Medication Management
           </Text>
 
+          </Animated.View>
+
         </ScrollView>
 
       </KeyboardAvoidingView>
@@ -522,6 +551,10 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 30,
     justifyContent: 'center',
+  },
+
+  content: {
+    width: '100%',
   },
 
   backgroundCircleOne: {

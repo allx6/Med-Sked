@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
+  Animated,
   View,
   Image,
   Text,
@@ -36,6 +37,31 @@ export default function LoginScreen({
   const [authError, setAuthError] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const entranceProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(entranceProgress, {
+      toValue: 1,
+      duration: 360,
+      useNativeDriver: true,
+    });
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [entranceProgress]);
+
+  const entranceStyle = {
+    opacity: entranceProgress,
+    transform: [
+      {
+        translateY: entranceProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [14, 0],
+        }),
+      },
+    ],
+  };
 
   const handleLogin = async () => {
     const nextErrors = {};
@@ -136,7 +162,7 @@ export default function LoginScreen({
 
           {/* LOGIN CARD */}
 
-          <View style={styles.card}>
+          <Animated.View style={[styles.card, entranceStyle]}>
             <View style={styles.logoSection}>
               <Image
                 accessible
@@ -224,7 +250,7 @@ export default function LoginScreen({
               <Text style={styles.registerLink}>Create Account</Text>
             </Pressable>
 
-          </View>
+          </Animated.View>
 
          
 
@@ -291,7 +317,7 @@ const styles = StyleSheet.create({
 
     paddingHorizontal: 20,
 
-    paddingTop: 54,
+    paddingTop: 20,
     paddingBottom: 20,
 
     justifyContent: 'center',
