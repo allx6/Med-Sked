@@ -7,7 +7,8 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
-const { createNotification } = require('../services/notificationService');
+const { createMedicationNotifications } = require('../services/notificationService');
+const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 
 const {
   generateTodayDoses,
@@ -46,6 +47,18 @@ const populateDose = (doseId) => DoseRecord.findById(doseId)
     'scheduleId',
     'time dose days startDate endDate enabled'
   );
+
+const restoreStockReservation = async (medicationId, userId) => {
+  const restoredMedication = await Medication.findOneAndUpdate(
+    { _id: medicationId, userId },
+    { $inc: { quantityOnHand: 1 } },
+    { returnDocument: 'after', runValidators: true }
+  );
+
+  if (!restoredMedication) {
+    throw new Error('Unable to restore reserved medication stock.');
+  }
+};
 
 
 // =====================================================
@@ -233,6 +246,12 @@ router.post(
         });
       }
 
+      if (isDoseDateAfterExpiration(scheduledDate, medication.expirationDate)) {
+        return res.status(400).json({
+          message: `Cannot create a dose scheduled for ${scheduledDate} because the medication expired on ${medication.expirationDate}.`,
+        });
+      }
+
 
       // -------------------------------------------------
       // VERIFY SCHEDULE
@@ -382,6 +401,17 @@ router.put(
         });
       }
 
+      const medication = await Medication.findOne({
+        _id: existingDose.medicationId,
+        userId: doseOwnerId,
+      });
+
+      if (isDoseDateAfterExpiration(existingDose.scheduledDate, medication?.expirationDate)) {
+        return res.status(400).json({
+          message: 'Cannot update a dose scheduled after the medication expiration date.',
+        });
+      }
+
       if (existingDose.refillDeducted) {
         await DoseRecord.updateOne(
           { _id: existingDose._id },
@@ -396,63 +426,122 @@ router.put(
         return res.json(await populateDose(existingDose._id));
       }
 
-      const dose = await DoseRecord.findOneAndUpdate(
-        {
-          _id: req.params.id,
-          userId: doseOwnerId,
-          status: { $ne: 'taken' },
-          refillDeducted: { $ne: true },
-        },
-        {
-          $set: {
-            status: 'taken',
-            takenAt: new Date(),
-            refillDeducted: true,
-          },
-        },
-        {
-          returnDocument: 'after',
-          runValidators: true,
-        }
-      );
-
-      if (!dose) {
-        return res.json(await populateDose(existingDose._id));
-      }
-
       const updatedMedication = await Medication.findOneAndUpdate(
         {
-          _id: dose.medicationId,
+          _id: existingDose.medicationId,
           userId: doseOwnerId,
           quantityOnHand: { $gt: 0 },
         },
-        {
-          $inc: { quantityOnHand: -1 },
-        },
+        { $inc: { quantityOnHand: -1 } },
         {
           returnDocument: 'after',
           runValidators: true,
         }
       );
+
+      if (!updatedMedication) {
+        return res.status(409).json({
+          message: 'Cannot take this dose because there is no medication stock remaining.',
+        });
+      }
+
+      let dose;
+      try {
+        dose = await DoseRecord.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            userId: doseOwnerId,
+            status: 'pending',
+            refillDeducted: { $ne: true },
+          },
+          {
+            $set: {
+              status: 'taken',
+              takenAt: new Date(),
+              refillDeducted: true,
+            },
+          },
+          {
+            returnDocument: 'after',
+            runValidators: true,
+          }
+        );
+      } catch (error) {
+        let currentDose;
+        try {
+          currentDose = await DoseRecord.findOne({
+            _id: req.params.id,
+            userId: doseOwnerId,
+          });
+        } catch (readError) {
+          throw error;
+        }
+
+        if (currentDose?.status === 'taken') {
+          return res.json(await populateDose(existingDose._id));
+        }
+
+        await restoreStockReservation(existingDose.medicationId, doseOwnerId);
+        throw error;
+      }
+
+      if (!dose) {
+        await restoreStockReservation(existingDose.medicationId, doseOwnerId);
+
+        const latestDose = await DoseRecord.findOne({
+          _id: req.params.id,
+          userId: doseOwnerId,
+        });
+
+        if (latestDose?.status === 'taken') {
+          return res.json(await populateDose(existingDose._id));
+        }
+
+        if (!latestDose) {
+          return res.status(404).json({ message: 'Dose record not found' });
+        }
+
+        return res.status(409).json({
+          message: 'Only pending doses can be marked as taken',
+        });
+      }
 
       if (
         updatedMedication &&
         updatedMedication.quantityOnHand <= updatedMedication.refillThreshold &&
         !updatedMedication.lowRefillNotified
       ) {
-        await createNotification({
-          recipient: updatedMedication.userId,
-          type: 'low_refill',
-          message: `${updatedMedication.name} is low on refill stock.`,
-          relatedEntityType: 'Medication',
-          relatedEntityId: updatedMedication._id,
-          dedupeKey: `low_refill:${updatedMedication._id}`,
-        });
-
-        await Medication.updateOne(
-          { _id: updatedMedication._id },
+        const notificationClaim = await Medication.updateOne(
+          {
+            _id: updatedMedication._id,
+            userId: updatedMedication.userId,
+            lowRefillNotified: { $ne: true },
+          },
           { $set: { lowRefillNotified: true } }
         );
+
+        if (notificationClaim.modifiedCount === 1) {
+          const patientNotification = await createMedicationNotifications({
+            patientId: updatedMedication.userId,
+            type: 'low_refill',
+            patientMessage: `${updatedMedication.name} is low on refill stock.`,
+            caregiverMessage: (patientName) => `${patientName}'s ${updatedMedication.name} is low on refill stock.`,
+            relatedEntityType: 'Medication',
+            relatedEntityId: updatedMedication._id,
+            dedupeKey: `low_refill:${updatedMedication._id}:${dose._id}`,
+          });
+
+          if (!patientNotification) {
+            await Medication.updateOne(
+              {
+                _id: updatedMedication._id,
+                userId: updatedMedication.userId,
+                lowRefillNotified: true,
+              },
+              { $set: { lowRefillNotified: false } }
+            );
+          }
+        }
       }
 
       const populatedDose = await populateDose(dose._id);
@@ -497,6 +586,30 @@ router.put(
 
       if (req.user.role === 'caregiver' && !require('mongoose').Types.ObjectId.isValid(doseOwnerId)) {
         return res.status(400).json({ message: 'Invalid patient ID' });
+      }
+
+      const existingDose = await DoseRecord.findOne({
+        _id: req.params.id,
+        userId: doseOwnerId,
+      });
+
+      if (!existingDose) {
+        return res.status(404).json({ message: 'Dose record not found' });
+      }
+
+      if (existingDose.status !== 'pending') {
+        return res.status(409).json({ message: 'Only pending doses can be skipped' });
+      }
+
+      const medication = await Medication.findOne({
+        _id: existingDose.medicationId,
+        userId: doseOwnerId,
+      });
+
+      if (isDoseDateAfterExpiration(existingDose.scheduledDate, medication?.expirationDate)) {
+        return res.status(400).json({
+          message: 'Cannot update a dose scheduled after the medication expiration date.',
+        });
       }
 
       const dose =

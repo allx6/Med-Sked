@@ -118,6 +118,86 @@ const validateSchedulePayload = (payload) => {
   return filtered;
 };
 
+const normalizeWhitespace = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+
+const normalizeDecimalString = (value) => {
+  const trimmed = normalizeWhitespace(value);
+  if (!trimmed) {
+    return '';
+  }
+
+  const numeric = Number(trimmed);
+  if (!Number.isFinite(numeric)) {
+    return trimmed;
+  }
+
+  const normalized = numeric.toString();
+  return normalized.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+};
+
+const normalizeMedicationName = (value) => normalizeWhitespace(value).toLowerCase();
+
+const normalizeMedicationDosage = (value) => {
+  const trimmed = normalizeWhitespace(value);
+  if (!trimmed) {
+    return '';
+  }
+
+  const dosageMatch = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i);
+  if (!dosageMatch) {
+    return trimmed.toLowerCase();
+  }
+
+  return `${normalizeDecimalString(dosageMatch[1])}${dosageMatch[2].toLowerCase()}`;
+};
+
+const buildNormalizedMedicationKey = (name, dosage) => {
+  const normalizedName = normalizeMedicationName(name);
+  const normalizedDosage = normalizeMedicationDosage(dosage);
+
+  if (!normalizedName || !normalizedDosage) {
+    return null;
+  }
+
+  return `${normalizedName}|${normalizedDosage}`;
+};
+
+const validateMedicationExpirationDate = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    return 'Expiration date must be a valid YYYY-MM-DD date.';
+  }
+
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return 'Expiration date must be a valid YYYY-MM-DD date.';
+  }
+
+  const [year, month, day] = trimmed.split('-').map(Number);
+  const parsedDate = new Date(year, month - 1, day);
+
+  if (
+    parsedDate.getFullYear() !== year
+    || parsedDate.getMonth() !== month - 1
+    || parsedDate.getDate() !== day
+  ) {
+    return 'Expiration date must be a valid YYYY-MM-DD date.';
+  }
+
+  return null;
+};
+
+const requireMedicationExpirationDate = (value) => {
+  if (value === undefined || value === null || typeof value !== 'string' || value.trim() === '') {
+    return 'Expiration date is required.';
+  }
+
+  return validateMedicationExpirationDate(value);
+};
+
 const validateMedicationFields = (payload) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return 'Invalid medication payload';
@@ -126,6 +206,11 @@ const validateMedicationFields = (payload) => {
   const name = typeof payload.name === 'string' ? payload.name.trim() : '';
   const dosage = typeof payload.dosage === 'string' ? payload.dosage.trim() : '';
   const frequency = typeof payload.frequency === 'string' ? payload.frequency.trim() : '';
+  const expirationDateError = requireMedicationExpirationDate(payload.expirationDate);
+
+  if (expirationDateError) {
+    return expirationDateError;
+  }
 
   if (name.length < 2) {
     return 'Medication name must contain at least 2 characters.';
@@ -149,7 +234,20 @@ const getTodayDate = () => {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 };
 
-const validateScheduleFields = (payload) => {
+const getTodayDateString = () => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+};
+
+const validateScheduleFields = (payload, {
+  allowPastStartDate = false,
+  medicationExpirationDate,
+  rejectExpiredMedication = false,
+  validateStartDateExpiration = true,
+  validateEndDateExpiration = true,
+} = {}) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return 'Invalid schedule payload';
   }
@@ -193,8 +291,28 @@ const validateScheduleFields = (payload) => {
   }
 
   const startDate = parseLocalDate(payload.startDate);
-  if (startDate < getTodayDate()) {
+  if (!allowPastStartDate && startDate < getTodayDate()) {
     return 'Start date cannot be earlier than today.';
+  }
+
+  const hasMedicationExpiration = validateMedicationExpirationDate(medicationExpirationDate) === null
+    && typeof medicationExpirationDate === 'string'
+    && medicationExpirationDate.trim() !== '';
+
+  if (hasMedicationExpiration && rejectExpiredMedication
+    && medicationExpirationDate < getTodayDateString()) {
+    return `Cannot create a schedule for an expired medication. This medication expired on ${medicationExpirationDate}.`;
+  }
+
+  if (hasMedicationExpiration && validateStartDateExpiration
+    && payload.startDate > medicationExpirationDate) {
+    return 'Schedule start date cannot be after the medication expiration date.';
+  }
+
+  if (hasMedicationExpiration && (payload.endDate === null
+    || payload.endDate === undefined
+    || (typeof payload.endDate === 'string' && payload.endDate.trim() === ''))) {
+    return 'End date is required because this medication has an expiration date.';
   }
 
   if (payload.endDate !== null && payload.endDate !== undefined
@@ -208,7 +326,13 @@ const validateScheduleFields = (payload) => {
   }
 
   if (payload.endDate && parseLocalDate(payload.endDate) < startDate) {
-    return 'End date cannot be earlier than the start date.';
+    return 'Schedule end date cannot be before the schedule start date.';
+  }
+
+  if (hasMedicationExpiration) {
+    if (validateEndDateExpiration && payload.endDate && payload.endDate > medicationExpirationDate) {
+      return 'Schedule end date cannot be after the medication expiration date.';
+    }
   }
 
   if (payload.enabled !== undefined && typeof payload.enabled !== 'boolean') {
@@ -238,5 +362,8 @@ module.exports = {
   pickAllowedFields,
   validateSchedulePayload,
   validateMedicationFields,
+  validateMedicationExpirationDate,
+  requireMedicationExpirationDate,
+  buildNormalizedMedicationKey,
   validateScheduleFields,
 };

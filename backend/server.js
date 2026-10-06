@@ -16,7 +16,6 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const aiRoutes = require('./routes/aiRoutes');
-const { detectMissedDoses } = require('./services/missedDoseService');
 const { validateEncryptionKey } = require('./services/encryptionService');
 
 const app = express();
@@ -140,7 +139,12 @@ app.use((error, req, res, next) => {
 // =====================================================
 
 try {
-  validateEncryptionKey();
+  const keyFingerprint = validateEncryptionKey();
+  console.info('Notification encryption configuration:', {
+    process: 'server',
+    environment: process.env.NODE_ENV || 'development',
+    keyFingerprint,
+  });
 } catch (error) {
   console.error(`Encryption configuration error: ${error.message}`);
   process.exit(1);
@@ -167,20 +171,6 @@ mongoose
         console.log(
           `Server running at http://localhost:${PORT}`
         );
-
-        const runMissedDoseDetection = async () => {
-          try {
-            const result = await detectMissedDoses();
-            if (result.markedMissed > 0) {
-              console.log('Missed-dose detection:', result);
-            }
-          } catch (error) {
-            console.error('Missed-dose detection error:', error);
-          }
-        };
-
-        runMissedDoseDetection();
-        setInterval(runMissedDoseDetection, 60 * 1000);
 
       }
     );

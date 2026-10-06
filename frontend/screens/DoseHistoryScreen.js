@@ -7,6 +7,7 @@ import React, {
 
 import {
   View,
+  Image,
   Text,
   FlatList,
   Pressable,
@@ -16,6 +17,7 @@ import {
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   generateTodayDoses,
@@ -27,10 +29,11 @@ import {
 
 import StatusBadge from '../components/StatusBadge';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import { getDoseActionErrorMessage } from '../utils/doseErrors';
+import { getSafeUserErrorMessage } from '../utils/medicationValidation';
 
 export default function DoseHistoryScreen({
   token,
-  onBack,
 }) {
   const { width } = useWindowDimensions();
   const compactLayout = width < 400;
@@ -85,8 +88,10 @@ export default function DoseHistoryScreen({
       );
 
       setError(
-        error.message ||
-          'Failed to load dose history.'
+        getSafeUserErrorMessage(
+          error,
+          'Unable to load dose history. Please check your connection and try again.'
+        )
       );
     } finally {
       setLoading(false);
@@ -260,8 +265,7 @@ export default function DoseHistoryScreen({
 
       Alert.alert(
         'Error',
-        error.message ||
-          'Failed to mark dose as taken.'
+        getDoseActionErrorMessage(error)
       );
     }
   };
@@ -292,8 +296,7 @@ export default function DoseHistoryScreen({
 
       Alert.alert(
         'Error',
-        error.message ||
-          'Failed to skip dose.'
+        getDoseActionErrorMessage(error)
       );
     }
   };
@@ -355,8 +358,9 @@ export default function DoseHistoryScreen({
 
       Alert.alert(
         'Error',
-        error.message ||
-          'Unable to complete this dose action.'
+        action === 'delete'
+          ? error.message || 'Unable to delete the dose. Please try again.'
+          : getDoseActionErrorMessage(error)
       );
     }
   };
@@ -459,6 +463,9 @@ export default function DoseHistoryScreen({
         {/* CARD HEADER */}
 
         <View style={styles.cardTop}>
+          <View style={styles.medicationIcon}>
+            <MaterialCommunityIcons name="pill" size={17} color="#0B4F59" />
+          </View>
           <View
             style={styles.medicationInfo}
           >
@@ -642,26 +649,19 @@ export default function DoseHistoryScreen({
 
   return (
     <View style={[styles.container, compactLayout && styles.compactContainer]}>
+      <View style={styles.decorCircle} pointerEvents="none" />
 
       {/* HEADER */}
 
-      <View style={[styles.header, compactLayout && styles.compactHeader]}>
-        <Pressable
-          onPress={onBack}
-          style={styles.backButton}
-        >
-          <Text
-            style={[styles.backText, compactLayout && styles.compactBackText]}
-          >
-            Back
-          </Text>
-        </Pressable>
-
-        <View
-          style={
-            styles.headerTitleContainer
-          }
-        >
+      <View style={styles.brandHeader}>
+        <Image
+          accessible
+          accessibilityLabel="MedSked logo"
+          source={require('../assets/medsked.png')}
+          resizeMode="contain"
+          style={styles.logo}
+        />
+        <View style={styles.headerTitleContainer}>
           <Text style={[styles.title, compactLayout && styles.compactTitle]}>
             Dose History
           </Text>
@@ -705,31 +705,33 @@ export default function DoseHistoryScreen({
         >
           <Text style={styles.filterTitle}>Date</Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScroll}
-          >
-            {availableDates.map((date) => (
-              <Pressable
-                key={date}
-                style={[
-                  styles.filterChip,
-                  selectedDate === date && styles.activeFilterChip,
-                ]}
-                onPress={() => setSelectedDate(date)}
-              >
-                <Text
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
+            >
+              {availableDates.map((date) => (
+                <Pressable
+                  key={date}
                   style={[
-                    styles.filterChipText,
-                    selectedDate === date && styles.activeFilterChipText,
+                    styles.filterChip,
+                    selectedDate === date && styles.activeFilterChip,
                   ]}
+                  onPress={() => setSelectedDate(date)}
                 >
-                  {getDateLabel(date)}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selectedDate === date && styles.activeFilterChipText,
+                    ]}
+                  >
+                    {getDateLabel(date)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* MEDICATION FILTER */}
 
@@ -739,78 +741,50 @@ export default function DoseHistoryScreen({
             Medication
           </Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-            contentContainerStyle={
-              styles.filterScroll
-            }
-          >
-            {/* ALL */}
-
-            <Pressable
-              style={[
-                styles.filterChip,
-
-                selectedMedication ===
-                  'all' &&
-                  styles.activeFilterChip,
-              ]}
-              onPress={() =>
-                setSelectedMedication(
-                  'all'
-                )
-              }
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
             >
-              <Text
+              <Pressable
                 style={[
-                  styles.filterChipText,
-
-                  selectedMedication ===
-                    'all' &&
-                    styles.activeFilterChipText,
+                  styles.filterChip,
+                  selectedMedication === 'all' && styles.activeFilterChip,
                 ]}
+                onPress={() => setSelectedMedication('all')}
               >
-                All Medications
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    selectedMedication === 'all' && styles.activeFilterChipText,
+                  ]}
+                >
+                  All Medications
+                </Text>
+              </Pressable>
 
-            {/* MEDICATIONS */}
-
-            {medications.map(
-              (medication) => (
+              {medications.map((medication) => (
                 <Pressable
                   key={medication.id}
                   style={[
                     styles.filterChip,
-
-                    selectedMedication ===
-                      medication.id &&
-                      styles.activeFilterChip,
+                    selectedMedication === medication.id && styles.activeFilterChip,
                   ]}
-                  onPress={() =>
-                    setSelectedMedication(
-                      medication.id
-                    )
-                  }
+                  onPress={() => setSelectedMedication(medication.id)}
                 >
                   <Text
                     style={[
                       styles.filterChipText,
-
-                      selectedMedication ===
-                        medication.id &&
-                        styles.activeFilterChipText,
+                      selectedMedication === medication.id && styles.activeFilterChipText,
                     ]}
                   >
                     {medication.name}
                   </Text>
                 </Pressable>
-              )
-            )}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          </View>
 
           {/* STATUS FILTER */}
 
@@ -823,68 +797,39 @@ export default function DoseHistoryScreen({
             Status
           </Text>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
-            contentContainerStyle={
-              styles.filterScroll
-            }
-          >
-            {[
-              {
-                key: 'all',
-                label: 'All',
-              },
-              {
-                key: 'pending',
-                label: 'Pending',
-              },
-              {
-                key: 'taken',
-                label: 'Taken',
-              },
-              {
-                key: 'skipped',
-                label: 'Skipped',
-              },
-              {
-                key: 'missed',
-                label: 'Missed',
-              },
-            ].map((status) => (
-              <Pressable
-                key={status.key}
-                style={[
-                  styles.filterChip,
-
-                  selectedStatus ===
-                    status.key &&
-                    styles.activeFilterChip,
-                ]}
-                onPress={() =>
-                  setSelectedStatus(
-                    status.key
-                  )
-                }
-              >
-                <Text
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
+            >
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'pending', label: 'Pending' },
+                { key: 'taken', label: 'Taken' },
+                { key: 'skipped', label: 'Skipped' },
+                { key: 'missed', label: 'Missed' },
+              ].map((status) => (
+                <Pressable
+                  key={status.key}
                   style={[
-                    styles.filterChipText,
-
-                    selectedStatus ===
-                      status.key &&
-                      styles.activeFilterChipText,
+                    styles.filterChip,
+                    selectedStatus === status.key && styles.activeFilterChip,
                   ]}
+                  onPress={() => setSelectedStatus(status.key)}
                 >
-                  {status.label}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          {/* RESULT COUNT */}
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      selectedStatus === status.key && styles.activeFilterChipText,
+                    ]}
+                  >
+                    {status.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           <Text
             style={styles.resultCount}
@@ -919,39 +864,20 @@ export default function DoseHistoryScreen({
       ) : (
         <FlatList
           data={groupedDoses}
-          keyExtractor={(item) =>
-            item.date
-          }
-          renderItem={
-            renderDateGroup
-          }
+          keyExtractor={(item) => item.date}
+          renderItem={renderDateGroup}
+          style={styles.flatList}
           contentContainerStyle={
             groupedDoses.length === 0
               ? styles.emptyList
               : styles.list
           }
           ListEmptyComponent={
-            <View
-              style={
-                styles.emptyContainer
-              }
-            >
-              <Text
-                style={
-                  styles.emptyTitle
-                }
-              >
-                No matching doses
-              </Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No matching doses</Text>
 
-              <Text
-                style={
-                  styles.emptyText
-                }
-              >
-                Try changing your
-                medication or status
-                filters.
+              <Text style={styles.emptyText}>
+                Try changing your medication or status filters.
               </Text>
             </View>
           }
@@ -1170,15 +1096,19 @@ const parseTimeForSorting = (
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#87CEEB',
+    paddingHorizontal: 26,
+    paddingTop: 20,
+    paddingBottom: 0,
+    backgroundColor: '#116F7A',
     width: '100%',
     maxWidth: 760,
     alignSelf: 'center',
+    overflow: 'hidden',
   },
 
   compactContainer: {
-    padding: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
 
   // =================================================
@@ -1188,7 +1118,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'column',
     alignItems: 'stretch',
-    marginBottom: 8,
+    marginBottom: 10,
   },
 
   compactHeader: {
@@ -1201,7 +1131,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#2F6690',
+    color: '#D8F0F2',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1211,28 +1141,52 @@ const styles = StyleSheet.create({
   },
 
   headerTitleContainer: {
-    marginTop: 4,
-    alignItems: 'flex-start',
+    flex: 1,
+    minWidth: 0,
+  },
+
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  logo: {
+    width: 31,
+    height: 31,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+  },
+
+  decorCircle: {
+    position: 'absolute',
+    top: -38,
+    right: -62,
+    width: 125,
+    height: 125,
+    borderRadius: 63,
+    backgroundColor: '#3D929B',
   },
 
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1E2A4A',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#D7EDF3',
   },
 
   compactTitle: {
-    fontSize: 20,
+    fontSize: 17,
   },
 
   subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 9,
+    color: '#A7CDD0',
     marginTop: 2,
   },
 
   compactSubtitle: {
-    fontSize: 12,
+    fontSize: 8,
   },
 
   // =================================================
@@ -1271,46 +1225,55 @@ const styles = StyleSheet.create({
   // =================================================
 
   filterSection: {
-    marginBottom: 12,
+    marginBottom: 8,
     width: '100%',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
+  },
+
+  filterRow: {
+    width: '100%',
+    overflow: 'hidden',
   },
 
   filterTitle: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: '800',
-    color: '#374151',
-    marginBottom: 7,
+    color: '#A7CDD0',
+    marginBottom: 4,
+    textTransform: 'uppercase',
   },
 
   statusFilterTitle: {
-    marginTop: 12,
+    marginTop: 8,
   },
 
   filterScroll: {
-    gap: 8,
+    gap: 6,
     flexGrow: 1,
     justifyContent: 'flex-start',
-    paddingRight: 10,
+    paddingRight: 8,
+    maxWidth: '100%',
+    minWidth: 0,
+    paddingBottom: 1,
   },
 
   filterChip: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#D7EDF3',
     borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
   },
 
   activeFilterChip: {
-    backgroundColor: '#2F6690',
-    borderColor: '#2F6690',
+    backgroundColor: '#0B4F59',
+    borderColor: '#0B4F59',
   },
 
   filterChipText: {
     color: '#4B5563',
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: '600',
   },
 
@@ -1319,10 +1282,11 @@ const styles = StyleSheet.create({
   },
 
   resultCount: {
-    marginTop: 10,
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
+    marginTop: 5,
+    fontSize: 8,
+    color: '#A7CDD0',
+    textAlign: 'left',
+    textTransform: 'uppercase',
   },
 
   // =================================================
@@ -1337,7 +1301,7 @@ const styles = StyleSheet.create({
 
   loadingText: {
     marginTop: 10,
-    color: '#6B7280',
+    color: '#A7CDD0',
     fontSize: 14,
   },
 
@@ -1345,10 +1309,16 @@ const styles = StyleSheet.create({
   // LIST
   // =================================================
 
+  flatList: {
+    flex: 1,
+    width: '100%',
+  },
+
   list: {
     paddingBottom: 30,
     width: '100%',
     alignSelf: 'center',
+    flexGrow: 1,
   },
 
   emptyList: {
@@ -1365,21 +1335,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 10,
+    marginTop: 5,
+    marginBottom: 6,
     paddingHorizontal: 2,
     width: '100%',
   },
 
   dateHeaderText: {
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
   },
 
   dateCount: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 8,
+    color: '#A7CDD0',
   },
 
   // =================================================
@@ -1394,13 +1365,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#FFFFFF',
     marginBottom: 6,
   },
 
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#A7CDD0',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -1411,51 +1382,63 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#D7EDF3',
     width: '100%',
     alignSelf: 'center',
   },
 
   cardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+  },
+
+  medicationIcon: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    backgroundColor: '#80AEB5',
   },
 
   medicationInfo: {
     flex: 1,
-    paddingRight: 10,
+    minWidth: 0,
+    marginLeft: 8,
+    paddingRight: 4,
   },
 
   medicationName: {
-    fontSize: 17,
+    fontSize: 11,
     fontWeight: '700',
     color: '#1E2A4A',
   },
 
   dosage: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 3,
+    fontSize: 8,
+    color: '#7A8494',
+    marginTop: 1,
   },
 
   frequency: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 8,
+    color: '#7A8494',
+    marginTop: 1,
   },
 
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 7,
-    gap: 8,
+    marginTop: 5,
+    gap: 6,
   },
 
   statusLabel: {
-    fontSize: 12,
+    fontSize: 8,
     color: '#6B7280',
     fontWeight: '600',
   },
@@ -1466,8 +1449,8 @@ const styles = StyleSheet.create({
 
   statusBadge: {
     borderRadius: 20,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
   },
 
   pendingBadge: {
@@ -1487,7 +1470,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    fontSize: 12,
+    fontSize: 8,
     fontWeight: '700',
   },
 
@@ -1512,13 +1495,16 @@ const styles = StyleSheet.create({
   // =================================================
 
   details: {
-    marginTop: 14,
+    marginTop: 9,
+    paddingTop: 7,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E8EB',
   },
 
   detailText: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 4,
+    fontSize: 8,
+    color: '#718991',
+    marginBottom: 3,
   },
 
   // =================================================
@@ -1527,9 +1513,8 @@ const styles = StyleSheet.create({
 
   actionRow: {
     flexDirection: 'row',
-    marginTop: 14,
+    marginTop: 8,
     gap: 8,
-    flexWrap: 'wrap',
   },
 
   compactActionRow: {
@@ -1539,30 +1524,34 @@ const styles = StyleSheet.create({
   takeButton: {
     flex: 1,
     minWidth: 120,
-    backgroundColor: '#2F6690',
-    borderRadius: 8,
-    paddingVertical: 11,
+    minHeight: 32,
+    justifyContent: 'center',
+    backgroundColor: '#218C73',
+    borderRadius: 5,
     alignItems: 'center',
   },
 
   takeButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 9,
     fontWeight: '700',
   },
 
   skipButton: {
     flex: 1,
     minWidth: 120,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 8,
-    paddingVertical: 11,
+    minHeight: 32,
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#9AAAB0',
+    borderRadius: 5,
     alignItems: 'center',
   },
 
   skipButtonText: {
-    color: '#374151',
-    fontSize: 13,
+    color: '#B91C1C',
+    fontSize: 9,
     fontWeight: '700',
   },
 
@@ -1571,18 +1560,15 @@ const styles = StyleSheet.create({
   // =================================================
 
   deleteButton: {
-    marginTop: 12,
-    alignSelf: 'stretch',
-    backgroundColor: '#DC2626',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    alignItems: 'center',
+    marginTop: 4,
+    alignSelf: 'flex-end',
+    paddingHorizontal: 2,
+    paddingVertical: 3,
   },
 
   deleteText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+    color: '#B91C1C',
+    fontSize: 8,
     fontWeight: '700',
   },
 });

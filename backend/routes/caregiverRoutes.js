@@ -11,6 +11,7 @@ const caregiverMiddleware = require('../middleware/caregiverMiddleware');
 const { createNotification } = require('../services/notificationService');
 const { createAuditLog } = require('../services/auditLogService');
 const { generateTodayDoses } = require('../services/doseGenerator');
+const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 
 const router = express.Router();
 
@@ -431,8 +432,15 @@ router.get(
 
       const todayDoses =
         doses.filter(
-          dose =>
-            dose.scheduledDate === today
+          (dose) => {
+            const medicationId = dose.medicationId?._id || dose.medicationId;
+            const medication = medications.find(
+              (item) => String(item._id) === String(medicationId)
+            );
+
+            return dose.scheduledDate === today
+              && !isDoseDateAfterExpiration(dose.scheduledDate, medication?.expirationDate);
+          }
         );
 
 
@@ -472,10 +480,15 @@ router.get(
       // ADHERENCE PERCENTAGE
       // -------------------------------------------------
 
+      const eligible =
+        taken +
+        missed +
+        skipped;
+
       const adherence =
-        total > 0
+        eligible > 0
           ? Math.round(
-              (taken / total) * 100
+              (taken / eligible) * 100
             )
           : 0;
 

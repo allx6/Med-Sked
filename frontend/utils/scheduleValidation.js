@@ -29,6 +29,13 @@ const getTodayDate = () => {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 };
 
+const getTodayDateString = () => {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${today.getFullYear()}-${month}-${day}`;
+};
+
 export const parseLocalDate = (value) => {
   if (!isValidLocalDate(value)) {
     return null;
@@ -38,12 +45,22 @@ export const parseLocalDate = (value) => {
   return new Date(year, month - 1, day);
 };
 
-export const validateScheduleFields = (schedule) => {
+export const validateScheduleFields = (schedule, {
+  allowPastStartDate = false,
+  medicationExpirationDate,
+  rejectExpiredMedication = false,
+  validateStartDateExpiration = true,
+  validateEndDateExpiration = true,
+} = {}) => {
   if (!schedule?.medicationId) {
-    return 'Please select a medication.';
+    return 'Medication is required.';
   }
 
-  if (typeof schedule.time !== 'string' || !timePattern.test(schedule.time.trim())) {
+  if (typeof schedule.time !== 'string' || !schedule.time.trim()) {
+    return 'Scheduled time is required.';
+  }
+
+  if (!timePattern.test(schedule.time.trim())) {
     return 'Please select a valid medication time.';
   }
 
@@ -60,17 +77,36 @@ export const validateScheduleFields = (schedule) => {
     return 'Please select valid schedule days.';
   }
 
-  if (!isValidLocalDate(schedule.startDate)) {
-    return 'Please select a valid start date.';
+  if (schedule.startDate === undefined || schedule.startDate === null || schedule.startDate === '') {
+    return 'Start date is required.';
   }
 
-  if (parseLocalDate(schedule.startDate) < getTodayDate()) {
+  if (!isValidLocalDate(schedule.startDate)) {
+    return 'Start date must be a valid date.';
+  }
+
+  if (!allowPastStartDate && parseLocalDate(schedule.startDate) < getTodayDate()) {
     return 'Start date cannot be earlier than today.';
+  }
+
+  if (isValidLocalDate(medicationExpirationDate)) {
+    if (rejectExpiredMedication && medicationExpirationDate < getTodayDateString()) {
+      return `Cannot create a schedule for an expired medication. This medication expired on ${medicationExpirationDate}.`;
+    }
+
+    if (validateStartDateExpiration && schedule.startDate > medicationExpirationDate) {
+      return 'Schedule start date cannot be after the medication expiration date.';
+    }
+
+    if (schedule.endDate === null || schedule.endDate === undefined
+      || (typeof schedule.endDate === 'string' && schedule.endDate.trim() === '')) {
+      return 'End date is required because this medication has an expiration date.';
+    }
   }
 
   if (schedule.endDate !== null && schedule.endDate !== undefined
     && !isValidLocalDate(schedule.endDate)) {
-    return 'Please select a valid end date.';
+    return 'End date must be a valid date.';
   }
 
   if (schedule.endDate && parseLocalDate(schedule.endDate) < getTodayDate()) {
@@ -78,7 +114,13 @@ export const validateScheduleFields = (schedule) => {
   }
 
   if (schedule.endDate && parseLocalDate(schedule.endDate) < parseLocalDate(schedule.startDate)) {
-    return 'End date cannot be before the start date.';
+    return 'Schedule end date cannot be before the schedule start date.';
+  }
+
+  if (isValidLocalDate(medicationExpirationDate)) {
+    if (validateEndDateExpiration && schedule.endDate && schedule.endDate > medicationExpirationDate) {
+      return 'Schedule end date cannot be after the medication expiration date.';
+    }
   }
 
   if (typeof schedule.enabled !== 'boolean') {
@@ -86,4 +128,16 @@ export const validateScheduleFields = (schedule) => {
   }
 
   return '';
+};
+
+export const getScheduleSubmissionErrorMessage = (error) => {
+  const message = typeof error?.message === 'string' ? error.message.trim() : '';
+  const genericError = /^(?:TypeError:|Network request failed$|Failed to fetch$|fetch failed$|Unable to connect to the Med-Sked server\b|Failed to process schedule request\b|Request failed with status \d+)/i;
+  const technicalError = /MongoServerError|MongooseError|stack trace|\bECONN[A-Z]+\b/i;
+
+  if (!message || genericError.test(message) || technicalError.test(message)) {
+    return 'Unable to save the schedule. Please check your connection and try again.';
+  }
+
+  return message;
 };

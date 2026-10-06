@@ -1,7 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const DoseRecord = require('../models/DoseRecord');
+const Medication = require('../models/Medication');
+const MedicationSchedule = require('../models/MedicationSchedule');
 
 const {
+  generateDosesForDate,
   parseTime,
   scheduleAppliesToDate,
 } = require('../services/doseGenerator');
@@ -85,4 +89,97 @@ test('eight-hour intervals remain distinct from fixed schedule times', () => {
   });
 
   assert.deepEqual(generated, ['8:00 AM', '4:00 PM', '12:00 AM']);
+});
+
+const runGenerationWithModels = async ({ targetDate, medication, schedule }) => {
+  const originals = {
+    scheduleFind: MedicationSchedule.find,
+    medicationFind: Medication.find,
+    doseCreate: DoseRecord.create,
+    consoleLog: console.log,
+  };
+  const created = [];
+
+  MedicationSchedule.find = () => ({
+    lean: async () => [schedule],
+  });
+  Medication.find = () => ({
+    lean: async () => [medication],
+  });
+  DoseRecord.create = async (dose) => {
+    created.push(dose);
+    return dose;
+  };
+  console.log = () => {};
+
+  try {
+    await generateDosesForDate('user-id', targetDate);
+  } finally {
+    MedicationSchedule.find = originals.scheduleFind;
+    Medication.find = originals.medicationFind;
+    DoseRecord.create = originals.doseCreate;
+    console.log = originals.consoleLog;
+  }
+
+  return created;
+};
+
+const makeDateSchedule = (date, overrides = {}) => ({
+  _id: 'schedule-id',
+  userId: 'user-id',
+  medicationId: 'medication-id',
+  time: '08:00',
+  startDate: formatTestDate(date),
+  endDate: null,
+  days: [new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date)],
+  enabled: true,
+  ...overrides,
+});
+
+const formatTestDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+test('generateDosesForDate creates the dose on expiration day', async () => {
+  const targetDate = new Date(2026, 9, 10);
+  const created = await runGenerationWithModels({
+    targetDate,
+    medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Daily', expirationDate: '2026-10-10' },
+    schedule: makeDateSchedule(targetDate),
+  });
+
+  assert.equal(created.length, 1);
+  assert.equal(created[0].scheduledDate, '2026-10-10');
+});
+
+test('generateDosesForDate skips a null-ended schedule after expiration', async () => {
+  const targetDate = new Date(2026, 9, 11);
+  const created = await runGenerationWithModels({
+    targetDate,
+    medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Daily', expirationDate: '2026-10-10' },
+    schedule: makeDateSchedule(targetDate),
+  });
+
+  assert.deepEqual(created, []);
+});
+
+test('generateDosesForDate checks the final interval candidate after midnight', async () => {
+  const targetDate = new Date(2026, 9, 10);
+  const created = await runGenerationWithModels({
+    targetDate,
+    medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Every 8 hours', expirationDate: '2026-10-10' },
+    schedule: makeDateSchedule(targetDate),
+  });
+
+  assert.deepEqual(created.map((dose) => dose.scheduledDate), ['2026-10-10', '2026-10-10']);
+});
+
+test('generateDosesForDate preserves legacy behavior without expiration', async () => {
+  const targetDate = new Date(2026, 9, 11);
+  const created = await runGenerationWithModels({
+    targetDate,
+    medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Daily', expirationDate: null },
+    schedule: makeDateSchedule(targetDate),
+  });
+
+  assert.equal(created.length, 1);
+  assert.equal(created[0].scheduledDate, '2026-10-11');
 });

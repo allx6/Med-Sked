@@ -25,9 +25,14 @@ import {
 import {
   getMedications,
   getPatientMedications,
+  getSchedules,
+  getPatientSchedules,
   createSchedule,
 } from '../services/api';
-import { validateScheduleFields } from '../utils/scheduleValidation';
+import {
+  getScheduleSubmissionErrorMessage,
+  validateScheduleFields,
+} from '../utils/scheduleValidation';
 
 
 export default function AddScheduleScreen({
@@ -45,6 +50,8 @@ export default function AddScheduleScreen({
   const [medications, setMedications] = useState([]);
   const [loadingMedications, setLoadingMedications] =
     useState(true);
+  const [hasScheduledMedications, setHasScheduledMedications] =
+    useState(false);
 
   const [selectedMedication, setSelectedMedication] =
     useState(null);
@@ -120,6 +127,7 @@ export default function AddScheduleScreen({
 
   const [saving, setSaving] =
     useState(false);
+  const [formError, setFormError] = useState('');
 
 
   // =====================================================
@@ -134,14 +142,31 @@ export default function AddScheduleScreen({
 
         setLoadingMedications(true);
 
-        const data = patientId
-          ? await getPatientMedications(token, patientId)
-          : await getMedications(token);
+        const [data, schedules] = await Promise.all([
+          patientId
+            ? getPatientMedications(token, patientId)
+            : getMedications(token),
+          patientId
+            ? getPatientSchedules(token, patientId)
+            : getSchedules(token),
+        ]);
+
+        const allMedications = Array.isArray(data)
+          ? data
+          : data?.medications || [];
+        const scheduledMedicationIds = new Set(
+          (Array.isArray(schedules) ? schedules : [])
+            .map((schedule) => schedule.medicationId?._id || schedule.medicationId)
+            .filter(Boolean)
+            .map(String)
+        );
+
+        setHasScheduledMedications(scheduledMedicationIds.size > 0);
 
         setMedications(
-          Array.isArray(data)
-            ? data
-            : data?.medications || []
+          allMedications.filter(
+            (medication) => !scheduledMedicationIds.has(String(medication._id))
+          )
         );
 
       } catch (error) {
@@ -329,6 +354,7 @@ export default function AddScheduleScreen({
   // =====================================================
 
   const handleSave = async () => {
+    setFormError('');
 
     const medicationDose =
       (selectedMedication?.dosage || dose || '').trim();
@@ -363,9 +389,12 @@ export default function AddScheduleScreen({
 
       };
 
-    const scheduleError = validateScheduleFields(schedule);
+    const scheduleError = validateScheduleFields(schedule, {
+      medicationExpirationDate: selectedMedication?.expirationDate,
+      rejectExpiredMedication: true,
+    });
     if (scheduleError) {
-      Alert.alert('Invalid Schedule', scheduleError);
+      setFormError(scheduleError);
       return;
     }
 
@@ -421,11 +450,7 @@ export default function AddScheduleScreen({
         error
       );
 
-      Alert.alert(
-        'Error',
-        error.message ||
-          'Failed to create schedule.'
-      );
+      setFormError(getScheduleSubmissionErrorMessage(error));
 
     } finally {
 
@@ -463,17 +488,6 @@ export default function AddScheduleScreen({
 
       <View style={styles.header}>
 
-        <Pressable
-          onPress={onCancel}
-          style={styles.backButton}
-        >
-
-          <Text style={styles.backText}>
-            Back
-          </Text>
-
-        </Pressable>
-
         <Text style={styles.title}>
           Add Schedule
         </Text>
@@ -483,6 +497,12 @@ export default function AddScheduleScreen({
         </Text>
 
       </View>
+
+      {formError ? (
+        <View style={styles.errorBox} accessibilityRole="alert">
+          <Text style={styles.errorText}>{formError}</Text>
+        </View>
+      ) : null}
 
 
       {/* =================================================
@@ -510,12 +530,15 @@ export default function AddScheduleScreen({
         <View style={styles.emptyBox}>
 
           <Text style={styles.emptyTitle}>
-            No medications available
+            {hasScheduledMedications
+              ? 'No unscheduled medications'
+              : 'No medications available'}
           </Text>
 
           <Text style={styles.emptyText}>
-            Add a medication first before creating
-            a schedule.
+            {hasScheduledMedications
+              ? 'Each medication can have only one schedule.'
+              : 'Add a medication first before creating a schedule.'}
           </Text>
 
         </View>
@@ -655,47 +678,52 @@ export default function AddScheduleScreen({
       </Text>
 
       <View style={styles.daysContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.daysScrollContent}
+          style={styles.daysScrollWrap}
+        >
+          {daysOfWeek.map(
+            (day) => {
 
-        {daysOfWeek.map(
-          (day) => {
+              const selected =
+                selectedDays.includes(day);
 
-            const selected =
-              selectedDays.includes(day);
+              const shortDay =
+                day.substring(0, 3);
 
-            const shortDay =
-              day.substring(0, 3);
+              return (
 
-            return (
-
-              <Pressable
-                key={day}
-                style={[
-                  styles.dayButton,
-                  selected &&
-                    styles.dayButtonSelected,
-                ]}
-                onPress={() =>
-                  toggleDay(day)
-                }
-              >
-
-                <Text
+                <Pressable
+                  key={day}
                   style={[
-                    styles.dayText,
+                    styles.dayButton,
                     selected &&
-                      styles.dayTextSelected,
+                      styles.dayButtonSelected,
                   ]}
+                  onPress={() =>
+                    toggleDay(day)
+                  }
                 >
-                  {shortDay}
-                </Text>
 
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.dayText,
+                      selected &&
+                        styles.dayTextSelected,
+                    ]}
+                  >
+                    {shortDay}
+                  </Text>
 
-            );
+                </Pressable>
 
-          }
-        )}
+              );
 
+            }
+          )}
+        </ScrollView>
       </View>
 
 
@@ -802,6 +830,12 @@ export default function AddScheduleScreen({
         </View>
 
       </View>
+
+      {selectedMedication?.expirationDate ? (
+        <Text style={styles.expirationHint}>
+          End date is required because this medication expires on {selectedMedication.expirationDate}.
+        </Text>
+      ) : null}
 
 
       {hasEndDate && (
@@ -988,12 +1022,15 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#116F7A',
   },
 
   content: {
     padding: 20,
     paddingBottom: 40,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
 
   header: {
@@ -1005,7 +1042,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: '#2F6690',
+    color: '#D8F0F2',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -1013,19 +1050,41 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#FFFFFF',
   },
 
   subtitle: {
     marginTop: 5,
     fontSize: 14,
-    color: '#6B7280',
+    color: '#A7CDD0',
+  },
+
+  errorBox: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  expirationHint: {
+    marginTop: 4,
+    color: '#D8F0F2',
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   label: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1E2A4A',
+    color: '#FFFFFF',
     marginBottom: 8,
     marginTop: 18,
   },
@@ -1076,7 +1135,7 @@ const styles = StyleSheet.create({
   },
 
   medicationOptionSelected: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
     backgroundColor: '#EEF6FA',
   },
 
@@ -1098,7 +1157,7 @@ const styles = StyleSheet.create({
   },
 
   selectedText: {
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   selectedSubText: {
@@ -1117,14 +1176,14 @@ const styles = StyleSheet.create({
   },
 
   radioSelected: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
   },
 
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   inputButton: {
@@ -1195,9 +1254,20 @@ const styles = StyleSheet.create({
   },
 
   daysContainer: {
+    width: '100%',
+    maxWidth: '100%',
+  },
+
+  daysScrollWrap: {
+    maxWidth: '100%',
+  },
+
+  daysScrollContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
+    paddingRight: 8,
+    paddingVertical: 2,
   },
 
   dayButton: {
@@ -1209,11 +1279,12 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    minWidth: 44,
   },
 
   dayButtonSelected: {
-    backgroundColor: '#2F6690',
-    borderColor: '#2F6690',
+    backgroundColor: '#0B4F59',
+    borderColor: '#0B4F59',
   },
 
   dayText: {
@@ -1268,7 +1339,7 @@ const styles = StyleSheet.create({
 
   saveButton: {
     marginTop: 25,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
     borderRadius: 12,
     minHeight: 52,
     alignItems: 'center',

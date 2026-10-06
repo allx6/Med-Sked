@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import medskedLogo from '../assets/medsked.png';
 import { loginAdmin } from '../services/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@gmail.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,9 +40,15 @@ export default function LoginPage() {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="auth-header">
-          <div className="brand-mark large">M</div>
-          <h1>MedSked Admin</h1>
-          <p>Secure sign in</p>
+          <div className="auth-brand">
+            <img className="auth-logo" src={medskedLogo} alt="MedSked" />
+            <div className="auth-brand-copy">
+              <strong>MedSked</strong>
+              <span>Administration portal</span>
+            </div>
+          </div>
+          <h1>Admin Sign In</h1>
+          <p>Sign in with your administrator account.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -49,8 +56,14 @@ export default function LoginPage() {
             <span>Email</span>
             <input
               type="email"
+              autoComplete="username"
+              placeholder="Enter admin email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setError('');
+              }}
+              disabled={loading}
               required
             />
           </label>
@@ -59,16 +72,22 @@ export default function LoginPage() {
             <span>Password</span>
             <input
               type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError('');
+              }}
+              disabled={loading}
               required
             />
           </label>
 
-          {error ? <div className="error-banner">{error}</div> : null}
+          {error ? <div className="error-banner" role="alert" aria-live="polite">{error}</div> : null}
 
           <button className="primary-button" type="submit" disabled={loading}>
-            {loading ? 'Signing in…' : 'Login'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
       </div>

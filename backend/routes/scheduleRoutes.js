@@ -17,7 +17,7 @@ const authMiddleware =
   require('../middleware/authMiddleware');
 const caregiverMiddleware =
   require('../middleware/caregiverMiddleware');
-const { createNotification } = require('../services/notificationService');
+const { createMedicationNotifications } = require('../services/notificationService');
 const {
   generateTodayDoses,
   reconcilePendingDosesForSchedule,
@@ -189,13 +189,6 @@ router.post(
         return respondWithError(res, error);
       }
 
-      const validationError = validateScheduleFields(payload);
-      if (validationError) {
-        const error = new Error(validationError);
-        error.statusCode = 400;
-        return respondWithError(res, error);
-      }
-
       const {
         medicationId,
         time,
@@ -273,6 +266,28 @@ router.post(
             'Medication not found',
         });
 
+      }
+
+      const validationError = validateScheduleFields(payload, {
+        medicationExpirationDate: medication.expirationDate,
+        rejectExpiredMedication: true,
+      });
+
+      if (validationError) {
+        const error = new Error(validationError);
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
+
+      const existingMedicationSchedule =
+        await MedicationSchedule.findOne({
+          medicationId,
+        });
+
+      if (existingMedicationSchedule) {
+        return res.status(409).json({
+          message: 'This medication already has a schedule.',
+        });
       }
 
       const medicationDose =
@@ -333,12 +348,15 @@ router.post(
           'name dosage frequency'
         );
 
-      await createNotification({
-        recipient: req.user.userId,
+      const medicationName = populatedSchedule.medicationId?.name || 'medication';
+      await createMedicationNotifications({
+        patientId: ownerId,
         type: 'schedule_changed',
-        message: `Medication schedule created for ${populatedSchedule.medicationId?.name || 'your medication'}.`,
+        patientMessage: `Your ${medicationName} schedule was created.`,
+        caregiverMessage: (patientName) => `${patientName}'s ${medicationName} schedule was created.`,
         relatedEntityType: 'MedicationSchedule',
         relatedEntityId: populatedSchedule._id,
+        dedupeKey: `schedule_changed:${schedule._id}:created`,
       });
 
 
@@ -354,6 +372,13 @@ router.post(
       );
 
     } catch (error) {
+
+      if (error.code === 11000
+        && (error.keyPattern?.medicationId || error.keyValue?.medicationId)) {
+        return res.status(409).json({
+          message: 'This medication already has a schedule.',
+        });
+      }
 
       console.error(
         '[Schedule][Backend] Create failed',
@@ -408,58 +433,8 @@ router.put(
         return respondWithError(res, error);
       }
 
-      const validationError = validateScheduleFields(payload);
-      if (validationError) {
-        const error = new Error(validationError);
-        error.statusCode = 400;
-        return respondWithError(res, error);
-      }
-
-      const {
-        medicationId,
-        time,
-        dose,
-        days,
-        startDate,
-        endDate,
-        enabled,
-      } = payload;
-
-
       // =================================================
       // VALIDATION
-      // =================================================
-
-      if (
-        !medicationId ||
-        !time ||
-        !days ||
-        !startDate
-      ) {
-
-        return res.status(400).json({
-          message:
-            'Medication, time, days, and start date are required',
-        });
-
-      }
-
-
-      if (
-        !Array.isArray(days) ||
-        days.length === 0
-      ) {
-
-        return res.status(400).json({
-          message:
-            'At least one day must be selected',
-        });
-
-      }
-
-
-      // =================================================
-      // VERIFY MEDICATION
       // =================================================
 
       if (!ownerId) {
@@ -469,42 +444,6 @@ router.put(
       if (!isValidObjectId(ownerId)) {
         return res.status(400).json({ message: 'Invalid patient ID' });
       }
-
-      if (!isValidObjectId(medicationId)) {
-        return res.status(400).json({ message: 'Invalid medication ID' });
-      }
-
-      const medication =
-        await Medication.findOne({
-
-          _id:
-            medicationId,
-
-          userId: ownerId,
-
-        });
-
-
-      if (!medication) {
-
-        return res.status(404).json({
-          message:
-            'Medication not found',
-        });
-
-      }
-
-      const medicationDose =
-        typeof medication.dosage === 'string' && medication.dosage.trim()
-          ? medication.dosage.trim()
-          : (typeof dose === 'string' && dose.trim() ? dose.trim() : '');
-
-      if (!medicationDose) {
-        return res.status(400).json({
-          message: 'Selected medication must include a dosage.',
-        });
-      }
-
 
       // =================================================
       // VERIFY SCHEDULE
@@ -530,35 +469,91 @@ router.put(
 
       }
 
+      const existingMedicationId = String(existingSchedule.medicationId);
+      if (payload.medicationId !== undefined
+        && String(payload.medicationId) !== existingMedicationId) {
+        return res.status(400).json({
+          message: 'A schedule medication cannot be changed.',
+        });
+      }
+
+      if (payload.startDate !== undefined
+        && payload.startDate !== existingSchedule.startDate) {
+        return res.status(400).json({
+          message: 'A schedule start date cannot be changed.',
+        });
+      }
+
+      if (payload.dose !== undefined
+        && payload.dose !== existingSchedule.dose) {
+        return res.status(400).json({
+          message: 'A schedule dose cannot be changed.',
+        });
+      }
+
+      const medication = await Medication.findOne({
+        _id: existingSchedule.medicationId,
+        userId: ownerId,
+      });
+
+      if (!medication) {
+        return res.status(404).json({ message: 'Medication not found' });
+      }
+
+      const updateFields = {
+        time: Object.prototype.hasOwnProperty.call(payload, 'time')
+          ? payload.time
+          : existingSchedule.time,
+        days: Object.prototype.hasOwnProperty.call(payload, 'days')
+          ? payload.days
+          : existingSchedule.days,
+        endDate: Object.prototype.hasOwnProperty.call(payload, 'endDate')
+          ? payload.endDate
+          : existingSchedule.endDate,
+        enabled: Object.prototype.hasOwnProperty.call(payload, 'enabled')
+          ? payload.enabled
+          : existingSchedule.enabled,
+      };
+
+      const validationError = validateScheduleFields({
+        medicationId: existingSchedule.medicationId,
+        time: updateFields.time,
+        dose: existingSchedule.dose,
+        days: updateFields.days,
+        startDate: existingSchedule.startDate,
+        endDate: updateFields.endDate,
+        enabled: updateFields.enabled,
+      }, {
+        allowPastStartDate: true,
+        medicationExpirationDate: medication.expirationDate,
+        validateStartDateExpiration: false,
+        validateEndDateExpiration: true,
+      });
+
+      if (validationError) {
+        const error = new Error(validationError);
+        error.statusCode = 400;
+        return respondWithError(res, error);
+      }
+
 
       // =================================================
       // UPDATE
       // =================================================
 
-      existingSchedule.medicationId =
-        medicationId;
-
       existingSchedule.time =
-        time.trim();
-
-      existingSchedule.dose =
-        medicationDose;
+        updateFields.time.trim();
 
       existingSchedule.days =
-        days;
-
-      existingSchedule.startDate =
-        startDate;
+        updateFields.days;
 
       existingSchedule.endDate =
-        endDate
-          ? endDate.trim()
+        updateFields.endDate
+          ? updateFields.endDate.trim()
           : null;
 
       existingSchedule.enabled =
-        enabled !== undefined
-          ? enabled
-          : true;
+        updateFields.enabled;
 
           const scheduleChanged = existingSchedule.isModified();
 
@@ -588,12 +583,15 @@ router.put(
         );
 
       if (scheduleChanged) {
-        await createNotification({
-          recipient: req.user.userId,
+        const medicationName = populatedSchedule.medicationId?.name || 'medication';
+        await createMedicationNotifications({
+          patientId: ownerId,
           type: 'schedule_changed',
-          message: `Medication schedule updated for ${populatedSchedule.medicationId?.name || 'your medication'}.`,
+          patientMessage: `Your ${medicationName} schedule was updated.`,
+          caregiverMessage: (patientName) => `${patientName}'s ${medicationName} schedule was updated.`,
           relatedEntityType: 'MedicationSchedule',
           relatedEntityId: populatedSchedule._id,
+          dedupeKey: `schedule_changed:${existingSchedule._id}:updated:${existingSchedule.updatedAt.toISOString()}`,
         });
       }
 

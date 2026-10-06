@@ -7,6 +7,7 @@ import React, {
 
 import {
   View,
+  Image,
   Text,
   StyleSheet,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getMedications,
@@ -23,7 +25,13 @@ import {
   takeDose,
   skipDose,
 } from '../services/api';
-import ConfirmationDialog from '../components/ConfirmationDialog';
+import {
+  filterDoseRecordsByMedicationExpiration,
+  getSafeUserErrorMessage,
+} from '../utils/medicationValidation';
+import { getDoseActionErrorMessage } from '../utils/doseErrors';
+
+const medSkedLogo = require('../assets/medsked.png');
 
 
 export default function DashboardScreen({
@@ -54,8 +62,6 @@ export default function DashboardScreen({
     doses,
     setDoses,
   ] = useState([]);
-
-  const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
 
   const [
     loading,
@@ -132,8 +138,10 @@ export default function DashboardScreen({
           );
 
           setError(
-            err.message ||
-              'Failed to load dashboard.'
+            getSafeUserErrorMessage(
+              err,
+              'Unable to load the dashboard. Please check your connection and try again.'
+            )
           );
 
         } finally {
@@ -195,12 +203,11 @@ export default function DashboardScreen({
       const today =
         getTodayString();
 
-      return doses
+      return filterDoseRecordsByMedicationExpiration(doses
 
         .filter(
           dose =>
-            dose.scheduledDate ===
-            today
+            dose.scheduledDate === today
         )
 
         .sort(
@@ -211,9 +218,9 @@ export default function DashboardScreen({
             convertTimeToMinutes(
               b.scheduledTime
             )
-        );
+        ), medications);
 
-    }, [doses]);
+    }, [doses, medications]);
 
 
   // =====================================================
@@ -241,6 +248,13 @@ export default function DashboardScreen({
     ).length;
 
 
+  const skippedCount =
+    todayDoses.filter(
+      dose =>
+        dose.status === 'skipped'
+    ).length;
+
+
   const medicationCount =
     medications.length;
 
@@ -249,12 +263,17 @@ export default function DashboardScreen({
   // ADHERENCE
   // =====================================================
 
+  const eligibleCount =
+    takenCount +
+    missedCount +
+    skippedCount;
+
   const adherence =
-    todayDoses.length > 0
+    eligibleCount > 0
       ? Math.round(
           (
             takenCount /
-            todayDoses.length
+            eligibleCount
           ) * 100
         )
       : 0;
@@ -289,8 +308,7 @@ export default function DashboardScreen({
 
         Alert.alert(
           'Error',
-          err.message ||
-            'Failed to mark dose as taken.'
+          getDoseActionErrorMessage(err)
         );
 
       }
@@ -349,8 +367,7 @@ export default function DashboardScreen({
 
                   Alert.alert(
                     'Error',
-                    err.message ||
-                      'Failed to skip dose.'
+                    getDoseActionErrorMessage(err)
                   );
 
                 }
@@ -487,6 +504,10 @@ export default function DashboardScreen({
 
             </View>
 
+
+            <View style={styles.doseMedicationIcon}>
+              <MaterialCommunityIcons name="pill" size={14} color="#0B4F59" />
+            </View>
 
             <View
               style={
@@ -654,7 +675,7 @@ export default function DashboardScreen({
 
         <ActivityIndicator
           size="small"
-          color="#2F6690"
+          color="#0B4F59"
           style={
             styles.loadingIndicator
           }
@@ -704,7 +725,7 @@ export default function DashboardScreen({
               loadDashboard(true)
             }
 
-            tintColor="#2F6690"
+            tintColor="#0B4F59"
 
           />
 
@@ -723,6 +744,17 @@ export default function DashboardScreen({
         <View
           style={styles.header}
         >
+
+          <View style={styles.headerDecoration} />
+
+          <View style={styles.headerBrand}>
+            <Image
+              accessible
+              accessibilityLabel="MedSked logo"
+              source={medSkedLogo}
+              resizeMode="contain"
+              style={styles.headerLogo}
+            />
 
           <View
             style={
@@ -760,49 +792,9 @@ export default function DashboardScreen({
 
           </View>
 
-
-          <Pressable
-
-            onPress={() => setShowLogoutConfirmation(true)}
-
-            hitSlop={8}
-
-            style={({ pressed }) => [
-
-              styles.logoutButton,
-
-              pressed &&
-                styles.buttonPressed,
-
-            ]}
-
-          >
-
-            <Text
-              style={
-                styles.logoutText
-              }
-            >
-              Logout
-            </Text>
-
-          </Pressable>
+          </View>
 
         </View>
-
-        <ConfirmationDialog
-          visible={showLogoutConfirmation}
-          title="Log out?"
-          message="Are you sure you want to log out of MedSked?"
-          confirmLabel="Log Out"
-          cancelLabel="Cancel"
-          danger
-          onConfirm={() => {
-            setShowLogoutConfirmation(false);
-            onLogout();
-          }}
-          onCancel={() => setShowLogoutConfirmation(false)}
-        />
 
 
         {/* ERROR */}
@@ -850,115 +842,38 @@ export default function DashboardScreen({
             TODAY'S OVERVIEW
         ================================================= */}
 
-        <View
-          style={styles.section}
-        >
-
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            Today's Overview
-          </Text>
-
-
-          <View
-            style={
-              styles.summaryCard
-            }
-          >
-
-            <View
-              style={
-                styles.summaryItem
-              }
-            >
-
-              <Text
-                style={
-                  styles.summaryNumber
-                }
-              >
-                {todayDoses.length}
-              </Text>
-
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                Doses
-              </Text>
-
+        <View style={[styles.section, styles.summarySection]}>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryItem}>
+              <View style={styles.summaryIcon}>
+                <MaterialCommunityIcons name="pill" size={16} color="#0B4F59" />
+              </View>
+              <View>
+                <Text style={styles.summaryNumber}>{todayDoses.length}</Text>
+                <Text style={styles.summaryLabel}>Doses</Text>
+              </View>
             </View>
 
-
-            <View
-              style={
-                styles.summaryDivider
-              }
-            />
-
-
-            <View
-              style={
-                styles.summaryItem
-              }
-            >
-
-              <Text
-                style={
-                  styles.summaryNumber
-                }
-              >
-                {takenCount}
-              </Text>
-
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                Taken
-              </Text>
-
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryIcon, styles.summaryIconTaken]}>
+                <MaterialCommunityIcons name="check-circle-outline" size={16} color="#16865A" />
+              </View>
+              <View>
+                <Text style={styles.summaryNumber}>{takenCount}</Text>
+                <Text style={styles.summaryLabel}>Taken</Text>
+              </View>
             </View>
 
-
-            <View
-              style={
-                styles.summaryDivider
-              }
-            />
-
-
-            <View
-              style={
-                styles.summaryItem
-              }
-            >
-
-              <Text
-                style={
-                  styles.summaryNumber
-                }
-              >
-                {pendingCount}
-              </Text>
-
-              <Text
-                style={
-                  styles.summaryLabel
-                }
-              >
-                Pending
-              </Text>
-
+            <View style={styles.summaryItem}>
+              <View style={[styles.summaryIcon, styles.summaryIconPending]}>
+                <MaterialCommunityIcons name="clock-outline" size={16} color="#C65050" />
+              </View>
+              <View>
+                <Text style={styles.summaryNumber}>{pendingCount}</Text>
+                <Text style={styles.summaryLabel}>Pending</Text>
+              </View>
             </View>
-
           </View>
-
         </View>
 
 
@@ -1138,13 +1053,7 @@ export default function DashboardScreen({
                 }
               >
 
-                <Text
-                  style={
-                    styles.quickIconText
-                  }
-                >
-                  +
-                </Text>
+                <MaterialCommunityIcons name="plus-circle-outline" size={18} color="#0B4F59" />
 
               </View>
 
@@ -1194,13 +1103,7 @@ export default function DashboardScreen({
                 }
               >
 
-                <Text
-                  style={
-                    styles.quickIconText
-                  }
-                >
-                  🗓
-                </Text>
+                <MaterialCommunityIcons name="calendar-blank-outline" size={18} color="#0B4F59" />
 
               </View>
 
@@ -1250,13 +1153,7 @@ export default function DashboardScreen({
                 }
               >
 
-                <Text
-                  style={
-                    styles.quickIconText
-                  }
-                >
-                  ▤
-                </Text>
+                <MaterialCommunityIcons name="history" size={18} color="#0B4F59" />
 
               </View>
 
@@ -1524,9 +1421,7 @@ export default function DashboardScreen({
                         styles.medicationIcon
                       }
                     >
-                      <Text>
-                        💊
-                      </Text>
+                      <MaterialCommunityIcons name="pill" size={18} color="#0B4F59" />
                     </View>
 
 
@@ -1565,6 +1460,37 @@ export default function DashboardScreen({
                           medication.frequency
                         }
                       </Text>
+
+                      {(() => {
+                        const rawDate = medication?.expirationDate;
+                        if (!rawDate || !String(rawDate).trim()) return null;
+
+                        const normalizedDate = String(rawDate).trim().split('T')[0];
+                        const [year, month, day] = normalizedDate.split('-').map(Number);
+                        if (![year, month, day].every(Number.isFinite)) {
+                          return null;
+                        }
+
+                        const parsedDate = new Date(year, month - 1, day);
+                        if (
+                          parsedDate.getFullYear() !== year ||
+                          parsedDate.getMonth() !== month - 1 ||
+                          parsedDate.getDate() !== day
+                        ) {
+                          return null;
+                        }
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const expiration = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+                        const expired = expiration < today;
+
+                        return (
+                          <Text style={expired ? styles.medicationExpirationExpired : styles.medicationExpiration}>
+                            {expired ? `Expired • ${normalizedDate}` : `Expires: ${normalizedDate}`}
+                          </Text>
+                        );
+                      })()}
 
                     </View>
 
@@ -1697,7 +1623,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#87CEEB',
+      '#116F7A',
   },
 
 
@@ -1713,7 +1639,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
 
     backgroundColor:
-      '#87CEEB',
+      '#116F7A',
 
   },
 
@@ -1728,7 +1654,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -1746,7 +1672,7 @@ const styles = StyleSheet.create({
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#FFFFFF',
 
   },
 
@@ -1762,7 +1688,7 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
 
-    color: '#6B7280',
+    color: '#A7CDD0',
 
   },
 
@@ -1773,8 +1699,11 @@ const styles = StyleSheet.create({
 
   scrollContent: {
 
-    paddingTop: 18,
-
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
+    paddingTop: 12,
+    paddingHorizontal: 20,
     paddingBottom: 20,
 
   },
@@ -1788,14 +1717,45 @@ const styles = StyleSheet.create({
 
     flexDirection: 'row',
 
-    alignItems: 'flex-start',
+    alignItems: 'center',
 
     justifyContent:
       'space-between',
 
-    paddingHorizontal: 20,
+    minHeight: 58,
+    marginHorizontal: 16,
+    marginBottom: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    overflow: 'hidden',
+    borderRadius: 12,
+    backgroundColor: '#0B4F59',
 
-    paddingBottom: 22,
+  },
+
+  headerDecoration: {
+    position: 'absolute',
+    width: 94,
+    height: 94,
+    top: -36,
+    right: -18,
+    borderRadius: 47,
+    backgroundColor: '#3D929B',
+    pointerEvents: 'none',
+  },
+
+  headerBrand: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  headerLogo: {
+    width: 31,
+    height: 31,
+    marginRight: 9,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
 
   },
 
@@ -1803,75 +1763,43 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    paddingRight: 15,
+    paddingRight: 8,
 
   },
 
   greeting: {
 
-    fontSize: 13,
+    fontSize: 8,
 
     fontWeight: '600',
 
-    color: '#6B7280',
+    color: '#A7CDD0',
 
   },
 
   username: {
 
-    marginTop: 2,
+    marginTop: 1,
 
-    fontSize: 27,
+    fontSize: 13,
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#FFFFFF',
 
   },
 
   subtitle: {
 
-    marginTop: 5,
+    marginTop: 2,
 
-    fontSize: 12,
+    fontSize: 8,
 
-    lineHeight: 18,
+    lineHeight: 11,
 
-    color: '#6B7280',
-
-  },
-
-  logoutButton: {
-
-    minHeight: 42,
-
-    paddingHorizontal: 12,
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    borderRadius: 11,
-
-    backgroundColor:
-      '#FFFFFF',
-
-    borderWidth: 1,
-
-    borderColor:
-      '#E4EAF0',
+    color: '#A7CDD0',
 
   },
-
-  logoutText: {
-
-    fontSize: 11,
-
-    fontWeight: '800',
-
-    color: '#DC2626',
-
-  },
-
 
   // ===================================================
   // ERROR
@@ -1915,19 +1843,14 @@ const styles = StyleSheet.create({
   },
 
   aiCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    backgroundColor: '#D7EDF3',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E3E9EF',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    shadowColor: '#1E2A4A',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    borderColor: '#B5D4DC',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    marginBottom: 9,
   },
   aiCardPressed: {
     opacity: 0.9,
@@ -1937,38 +1860,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   aiIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#EAF3F9',
+    width: 27,
+    height: 27,
+    borderRadius: 7,
+    backgroundColor: '#C5E3EA',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
   aiIconText: {
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
   aiTextWrap: {
     flex: 1,
   },
   aiTitle: {
-    fontSize: 16,
+    fontSize: 9,
     fontWeight: '800',
     color: '#1E2A4A',
   },
   aiSubtitle: {
-    marginTop: 4,
-    fontSize: 12,
-    lineHeight: 18,
+    marginTop: 2,
+    fontSize: 8,
+    lineHeight: 11,
     color: '#6B7280',
   },
   aiArrow: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '700',
     color: '#6B7280',
-    marginLeft: 8,
+    marginLeft: 6,
   },
 
 
@@ -1978,9 +1901,9 @@ const styles = StyleSheet.create({
 
   section: {
 
-    marginBottom: 23,
+    marginBottom: 10,
 
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
 
   },
 
@@ -1988,44 +1911,44 @@ const styles = StyleSheet.create({
 
     flexDirection: 'row',
 
-    alignItems: 'flex-start',
+    alignItems: 'center',
 
     justifyContent:
       'space-between',
 
-    marginBottom: 11,
+    marginBottom: 6,
 
   },
 
   sectionTitle: {
 
-    fontSize: 18,
+    fontSize: 10,
 
     fontWeight: '900',
 
-    color: '#1E2A4A',
+    color: '#FFFFFF',
 
   },
 
   sectionSubtitle: {
 
-    marginTop: 3,
+    marginTop: 1,
 
-    fontSize: 11,
+    fontSize: 8,
 
-    color: '#7A8494',
+    color: '#A7CDD0',
 
   },
 
   viewAll: {
 
-    marginTop: 2,
+    marginTop: 1,
 
-    fontSize: 12,
+    fontSize: 8,
 
     fontWeight: '800',
 
-    color: '#2F6690',
+    color: '#83DBDE',
 
   },
 
@@ -2034,81 +1957,61 @@ const styles = StyleSheet.create({
   // SUMMARY
   // ===================================================
 
+  summarySection: {
+    marginBottom: 10,
+  },
+
   summaryCard: {
-
     flexDirection: 'row',
-
-    alignItems: 'center',
-
-    minHeight: 105,
-
-    paddingHorizontal: 8,
-
-    borderRadius: 18,
-
-    backgroundColor:
-      '#FFFFFF',
-
-    borderWidth: 1,
-
-    borderColor:
-      '#E3E9EF',
-
-    shadowColor:
-      '#1E2A4A',
-
-    shadowOpacity: 0.05,
-
-    shadowRadius: 10,
-
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-
-    elevation: 2,
-
+    gap: 8,
   },
 
   summaryItem: {
-
     flex: 1,
-
+    minWidth: 0,
+    minHeight: 60,
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#D7EDF3',
+    borderWidth: 1,
+    borderColor: '#B5D4DC',
+  },
 
+  summaryIcon: {
+    width: 25,
+    height: 25,
+    alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#8EBAC5',
+    borderRadius: 6,
+    backgroundColor: '#C5E3EA',
+  },
 
+  summaryIconTaken: {
+    backgroundColor: '#CBE8D8',
+    borderColor: '#8BBDA1',
+  },
+
+  summaryIconPending: {
+    backgroundColor: '#F1D6D4',
+    borderColor: '#D9A19D',
   },
 
   summaryNumber: {
-
-    fontSize: 25,
-
+    fontSize: 17,
+    lineHeight: 19,
     fontWeight: '900',
-
-    color: '#1E2A4A',
-
+    color: '#17313A',
   },
 
   summaryLabel: {
-
-    marginTop: 4,
-
-    fontSize: 11,
-
+    marginTop: 1,
+    fontSize: 8,
     color: '#7A8494',
-
-  },
-
-  summaryDivider: {
-
-    width: 1,
-
-    height: 42,
-
-    backgroundColor:
-      '#E5EAF0',
-
   },
 
 
@@ -2118,33 +2021,33 @@ const styles = StyleSheet.create({
 
   adherencePercentage: {
 
-    fontSize: 19,
+    fontSize: 11,
 
     fontWeight: '900',
 
-    color: '#2F6690',
+    color: '#FFFFFF',
 
   },
 
   adherenceCard: {
 
-    padding: 16,
+    padding: 10,
 
-    borderRadius: 17,
+    borderRadius: 12,
 
     backgroundColor:
-      '#FFFFFF',
+      '#D7EDF3',
 
     borderWidth: 1,
 
     borderColor:
-      '#E3E9EF',
+      '#B5D4DC',
 
   },
 
   progressBackground: {
 
-    height: 10,
+    height: 5,
 
     overflow: 'hidden',
 
@@ -2162,7 +2065,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -2173,13 +2076,13 @@ const styles = StyleSheet.create({
     justifyContent:
       'space-between',
 
-    marginTop: 9,
+    marginTop: 6,
 
   },
 
   adherenceText: {
 
-    fontSize: 11,
+    fontSize: 8,
 
     color: '#6B7280',
 
@@ -2187,7 +2090,7 @@ const styles = StyleSheet.create({
 
   missedText: {
 
-    fontSize: 11,
+    fontSize: 8,
 
     fontWeight: '700',
 
@@ -2212,19 +2115,19 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    minHeight: 128,
+    minHeight: 72,
 
-    padding: 12,
+    padding: 8,
 
-    borderRadius: 17,
+    borderRadius: 12,
 
     backgroundColor:
-      '#FFFFFF',
+      '#D7EDF3',
 
     borderWidth: 1,
 
     borderColor:
-      '#E3E9EF',
+      '#B5D4DC',
 
   },
 
@@ -2242,18 +2145,22 @@ const styles = StyleSheet.create({
 
   quickIcon: {
 
-    width: 38,
-    height: 38,
+    width: 25,
+    height: 25,
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    marginBottom: 10,
+    marginBottom: 5,
 
-    borderRadius: 12,
+    borderRadius: 6,
 
     backgroundColor:
-      '#EAF3F9',
+      '#C5E3EA',
+
+    borderWidth: 1,
+
+    borderColor: '#8EBAC5',
 
   },
 
@@ -2263,13 +2170,13 @@ const styles = StyleSheet.create({
 
     fontWeight: '800',
 
-    color: '#2F6690',
+    color: '#0B4F59',
 
   },
 
   quickTitle: {
 
-    fontSize: 11,
+    fontSize: 9,
 
     fontWeight: '900',
 
@@ -2279,11 +2186,11 @@ const styles = StyleSheet.create({
 
   quickDescription: {
 
-    marginTop: 4,
+    marginTop: 2,
 
-    fontSize: 9,
+    fontSize: 8,
 
-    lineHeight: 14,
+    lineHeight: 10,
 
     color: '#7A8494',
 
@@ -2296,19 +2203,19 @@ const styles = StyleSheet.create({
 
   doseCard: {
 
-    marginBottom: 10,
+    marginBottom: 7,
 
-    padding: 14,
+    padding: 9,
 
-    borderRadius: 16,
+    borderRadius: 12,
 
     backgroundColor:
-      '#FFFFFF',
+      '#D7EDF3',
 
     borderWidth: 1,
 
     borderColor:
-      '#E3E9EF',
+      '#B5D4DC',
 
   },
 
@@ -2322,17 +2229,17 @@ const styles = StyleSheet.create({
 
   timeBox: {
 
-    width: 65,
+    width: 62,
 
   },
 
   doseTime: {
 
-    fontSize: 12,
+    fontSize: 10,
 
     fontWeight: '900',
 
-    color: '#2F6690',
+    color: '#0B4F59',
 
   },
 
@@ -2340,13 +2247,26 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    paddingRight: 8,
+    paddingRight: 6,
+
+  },
+
+  doseMedicationIcon: {
+    width: 23,
+    height: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#8EBAC5',
+    borderRadius: 6,
+    backgroundColor: '#C5E3EA',
 
   },
 
   doseMedication: {
 
-    fontSize: 14,
+    fontSize: 10,
 
     fontWeight: '800',
 
@@ -2356,9 +2276,9 @@ const styles = StyleSheet.create({
 
   doseDosage: {
 
-    marginTop: 2,
+    marginTop: 1,
 
-    fontSize: 11,
+    fontSize: 8,
 
     color: '#7A8494',
 
@@ -2434,7 +2354,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -2545,7 +2465,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
 
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
 
   },
 
@@ -2570,34 +2490,38 @@ const styles = StyleSheet.create({
 
     alignItems: 'center',
 
-    marginBottom: 10,
+    marginBottom: 7,
 
-    padding: 13,
+    padding: 9,
 
-    borderRadius: 16,
+    borderRadius: 12,
 
     backgroundColor:
-      '#FFFFFF',
+      '#D7EDF3',
 
     borderWidth: 1,
 
     borderColor:
-      '#E3E9EF',
+      '#B5D4DC',
 
   },
 
   medicationIcon: {
 
-    width: 43,
-    height: 43,
+    width: 28,
+    height: 28,
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    borderRadius: 13,
+    borderRadius: 7,
 
     backgroundColor:
-      '#EAF3F9',
+      '#C5E3EA',
+
+    borderWidth: 1,
+
+    borderColor: '#8EBAC5',
 
   },
 
@@ -2605,13 +2529,13 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    marginLeft: 11,
+    marginLeft: 8,
 
   },
 
   medicationName: {
 
-    fontSize: 13,
+    fontSize: 9,
 
     fontWeight: '900',
 
@@ -2621,9 +2545,9 @@ const styles = StyleSheet.create({
 
   medicationDosage: {
 
-    marginTop: 2,
+    marginTop: 1,
 
-    fontSize: 10,
+    fontSize: 8,
 
     color: '#6B7280',
 
@@ -2631,37 +2555,51 @@ const styles = StyleSheet.create({
 
   medicationFrequency: {
 
-    marginTop: 2,
+    marginTop: 1,
 
-    fontSize: 10,
+    fontSize: 8,
 
     color: '#8A94A3',
 
+  },
+
+  medicationExpiration: {
+    marginTop: 5,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0B4F59',
+  },
+
+  medicationExpirationExpired: {
+    marginTop: 5,
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B91C1C',
   },
 
   editMedication: {
 
     minWidth: 50,
 
-    minHeight: 38,
+    minHeight: 28,
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    borderRadius: 9,
+    borderRadius: 7,
 
     backgroundColor:
-      '#EAF3F9',
+      '#0B4F59',
 
   },
 
   editText: {
 
-    fontSize: 10,
+    fontSize: 8,
 
     fontWeight: '800',
 
-    color: '#2F6690',
+    color: '#FFFFFF',
 
   },
 

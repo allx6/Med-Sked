@@ -1,15 +1,35 @@
 const mongoose = require('mongoose');
 
-const { encrypt, decrypt } = require('../services/encryptionService');
+const {
+  encrypt,
+  decrypt,
+  getEncryptionFormatVersion,
+} = require('../services/encryptionService');
 
-const safeReadNotificationMessage = (value) => {
+const logNotificationDecryptionFailure = (value, error, notificationId) => {
+  console.error('Notification decryption failed:', {
+    notificationId: notificationId ? String(notificationId) : 'unavailable',
+    formatVersion: getEncryptionFormatVersion(value),
+    failureCategory: error?.code || 'DECRYPTION_FAILED',
+    operation: 'decrypt',
+    environment: process.env.NODE_ENV || 'development',
+  });
+};
+
+const safeReadNotificationMessage = (value, { notificationId } = {}) => {
   if (typeof value !== 'string' || !value.startsWith('enc:')) {
+    logNotificationDecryptionFailure(
+      value,
+      { code: 'MALFORMED_ENVELOPE' },
+      notificationId
+    );
     return '[Encrypted notification unavailable]';
   }
 
   try {
     return decrypt(value, { suppressErrorLog: true });
   } catch (error) {
+    logNotificationDecryptionFailure(value, error, notificationId);
     return '[Encrypted notification unavailable]';
   }
 };
@@ -51,7 +71,12 @@ const notificationSchema = new mongoose.Schema(
           return value;
         }
 
-        return decrypt(value);
+        try {
+          return decrypt(value, { suppressErrorLog: true });
+        } catch (error) {
+          logNotificationDecryptionFailure(value, error, this?._id);
+          throw error;
+        }
       },
     },
 

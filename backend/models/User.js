@@ -40,6 +40,52 @@ const userSchema = new mongoose.Schema(
       ],
       default: 'patient',
     },
+
+    emailVerified: {
+      type: Boolean,
+    },
+
+    emailVerificationOtpHash: {
+      type: String,
+    },
+
+    emailVerificationExpires: {
+      type: Date,
+    },
+
+    emailVerificationAttempts: {
+      type: Number,
+      default: 0,
+    },
+
+    emailVerificationLastSentAt: {
+      type: Date,
+    },
+
+    passwordResetOtpHash: {
+      type: String,
+    },
+
+    passwordResetOtpExpires: {
+      type: Date,
+    },
+
+    passwordResetAttempts: {
+      type: Number,
+      default: 0,
+    },
+
+    passwordResetLastSentAt: {
+      type: Date,
+    },
+
+    passwordResetAuthorizationHash: {
+      type: String,
+    },
+
+    passwordResetAuthorizationExpires: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

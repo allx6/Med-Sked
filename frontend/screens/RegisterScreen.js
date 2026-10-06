@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
+  Animated,
   View,
   Image,
   Text,
@@ -20,11 +21,14 @@ import {
 import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
+import { getSafeUserErrorMessage } from '../utils/medicationValidation';
+import { isValidEmail } from '../utils/helpers';
 
 const medSkedLogo = require('../assets/medsked.png');
 
 export default function RegisterScreen({
-  onRegister,
+  onVerificationRequired,
+  onNavigateLanding,
   onNavigateLogin,
 }) {
 
@@ -46,6 +50,31 @@ export default function RegisterScreen({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [authError, setAuthError] = useState('');
+  const entranceProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(entranceProgress, {
+      toValue: 1,
+      duration: 360,
+      useNativeDriver: true,
+    });
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [entranceProgress]);
+
+  const entranceStyle = {
+    opacity: entranceProgress,
+    transform: [
+      {
+        translateY: entranceProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [14, 0],
+        }),
+      },
+    ],
+  };
 
 
   // =====================================================
@@ -77,12 +106,12 @@ export default function RegisterScreen({
       return;
     }
 
-    if (!/^[^\s@]+@gmail\.com$/i.test(email.trim())) {
-      nextErrors.email = 'Please enter a valid Gmail address.';
+    if (!isValidEmail(email.trim())) {
+      nextErrors.email = 'Please enter a valid email address.';
       setErrors(nextErrors);
       Alert.alert(
         'Invalid Email',
-        'Please use a Gmail address ending in @gmail.com.'
+        'Please enter a valid email address.'
       );
       return;
     }
@@ -146,24 +175,30 @@ export default function RegisterScreen({
         role
       );
 
+      if (result.verificationRequired) {
+        onVerificationRequired(
+          email.trim().toLowerCase(),
+          result.message,
+          60
+        );
+        return;
+      }
 
-      const registeredUser =
-        result.user || result;
-
-      const token =
-        result.token || '';
-
-
-      onRegister(
-        registeredUser,
-        token
-      );
-
+      throw new Error('Unable to create your account. Please try again.');
 
     } catch (error) {
-      const message =
-        error?.message ||
-        'Unable to create your account.';
+      if (error.responseData?.verificationRequired) {
+        onVerificationRequired(
+          email.trim().toLowerCase(),
+          error.message
+        );
+        return;
+      }
+
+      const message = getSafeUserErrorMessage(
+        error,
+        'Unable to create your account.'
+      );
 
       setAuthError(message);
     } finally {
@@ -212,6 +247,7 @@ export default function RegisterScreen({
             style={styles.backgroundCircleTwo}
           />
 
+          <Animated.View style={[styles.content, entranceStyle]}>
 
           {/* =================================================
               TOP
@@ -220,13 +256,14 @@ export default function RegisterScreen({
           <View style={styles.topSection}>
 
             <Pressable
-              onPress={onNavigateLogin}
+              accessibilityRole="button"
+              onPress={onNavigateLanding}
               style={styles.backButton}
               hitSlop={10}
             >
 
               <Text style={styles.backText}>
-                Back to Login
+                Back
               </Text>
 
             </Pressable>
@@ -487,6 +524,8 @@ export default function RegisterScreen({
             MedSked • Medication Management
           </Text>
 
+          </Animated.View>
+
         </ScrollView>
 
       </KeyboardAvoidingView>
@@ -504,12 +543,12 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#116F7A',
   },
 
   container: {
     flex: 1,
-    backgroundColor: '#EEF5FA',
+    backgroundColor: '#116F7A',
   },
 
   scrollContent: {
@@ -520,12 +559,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  content: {
+    width: '100%',
+  },
+
   backgroundCircleOne: {
     position: 'absolute',
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#DCECF5',
+    backgroundColor: '#3D929B',
     top: -110,
     right: -90,
   },
@@ -535,14 +578,14 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: '#E3F1F8',
+    backgroundColor: '#3D929B',
     bottom: -70,
     left: -70,
   },
 
   topSection: {
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 14,
   },
 
   backButton: {
@@ -556,21 +599,21 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#D8F0F2',
   },
 
   logoCircle: {
-    width: 104,
-    height: 104,
-    borderRadius: 32,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 11,
+    marginBottom: 8,
   },
 
   logoImage: {
-    width: 200,
-    height: 200,
+    width: 50,
+    height: 50,
     borderRadius: 32,
   },
 
@@ -579,9 +622,9 @@ const styles = StyleSheet.create({
   },
 
   logoText: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '900',
-    color: '#1E2A4A',
+    color: '#FFFFFF',
   },
 
   tagline: {
@@ -590,13 +633,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
-    color: '#6B7280',
+    color: '#A7CDD0',
   },
 
   card: {
     width: '100%',
-    padding: 22,
-    borderRadius: 22,
+    maxWidth: 440,
+    alignSelf: 'center',
+    padding: 20,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E4EAF0',
@@ -611,15 +656,15 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 23,
+    fontSize: 19,
     fontWeight: '900',
     color: '#1E2A4A',
   },
 
   subtitle: {
     marginTop: 5,
-    marginBottom: 20,
-    fontSize: 13,
+    marginBottom: 15,
+    fontSize: 12,
     color: '#6B7280',
   },
 
@@ -652,9 +697,9 @@ const styles = StyleSheet.create({
 
   roleOption: {
     flex: 1,
-    minHeight: 78,
-    padding: 14,
-    borderRadius: 13,
+    minHeight: 64,
+    padding: 10,
+    borderRadius: 7,
     borderWidth: 1,
     borderColor: '#D8E0E8',
     backgroundColor: '#F8FAFC',
@@ -662,7 +707,7 @@ const styles = StyleSheet.create({
   },
 
   roleOptionSelected: {
-    borderColor: '#2F6690',
+    borderColor: '#0B4F59',
     backgroundColor: '#EAF4FA',
   },
 
@@ -674,7 +719,7 @@ const styles = StyleSheet.create({
   },
 
   roleTitleSelected: {
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   roleDescription: {
@@ -691,13 +736,13 @@ const styles = StyleSheet.create({
   },
 
   registerButton: {
-    minHeight: 53,
+    minHeight: 44,
     marginTop: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 13,
-    backgroundColor: '#2F6690',
-    shadowColor: '#2F6690',
+    borderRadius: 6,
+    backgroundColor: '#0B4F59',
+    shadowColor: '#0B4F59',
     shadowOpacity: 0.18,
     shadowRadius: 10,
     shadowOffset: {
@@ -725,7 +770,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 14,
     flexWrap: 'wrap',
   },
 
@@ -738,7 +783,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     fontSize: 12,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   footerText: {

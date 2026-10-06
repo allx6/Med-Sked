@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   View,
+  Text,
+  Pressable,
   StyleSheet,
 } from 'react-native';
 
@@ -12,6 +14,10 @@ import {
 
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import EmailVerificationScreen from './screens/EmailVerificationScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import LandingScreen from './screens/LandingScreen';
+import HowItWorksScreen from './screens/HowItWorksScreen';
 
 import DashboardScreen from './screens/DashboardScreen';
 import MedicationsScreen from './screens/MedicationsScreen';
@@ -46,7 +52,7 @@ export default function App() {
   // CURRENT SCREEN
   // =====================================================
 
-  const [screen, setScreen] = useState('login');
+  const [screen, setScreen] = useState('landing');
 
 
   // =====================================================
@@ -56,65 +62,43 @@ export default function App() {
   const [user, setUser] = useState(null);
 
   const [token, setToken] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [verificationCooldown, setVerificationCooldown] = useState(0);
+  const [loginNotice, setLoginNotice] = useState('');
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
-  const lastUnreadCountTokenRef = useRef(null);
-  const unreadCountRequestRef = useRef(null);
+  const unreadCountRequestRef = useRef(0);
+
+  const refreshUnreadNotificationCount = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    const requestId = unreadCountRequestRef.current + 1;
+    unreadCountRequestRef.current = requestId;
+
+    try {
+      const result = await getUnreadNotificationCount(token);
+      if (unreadCountRequestRef.current === requestId) {
+        setUnreadNotificationCount(Number(result?.count) || 0);
+      }
+    } catch (error) {
+      // Keep the last known count when the API is temporarily unavailable.
+    }
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
-      lastUnreadCountTokenRef.current = null;
-      unreadCountRequestRef.current = null;
+      unreadCountRequestRef.current += 1;
       setUnreadNotificationCount(0);
-      return undefined;
+      return;
     }
 
-    if (unreadCountRequestRef.current?.token === token) {
-      return undefined;
+    if (['profile', 'caregiverProfile', 'notifications'].includes(screen)) {
+      refreshUnreadNotificationCount();
     }
-
-    if (lastUnreadCountTokenRef.current === token) {
-      return undefined;
-    }
-
-    let active = true;
-    const loadUnreadCount = async () => {
-      console.log('[App] Unread count started');
-      const start = performance.now();
-
-      try {
-        const result = await getUnreadNotificationCount(token);
-
-        if (!active) {
-          return;
-        }
-
-        const count = Number(result?.count) || 0;
-        setUnreadNotificationCount(count);
-        lastUnreadCountTokenRef.current = token;
-
-        console.log(`[App] Unread count finished: ${((performance.now() - start)).toFixed(0)} ms`);
-      } catch (error) {
-        if (active) {
-          setUnreadNotificationCount(0);
-        }
-      } finally {
-        if (active && unreadCountRequestRef.current?.token === token) {
-          unreadCountRequestRef.current = null;
-        }
-      }
-    };
-
-    unreadCountRequestRef.current = { token };
-    loadUnreadCount();
-
-    return () => {
-      active = false;
-      if (unreadCountRequestRef.current?.token === token) {
-        unreadCountRequestRef.current = null;
-      }
-    };
-  }, [token, screen]);
+  }, [token, screen, refreshUnreadNotificationCount]);
 
 
   // =====================================================
@@ -156,9 +140,9 @@ export default function App() {
     // ROLE-BASED REDIRECT
     // -----------------------------------------------------
 
-    if (
-      loggedInUser?.role === 'caregiver'
-    ) {
+    if (loggedInUser?.role === 'admin') {
+      setScreen('adminAccess');
+    } else if (loggedInUser?.role === 'caregiver') {
 
       setScreen('caregiverDashboard');
 
@@ -170,35 +154,22 @@ export default function App() {
   }
 
 
-  // =====================================================
-  // REGISTER
-  // =====================================================
+  function handleVerificationRequired(email, message, cooldown = 0) {
+    setVerificationEmail(email);
+    setVerificationMessage(message || '');
+    setVerificationCooldown(cooldown);
+    setScreen('emailVerification');
+  }
 
-  function handleRegister(
-    registeredUser,
-    registeredToken
-  ) {
+  function handleEmailVerified() {
+    setVerificationMessage('');
+    setVerificationCooldown(0);
+    setScreen('login');
+  }
 
-    setUser(registeredUser);
-
-    setToken(registeredToken);
-
-
-    // -----------------------------------------------------
-    // ROLE-BASED REDIRECT
-    // -----------------------------------------------------
-
-    if (
-      registeredUser?.role === 'caregiver'
-    ) {
-
-      setScreen('caregiverDashboard');
-
-    } else {
-
-      setScreen('dashboard');
-
-    }
+  function handlePasswordResetComplete(message) {
+    setLoginNotice(message);
+    setScreen('login');
   }
 
 
@@ -431,6 +402,38 @@ export default function App() {
         style={styles.container}
       >
 
+      {user?.role === 'admin' ? (
+        <View style={styles.adminAccess}>
+          <Text style={styles.adminAccessTitle}>
+            Admin accounts use the MedSked Admin Web.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleLogout}
+            style={({ pressed }) => [
+              styles.adminLogoutButton,
+              pressed && styles.adminLogoutButtonPressed,
+            ]}
+          >
+            <Text style={styles.adminLogoutText}>Log Out</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+      {screen === 'landing' && !user && (
+        <LandingScreen
+          onSignIn={() => setScreen('login')}
+          onGetStarted={() => setScreen('register')}
+          onHowItWorks={() => setScreen('howItWorks')}
+        />
+      )}
+
+      {screen === 'howItWorks' && !user && (
+        <HowItWorksScreen
+          onBack={() => setScreen('landing')}
+        />
+      )}
+
       {/* =================================================
           LOGIN
       ================================================= */}
@@ -439,6 +442,11 @@ export default function App() {
 
         <LoginScreen
           onLogin={handleLogin}
+          initialEmail={verificationEmail}
+          initialNotice={loginNotice}
+          onNavigateForgotPassword={() => setScreen('forgotPassword')}
+          onNavigateVerification={(email) => handleVerificationRequired(email)}
+          onNavigateLanding={() => setScreen('landing')}
 
           onNavigateRegister={() =>
             setScreen('register')
@@ -455,13 +463,31 @@ export default function App() {
       {screen === 'register' && (
 
         <RegisterScreen
-          onRegister={handleRegister}
+          onVerificationRequired={handleVerificationRequired}
+          onNavigateLanding={() => setScreen('landing')}
 
           onNavigateLogin={() =>
             setScreen('login')
           }
         />
 
+      )}
+
+      {screen === 'emailVerification' && (
+        <EmailVerificationScreen
+          email={verificationEmail}
+          initialMessage={verificationMessage}
+          initialCooldownSeconds={verificationCooldown}
+          onVerified={handleEmailVerified}
+          onBackToLogin={() => setScreen('login')}
+        />
+      )}
+
+      {screen === 'forgotPassword' && (
+        <ForgotPasswordScreen
+          onBackToLogin={() => setScreen('login')}
+          onResetComplete={handlePasswordResetComplete}
+        />
       )}
 
 
@@ -550,7 +576,6 @@ export default function App() {
 
           <CaregiverPatientsScreen
             token={token}
-            onBack={() => setScreen('caregiverDashboard')}
             onSelectPatient={handleSelectPatient}
             onOpenConnections={handleCaregiverConnections}
           />
@@ -564,8 +589,6 @@ export default function App() {
           <CaregiverConnectionsScreen
 
             token={token}
-
-            onBack={() => setScreen('caregiverDashboard')}
 
             onOpenPatientMonitoring={
               handleSelectPatient
@@ -583,7 +606,6 @@ export default function App() {
             unreadNotificationCount={unreadNotificationCount}
             onOpenNotifications={handleNotifications}
             onLogout={handleLogout}
-            onBack={() => setScreen('caregiverDashboard')}
           />
         )}
 
@@ -645,6 +667,7 @@ export default function App() {
           token={token}
           patientId={selectedPatient._id}
           schedule={caregiverSchedule}
+          autoReturnOnSuccess
           onScheduleUpdated={() => setScreen('patientMonitoring')}
           onCancel={() => setScreen('patientMonitoring')}
         />
@@ -662,10 +685,6 @@ export default function App() {
           <MedicationsScreen
 
             token={token}
-
-            onBack={() =>
-              setScreen('dashboard')
-            }
 
             onAddMedication={
               handleAddMedication
@@ -750,10 +769,6 @@ export default function App() {
           <ScheduleScreen
 
             token={token}
-
-            onBack={() =>
-              setScreen('dashboard')
-            }
 
             onAddSchedule={
               handleAddSchedule
@@ -841,10 +856,6 @@ export default function App() {
 
             token={token}
 
-            onBack={() =>
-              setScreen('dashboard')
-            }
-
           />
 
         )}
@@ -861,10 +872,7 @@ export default function App() {
           <PatientConnectionsScreen
 
             token={token}
-
-            onBack={() =>
-              setScreen('profile')
-            }
+            onBack={() => setScreen('profile')}
 
           />
 
@@ -889,7 +897,6 @@ export default function App() {
             onOpenNotifications={handleNotifications}
             onOpenAnalytics={() => handleAnalytics()}
             onLogout={handleLogout}
-            onBack={() => setScreen('dashboard')}
             onOpenCaregiverRequests={handlePatientCaregiverRequests}
             onOpenPatientConnections={handlePatientConnections}
           />
@@ -899,6 +906,8 @@ export default function App() {
         user && (
           <NotificationsScreen
             token={token}
+            unreadNotificationCount={unreadNotificationCount}
+            onUnreadCountChange={refreshUnreadNotificationCount}
             onBack={() => setScreen(user.role === 'caregiver' ? 'caregiverProfile' : 'profile')}
           />
         )}
@@ -908,7 +917,7 @@ export default function App() {
           <AnalyticsScreen
             token={token}
             patientId={analyticsPatientId}
-            onBack={() => setScreen(user.role === 'caregiver' ? 'patientMonitoring' : 'profile')}
+            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : () => setScreen('profile')}
           />
         )}
 
@@ -918,7 +927,7 @@ export default function App() {
             token={token}
             userRole={user.role}
             patientId={user.role === 'caregiver' ? selectedPatient?._id : null}
-            onBack={() => setScreen(user.role === 'caregiver' ? 'patientMonitoring' : 'dashboard')}
+            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : () => setScreen('dashboard')}
           />
         )}
 
@@ -973,6 +982,9 @@ export default function App() {
         />
       )}
 
+        </>
+      )}
+
       </SafeAreaView>
     </SafeAreaProvider>
 
@@ -992,6 +1004,41 @@ const styles = StyleSheet.create({
 
     backgroundColor: colors.background,
 
+  },
+
+  adminAccess: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+
+  adminAccessTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  adminLogoutButton: {
+    minWidth: 160,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    paddingHorizontal: 20,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+  },
+
+  adminLogoutButtonPressed: {
+    opacity: 0.8,
+  },
+
+  adminLogoutText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '800',
   },
 
 });

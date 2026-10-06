@@ -6,6 +6,7 @@ import React, {
 
 import {
   View,
+  Image,
   Text,
   FlatList,
   Pressable,
@@ -14,6 +15,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getMedications,
@@ -22,6 +24,10 @@ import {
 } from '../services/api';
 
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import {
+  getMedicationExpirationState,
+  getSafeUserErrorMessage,
+} from '../utils/medicationValidation';
 
 
 // =====================================================
@@ -30,7 +36,6 @@ import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function MedicationsScreen({
   token,
-  onBack,
   onAddMedication,
   onEditMedication,
 }) {
@@ -125,8 +130,10 @@ export default function MedicationsScreen({
         );
 
         setError(
-          err.message ||
-            'Failed to load medications.'
+          getSafeUserErrorMessage(
+            err,
+            'Unable to load medications. Please check your connection and try again.'
+          )
         );
 
       } finally {
@@ -173,6 +180,17 @@ export default function MedicationsScreen({
     );
   };
 
+  const activeMedicationCount = medications.filter(
+    (medication) => !getMedicationExpirationState(medication?.expirationDate).expired
+  ).length;
+  const unitsInStock = medications.reduce((total, medication) => {
+    const quantity = Number(medication.quantityOnHand ?? 0);
+    return total + (Number.isFinite(quantity) ? quantity : 0);
+  }, 0);
+  const refillCount = medications.filter(
+    (medication) => Number(medication.quantityOnHand ?? 0) <= Number(medication.refillThreshold ?? 0)
+  ).length;
+
   const handleDeleteMedication = (medication) => {
     setPendingMedication(medication);
     setShowDeleteConfirm(true);
@@ -202,7 +220,10 @@ export default function MedicationsScreen({
     } catch (deleteError) {
       Alert.alert(
         'Delete failed',
-        deleteError.message || 'Failed to delete medication.'
+        getSafeUserErrorMessage(
+          deleteError,
+          'Unable to delete this medication. Please try again.'
+        )
       );
     }
   };
@@ -279,6 +300,19 @@ export default function MedicationsScreen({
       .join(', ');
   };
 
+  const formatDayLabel = (day) => {
+    const dayLabels = {
+      Monday: 'M',
+      Tuesday: 'T',
+      Wednesday: 'W',
+      Thursday: 'TH',
+      Friday: 'F',
+      Saturday: 'S',
+      Sunday: 'S',
+    };
+    return dayLabels[day] || String(day).slice(0, 2).toUpperCase();
+  };
+
 
   // =====================================================
   // MEDICATION CARD
@@ -287,6 +321,9 @@ export default function MedicationsScreen({
   const renderMedication = ({
     item,
   }) => {
+
+    const expirationState = getMedicationExpirationState(item?.expirationDate);
+    const isExpired = expirationState.expired;
 
     const medicationSchedules =
       getMedicationSchedules(
@@ -303,20 +340,8 @@ export default function MedicationsScreen({
           style={styles.cardTop}
         >
 
-          <View
-            style={
-              styles.iconContainer
-            }
-          >
-
-            <Text
-              style={
-                styles.icon
-              }
-            >
-              💊
-            </Text>
-
+          <View style={styles.iconContainer}>
+            <MaterialCommunityIcons name="pill" size={21} color="#0B4F59" />
           </View>
 
 
@@ -326,15 +351,14 @@ export default function MedicationsScreen({
             }
           >
 
-            <Text
-              style={
-                styles.medicationName
-              }
-              numberOfLines={1}
-            >
-              {item.name ||
-                'Medication'}
-            </Text>
+            <View style={styles.medicationNameRow}>
+              <Text style={styles.medicationName} numberOfLines={1}>
+                {item.name || 'Medication'}
+              </Text>
+              <Text style={isExpired ? styles.expiredInlineBadge : styles.activeInlineBadge}>
+                {isExpired ? 'EXPIRED' : 'ACTIVE'}
+              </Text>
+            </View>
 
 
             {item.dosage ? (
@@ -362,12 +386,20 @@ export default function MedicationsScreen({
 
             ) : null}
 
+            {isExpired ? (
+              <Text style={styles.expiredInlineBadge}>Expired</Text>
+            ) : expirationState.expirationDate ? (
+              <Text style={styles.expirationText}>Expires: {expirationState.expirationDate}</Text>
+            ) : null}
+
           </View>
 
 
           {/* EDIT BUTTON */}
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${item.name || 'medication'}`}
             onPress={() =>
               onEditMedication(
                 item
@@ -381,17 +413,13 @@ export default function MedicationsScreen({
             ]}
           >
 
-            <Text
-              style={
-                styles.editButtonText
-              }
-            >
-              Edit
-            </Text>
+            <MaterialCommunityIcons name="pencil-outline" size={17} color="#FFFFFF" />
 
           </Pressable>
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.name || 'medication'}`}
             onPress={() => handleDeleteMedication(item)}
             hitSlop={8}
             style={({ pressed }) => [
@@ -399,7 +427,7 @@ export default function MedicationsScreen({
               pressed && styles.buttonPressed,
             ]}
           >
-            <Text style={styles.deleteMedicationText}>Delete</Text>
+            <MaterialCommunityIcons name="delete-outline" size={17} color="#FFFFFF" />
           </Pressable>
 
         </View>
@@ -459,21 +487,22 @@ export default function MedicationsScreen({
                 styles.detailLabel
               }
             >
-              Status
+              Stock
             </Text>
 
             <Text
-              style={
-                styles.activeStatus
-              }
+              style={styles.detailValue}
             >
-              Active
+              {Number(item.quantityOnHand ?? 0)} units on hand
+            </Text>
+            <Text style={styles.stockDetail}>
+              Threshold {Number(item.refillThreshold ?? 0)}
             </Text>
 
           </View>
 
           <View style={styles.detailBlock}>
-            <Text style={styles.detailLabel}>Refill</Text>
+            <Text style={styles.detailLabel}>Refill status</Text>
             <Text
               style={[
                 styles.detailValue,
@@ -487,9 +516,6 @@ export default function MedicationsScreen({
                 : Number(item.quantityOnHand ?? 0) <= Number(item.refillThreshold ?? 0)
                   ? 'Low stock'
                   : 'In stock'}
-            </Text>
-            <Text style={styles.stockDetail}>
-              {Number(item.quantityOnHand ?? 0)} on hand / threshold {Number(item.refillThreshold ?? 0)}
             </Text>
           </View>
 
@@ -512,13 +538,10 @@ export default function MedicationsScreen({
             }
           >
 
-            <Text
-              style={
-                styles.scheduleTitle
-              }
-            >
-              💊 Dose Schedule
-            </Text>
+            <View style={styles.scheduleTitleRow}>
+              <MaterialCommunityIcons name="calendar-clock" size={15} color="#0B4F59" />
+              <Text style={styles.scheduleTitle}>Dose Schedule</Text>
+            </View>
 
             <Text
               style={
@@ -597,21 +620,21 @@ export default function MedicationsScreen({
 
                     {/* DAYS */}
 
-                    <View
-                      style={
-                        styles.scheduleInfo
-                      }
-                    >
-
-                      <Text
-                        style={
-                          styles.daysText
-                        }
-                      >
-                        {formatDays(
-                          schedule.days
-                        )}
-                      </Text>
+                    <View style={styles.scheduleInfo}>
+                      {Array.isArray(schedule.days) && schedule.days.length > 0 ? (
+                        <View style={styles.scheduleDays}>
+                          {schedule.days.map((day, dayIndex) => (
+                            <View
+                              key={`${schedule._id || index}-${dayIndex}`}
+                              style={styles.scheduleDay}
+                            >
+                              <Text style={styles.scheduleDayText}>{formatDayLabel(day)}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={styles.daysText}>{formatDays(schedule.days)}</Text>
+                      )}
 
 
                       {schedule.startDate ? (
@@ -635,19 +658,23 @@ export default function MedicationsScreen({
                     <View
                       style={[
                         styles.enabledBadge,
-                        !schedule.enabled &&
-                          styles.disabledBadge,
+                        isExpired
+                          ? styles.expiredBadge
+                          : !schedule.enabled && styles.disabledBadge,
                       ]}
                     >
 
                       <Text
                         style={[
                           styles.enabledText,
-                          !schedule.enabled &&
-                            styles.disabledText,
+                          isExpired
+                            ? styles.expiredBadgeText
+                            : !schedule.enabled && styles.disabledText,
                         ]}
                       >
-                        {schedule.enabled
+                        {isExpired
+                          ? 'EXPIRED'
+                          : schedule.enabled
                           ? 'ON'
                           : 'OFF'}
                       </Text>
@@ -687,7 +714,7 @@ export default function MedicationsScreen({
 
         <ActivityIndicator
           size="large"
-          color="#2F6690"
+          color="#0B4F59"
         />
 
         <Text
@@ -716,6 +743,7 @@ export default function MedicationsScreen({
         styles.container
       }
     >
+      <View style={styles.content}>
 
       {/* HEADER */}
 
@@ -725,40 +753,22 @@ export default function MedicationsScreen({
         }
       >
 
-        <Pressable
-          onPress={onBack}
-          hitSlop={10}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed &&
-              styles.buttonPressed,
-          ]}
-        >
-
-          <Text
-            style={
-              styles.backText
-            }
-          >
-            Back
-          </Text>
-
-        </Pressable>
-
-
         <View
           style={
             styles.headerContent
           }
         >
 
-          <Text
-            style={
-              styles.pageTitle
-            }
-          >
-            My Medications
-          </Text>
+          <View style={styles.pageTitleRow}>
+            <Text style={styles.pageTitle}>My Medication</Text>
+            <Image
+              accessible
+              accessibilityLabel="MedSked logo"
+              source={require('../assets/medsked.png')}
+              resizeMode="contain"
+              style={styles.pageLogo}
+            />
+          </View>
 
           <Text
             style={
@@ -785,13 +795,7 @@ export default function MedicationsScreen({
           ]}
         >
 
-          <Text
-            style={
-              styles.headerAddText
-            }
-          >
-            +
-          </Text>
+          <Text style={styles.headerAddText}>+ Add</Text>
 
         </Pressable>
 
@@ -866,7 +870,7 @@ export default function MedicationsScreen({
                   true
                 )
               }
-              tintColor="#2F6690"
+              tintColor="#0B4F59"
             />
           }
 
@@ -880,31 +884,37 @@ export default function MedicationsScreen({
               : styles.list
           }
 
-          ListHeaderComponent={
-            medications.length > 0 ? (
-
-              <View
-                style={
-                  styles.countContainer
-                }
-              >
-
-                <Text
-                  style={
-                    styles.countText
-                  }
-                >
-                  {medications.length}{' '}
-                  {medications.length === 1
-                    ? 'medication'
-                    : 'medications'}{' '}
-                  added
-                </Text>
-
+          ListHeaderComponent={(
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryCard}>
+                <View style={[styles.summaryIcon, styles.summaryIconBlue]}>
+                  <MaterialCommunityIcons name="pill" size={15} color="#0B4F59" />
+                </View>
+                <View style={styles.summaryText}>
+                  <Text style={styles.summaryNumber}>{activeMedicationCount}</Text>
+                  <Text style={styles.summaryLabel}>Active medications</Text>
+                </View>
               </View>
-
-            ) : null
-          }
+              <View style={styles.summaryCard}>
+                <View style={[styles.summaryIcon, styles.summaryIconGreen]}>
+                  <MaterialCommunityIcons name="check-circle-outline" size={15} color="#16865A" />
+                </View>
+                <View style={styles.summaryText}>
+                  <Text style={styles.summaryNumber}>{unitsInStock}</Text>
+                  <Text style={styles.summaryLabel}>Units in stock</Text>
+                </View>
+              </View>
+              <View style={styles.summaryCard}>
+                <View style={[styles.summaryIcon, styles.summaryIconRed]}>
+                  <MaterialCommunityIcons name="clock-outline" size={15} color="#C65050" />
+                </View>
+                <View style={styles.summaryText}>
+                  <Text style={styles.summaryNumber}>{refillCount}</Text>
+                  <Text style={styles.summaryLabel}>Refills needed</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           ListEmptyComponent={
 
@@ -990,6 +1000,8 @@ export default function MedicationsScreen({
 
       )}
 
+      </View>
+
       <ConfirmationDialog
         visible={showDeleteConfirm}
         title="Delete medication?"
@@ -1028,7 +1040,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor:
-      '#87CEEB',
+      '#116F7A',
+  },
+
+  content: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 1000,
+    alignSelf: 'center',
   },
 
 
@@ -1045,7 +1064,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor:
-      '#87CEEB',
+      '#116F7A',
   },
 
   loadingText: {
@@ -1060,9 +1079,12 @@ const styles = StyleSheet.create({
   // ===================================================
 
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 36,
+    paddingTop: 28,
+    paddingBottom: 12,
   },
 
   backButton: {
@@ -1078,59 +1100,65 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 30,
     fontWeight: '300',
-    color: '#2F6690',
+    color: '#D8F0F2',
   },
 
   backText: {
     marginLeft: 4,
     fontSize: 13,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#D8F0F2',
   },
 
   headerContent: {
-    paddingRight: 55,
+    flex: 1,
+    minWidth: 0,
+  },
+
+  pageTitleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  pageLogo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
   },
 
   pageTitle: {
-    fontSize: 27,
+    fontSize: 25,
     fontWeight: '900',
-    color: '#1E2A4A',
+    color: '#D7EDF3',
   },
 
   pageSubtitle: {
-    marginTop: 5,
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#6B7280',
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#A7CDD0',
   },
 
   headerAddButton: {
-    position: 'absolute',
-    right: 20,
-    bottom: 21,
-    width: 46,
-    height: 46,
+    flexShrink: 0,
+    marginLeft: 12,
+    minWidth: 80,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     backgroundColor:
-      '#2F6690',
-    shadowColor:
-      '#2F6690',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 4,
+      '#0B4F59',
   },
 
   headerAddText: {
-    fontSize: 27,
-    lineHeight: 29,
-    fontWeight: '400',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
     color: '#FFFFFF',
   },
 
@@ -1149,13 +1177,76 @@ const styles = StyleSheet.create({
     color: '#7A8494',
   },
 
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  summaryCard: {
+    flex: 1,
+    minWidth: 150,
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#D7EDF3',
+    borderWidth: 1,
+    borderColor: '#B5D4DC',
+  },
+
+  summaryIcon: {
+    width: 25,
+    height: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 7,
+    borderWidth: 1,
+    borderRadius: 6,
+  },
+
+  summaryIconBlue: {
+    backgroundColor: '#C5E3EA',
+    borderColor: '#8EBAC5',
+  },
+
+  summaryIconGreen: {
+    backgroundColor: '#CBE8D8',
+    borderColor: '#8BBDA1',
+  },
+
+  summaryIconRed: {
+    backgroundColor: '#F1D6D4',
+    borderColor: '#D9A19D',
+  },
+
+  summaryText: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  summaryNumber: {
+    fontSize: 18,
+    lineHeight: 19,
+    fontWeight: '900',
+    color: '#17313A',
+  },
+
+  summaryLabel: {
+    marginTop: 1,
+    fontSize: 8,
+    color: '#7A8494',
+  },
+
 
   // ===================================================
   // LIST
   // ===================================================
 
   list: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 36,
     paddingBottom: 20,
   },
 
@@ -1165,23 +1256,14 @@ const styles = StyleSheet.create({
   // ===================================================
 
   card: {
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 18,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
     backgroundColor:
-      '#FFFFFF',
+      '#D7EDF3',
     borderWidth: 1,
     borderColor:
-      '#E3E9EF',
-    shadowColor:
-      '#1E2A4A',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    elevation: 2,
+      '#B5D4DC',
   },
 
   cardTop: {
@@ -1190,13 +1272,13 @@ const styles = StyleSheet.create({
   },
 
   iconContainer: {
-    width: 50,
-    height: 50,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
+    borderRadius: 8,
     backgroundColor:
-      '#EAF3F9',
+      '#80AEB5',
   },
 
   icon: {
@@ -1205,26 +1287,61 @@ const styles = StyleSheet.create({
 
   medicationInfo: {
     flex: 1,
-    marginLeft: 13,
-    paddingRight: 8,
+    minWidth: 0,
+    marginLeft: 10,
+    paddingRight: 6,
+  },
+
+  medicationNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
 
   medicationName: {
-    fontSize: 16,
+    flexShrink: 1,
+    fontSize: 14,
     fontWeight: '800',
     color: '#1E2A4A',
   },
 
   dosage: {
-    marginTop: 3,
+    marginTop: 2,
     fontSize: 12,
     color: '#5F6B7A',
   },
 
   frequency: {
-    marginTop: 2,
-    fontSize: 11,
+    marginTop: 1,
+    fontSize: 10,
     color: '#8A94A3',
+  },
+
+  expiredInlineBadge: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: '#B91C1C',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+
+  activeInlineBadge: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: '#176B4B',
+    backgroundColor: '#BFE3D0',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+
+  expirationText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#0B4F59',
+    fontWeight: '600',
   },
 
 
@@ -1233,30 +1350,27 @@ const styles = StyleSheet.create({
   // ===================================================
 
   editButton: {
-    minWidth: 62,
-    minHeight: 40,
-    paddingHorizontal: 12,
+    width: 32,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor:
-      '#EAF3F9',
+    borderRadius: 6,
+    backgroundColor: '#0B4F59',
   },
 
   editButtonText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   deleteMedicationButton: {
-    minWidth: 62,
-    minHeight: 40,
-    paddingHorizontal: 10,
+    width: 32,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-    backgroundColor: '#FEE2E2',
+    borderRadius: 6,
+    backgroundColor: '#0B4F59',
     marginLeft: 6,
   },
 
@@ -1285,35 +1399,52 @@ const styles = StyleSheet.create({
 
   detailsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
 
   detailBlock: {
-    flex: 1,
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 7,
+    backgroundColor: '#0B4F59',
   },
 
   detailLabel: {
-    fontSize: 10,
+    fontSize: 7,
     fontWeight: '600',
-    color: '#9AA3AF',
+    color: '#A7CDD0',
   },
 
   detailValue: {
-    marginTop: 3,
-    fontSize: 12,
+    marginTop: 0,
+    fontSize: 9,
     fontWeight: '700',
-    color: '#374151',
+    color: '#FFFFFF',
   },
 
   activeStatus: {
-    marginTop: 3,
-    fontSize: 12,
+    marginTop: 0,
+    fontSize: 9,
     fontWeight: '800',
-    color: '#15803D',
+    color: '#A8E3C3',
+  },
+
+  expiredStatus: {
+    marginTop: 0,
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FCA5A5',
   },
 
   lowStock: { color: '#B91C1C' },
   stockOkay: { color: '#15803D' },
-  stockDetail: { marginTop: 2, fontSize: 10, color: '#9AA3AF' },
+  stockDetail: { marginTop: 0, fontSize: 7, color: '#A7CDD0' },
 
 
   // ===================================================
@@ -1321,28 +1452,34 @@ const styles = StyleSheet.create({
   // ===================================================
 
   scheduleSection: {
-    marginTop: 16,
-    paddingTop: 14,
+    marginTop: 12,
+    paddingTop: 11,
     borderTopWidth: 1,
     borderTopColor:
-      '#EEF1F4',
+      '#B5D4DC',
   },
 
   scheduleHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 9,
+    marginBottom: 7,
+  },
+
+  scheduleTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
 
   scheduleTitle: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '800',
     color: '#1E2A4A',
   },
 
   scheduleCount: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     color: '#8A94A3',
   },
@@ -1353,21 +1490,18 @@ const styles = StyleSheet.create({
   // ===================================================
 
   scheduleList: {
-    gap: 8,
+    gap: 6,
   },
 
   scheduleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 55,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    minHeight: 44,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
     borderRadius: 12,
     backgroundColor:
-      '#F7FAFC',
-    borderWidth: 1,
-    borderColor:
-      '#E8EEF3',
+      '#80AEB5',
   },
 
 
@@ -1380,9 +1514,9 @@ const styles = StyleSheet.create({
   },
 
   timeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
 
@@ -1395,16 +1529,44 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
 
+  scheduleDays: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+  },
+
+  scheduleDay: {
+    width: 25,
+    height: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: '#0B4F59',
+  },
+
+  scheduleDayText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+  },
+
   daysText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '700',
     color: '#374151',
   },
 
   dateText: {
+    alignSelf: 'flex-start',
     marginTop: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#D7EDF3',
     fontSize: 9,
-    color: '#8A94A3',
+    fontWeight: '700',
+    color: '#0B4F59',
   },
 
 
@@ -1431,8 +1593,16 @@ const styles = StyleSheet.create({
       '#F3F4F6',
   },
 
+  expiredBadge: {
+    backgroundColor: '#FEE2E2',
+  },
+
   disabledText: {
     color: '#6B7280',
+  },
+
+  expiredBadgeText: {
+    color: '#B91C1C',
   },
 
 
@@ -1488,7 +1658,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 13,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
 
@@ -1546,7 +1716,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 12,
     backgroundColor:
-      '#2F6690',
+      '#0B4F59',
   },
 
   emptyButtonText: {

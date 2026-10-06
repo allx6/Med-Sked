@@ -8,8 +8,12 @@ const {
   parsePositiveInteger,
   validateSchedulePayload,
   validateMedicationFields,
+  validateMedicationExpirationDate,
+  buildNormalizedMedicationKey,
   validateScheduleFields,
 } = require('../utils/validation');
+
+const formatLocalDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 test('valid ObjectIds are accepted', () => {
   assert.equal(isValidObjectId('507f1f77bcf86cd799439011'), true);
@@ -80,7 +84,12 @@ test('medication fields accept valid values', () => {
     name: '  Paracetamol  ',
     dosage: '500 mg',
     frequency: 'Every 8 hours',
+    expirationDate: '2099-12-31',
   }), null);
+
+  assert.equal(validateMedicationExpirationDate('2026-12-31'), null);
+  assert.equal(buildNormalizedMedicationKey('  Metformin   ', '500MG'), 'metformin|500mg');
+  assert.equal(buildNormalizedMedicationKey('Metformin', '500 mg'), 'metformin|500mg');
 });
 
 test('medication fields reject invalid values and minutes', () => {
@@ -98,16 +107,24 @@ test('medication fields reject invalid values and minutes', () => {
   invalidPayloads.forEach((payload) => {
     assert.equal(typeof validateMedicationFields(payload), 'string');
   });
+
+  assert.equal(typeof validateMedicationExpirationDate('2026-02-30'), 'string');
+  assert.equal(typeof validateMedicationExpirationDate('2026/12/31'), 'string');
+  assert.equal(typeof validateMedicationExpirationDate('2026-12-31T00:00:00Z'), 'string');
 });
 
 test('schedule fields accept valid values', () => {
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
   assert.equal(validateScheduleFields({
     medicationId: '507f1f77bcf86cd799439011',
     time: '08:00',
     dose: '500 mg',
     days: ['Monday', 'Friday'],
-    startDate: '2026-09-24',
-    endDate: '2026-10-01',
+    startDate: formatLocalDate(today),
+    endDate: formatLocalDate(tomorrow),
     enabled: true,
   }), null);
 });
