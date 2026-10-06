@@ -15,11 +15,13 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getMyPatients,
   getCaregiverRequests,
 } from '../services/api';
+import { colors } from '../theme';
 
 export default function CaregiverDashboardScreen({
   username,
@@ -140,7 +142,7 @@ export default function CaregiverDashboardScreen({
 
         <ActivityIndicator
           size="small"
-          color="#2F6690"
+          color="#0B4F59"
           style={styles.loadingIndicator}
         />
 
@@ -168,7 +170,7 @@ export default function CaregiverDashboardScreen({
             onRefresh={() =>
               loadPatients(true)
             }
-            tintColor="#2F6690"
+            tintColor="#0B4F59"
           />
         }
         contentContainerStyle={
@@ -198,20 +200,6 @@ export default function CaregiverDashboardScreen({
             </Text>
 
           </View>
-
-          <Pressable
-            onPress={onLogout}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.logoutButton,
-              pressed &&
-                styles.buttonPressed,
-            ]}
-          >
-            <Text style={styles.logoutText}>
-              Logout
-            </Text>
-          </Pressable>
 
         </View>
 
@@ -257,7 +245,10 @@ export default function CaregiverDashboardScreen({
             ]}
           >
             <View style={styles.managementContent}>
-              <View>
+              <View style={styles.managementIcon}>
+                <MaterialCommunityIcons name="account-plus-outline" size={22} color="#0B4F59" />
+              </View>
+              <View style={styles.managementCopy}>
                 <Text style={styles.managementTitle}>Manage caregiver connections</Text>
                 <Text style={styles.managementSubtitle}>
                   {pendingCount > 0
@@ -265,7 +256,7 @@ export default function CaregiverDashboardScreen({
                     : 'Search for patients and send connection requests.'}
                 </Text>
               </View>
-              <Text style={styles.managementArrow}>›</Text>
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#7A8494" />
             </View>
           </Pressable>
 
@@ -285,11 +276,12 @@ export default function CaregiverDashboardScreen({
 
             <View style={styles.summaryItem}>
 
-              <Text
-                style={styles.summaryNumber}
-              >
-                {patientCount}
-              </Text>
+              <View style={styles.summaryMetric}>
+                <View style={styles.summaryIcon}>
+                  <MaterialCommunityIcons name="account-multiple-outline" size={18} color="#0B4F59" />
+                </View>
+                <Text style={styles.summaryNumber}>{patientCount}</Text>
+              </View>
 
               <Text style={styles.summaryLabel}>
                 {patientCount === 1
@@ -305,11 +297,12 @@ export default function CaregiverDashboardScreen({
 
             <View style={styles.summaryItem}>
 
-              <Text
-                style={styles.summaryNumber}
-              >
-                ✓
-              </Text>
+              <View style={styles.summaryMetric}>
+                <View style={[styles.summaryIcon, styles.summaryIconSuccess]}>
+                  <MaterialCommunityIcons name="eye-check-outline" size={18} color="#15803D" />
+                </View>
+                <MaterialCommunityIcons name="check-circle" size={23} color="#15803D" />
+              </View>
 
               <Text style={styles.summaryLabel}>
                 Monitoring
@@ -323,11 +316,11 @@ export default function CaregiverDashboardScreen({
 
             <View style={styles.summaryItem}>
 
-              <Text
-                style={styles.summaryNumber}
-              >
-                💊
-              </Text>
+              <View style={styles.summaryMetric}>
+                <View style={styles.summaryIcon}>
+                  <MaterialCommunityIcons name="pill" size={18} color="#0B4F59" />
+                </View>
+              </View>
 
               <Text style={styles.summaryLabel}>
                 Medication
@@ -372,9 +365,9 @@ export default function CaregiverDashboardScreen({
 
             <View style={styles.emptyCard}>
 
-              <Text style={styles.emptyIcon}>
-                👥
-              </Text>
+              <View style={styles.emptyIconWrap}>
+                <MaterialCommunityIcons name="account-multiple-outline" size={27} color="#0B4F59" />
+              </View>
 
               <Text style={styles.emptyTitle}>
                 No patients connected
@@ -432,13 +425,7 @@ export default function CaregiverDashboardScreen({
                   <View
                     style={styles.patientIcon}
                   >
-                    <Text
-                      style={
-                        styles.patientIconText
-                      }
-                    >
-                      👤
-                    </Text>
+                    <MaterialCommunityIcons name="account-outline" size={25} color="#0B4F59" />
                   </View>
 
                   <View
@@ -467,13 +454,10 @@ export default function CaregiverDashboardScreen({
                       </Text>
                     ) : null}
 
-                    <Text
-                      style={
-                        styles.patientStatus
-                      }
-                    >
-                      ● Active relationship
-                    </Text>
+                    <View style={styles.patientStatusRow}>
+                      <MaterialCommunityIcons name="check-circle" size={13} color="#15803D" />
+                      <Text style={styles.patientStatus}>Active relationship</Text>
+                    </View>
 
                     <Text style={styles.patientPermission}>
                       Permission: {permission === 'ADHERENCE_SUPPORT' ? 'Adherence support' : 'View only'}
@@ -481,11 +465,7 @@ export default function CaregiverDashboardScreen({
 
                   </View>
 
-                  <Text
-                    style={styles.arrow}
-                  >
-                    ›
-                  </Text>
+                  <MaterialCommunityIcons name="chevron-right" size={24} color="#9AA3AF" />
 
                 </Pressable>
               );
@@ -508,7 +488,7 @@ export default function CaregiverDashboardScreen({
             <View
               style={styles.infoIcon}
             >
-              <Text>ℹ️</Text>
+              <MaterialCommunityIcons name="information-outline" size={20} color="#0B4F59" />
             </View>
 
             <View
@@ -552,14 +532,14 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   loadingLogo: {
@@ -568,7 +548,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 21,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   loadingLogoText: {
@@ -579,7 +559,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 23,
     fontWeight: '900',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   loadingIndicator: {
@@ -589,7 +569,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     fontSize: 12,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   scrollContent: {
@@ -608,9 +588,9 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     padding: 18,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardTint,
     borderWidth: 1,
-    borderColor: '#E3E9EF',
+    borderColor: colors.cardTintBorder,
     shadowColor: '#1E2A4A',
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -644,23 +624,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: '#6B7280',
-  },
-
-  logoutButton: {
-    minHeight: 42,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E4EAF0',
-  },
-
-  logoutText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#DC2626',
   },
 
   errorBox: {
@@ -699,13 +662,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   sectionSubtitle: {
     marginTop: 3,
     fontSize: 11,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
     lineHeight: 16,
   },
 
@@ -715,9 +678,9 @@ const styles = StyleSheet.create({
     minHeight: 94,
     paddingHorizontal: 8,
     borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardTint,
     borderWidth: 1,
-    borderColor: '#E3E9EF',
+    borderColor: colors.cardTintBorder,
     shadowColor: '#1E2A4A',
     shadowOpacity: 0.05,
     shadowRadius: 10,
@@ -731,7 +694,9 @@ const styles = StyleSheet.create({
   managementCard: {
     padding: 16,
     borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardTint,
+    borderWidth: 1,
+    borderColor: colors.cardTintBorder,
     shadowColor: '#1E2A4A',
     shadowOpacity: 0.12,
     shadowRadius: 10,
@@ -749,28 +714,40 @@ const styles = StyleSheet.create({
   managementContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
+  },
+
+  managementIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#EAF3F9',
   },
 
   managementTitle: {
-    color: '#000000',
+    color: '#1E2A4A',
     fontSize: 15,
     fontWeight: '900',
+  },
+
+  managementCopy: {
+    flex: 1,
   },
 
   managementSubtitle: {
     maxWidth: 285,
     marginTop: 5,
-    color: '#000000',
+    color: '#6B7280',
     fontSize: 11,
     lineHeight: 16,
   },
 
-  managementArrow: {
-    marginLeft: 10,
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '300',
+  summaryMetric: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
 
   summaryItem: {
@@ -783,6 +760,22 @@ const styles = StyleSheet.create({
     fontSize: 23,
     fontWeight: '900',
     color: '#1E2A4A',
+  },
+
+  summaryIcon: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: '#EAF3F9',
+    borderWidth: 1,
+    borderColor: '#D7E8F2',
+  },
+
+  summaryIconSuccess: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
   },
 
   summaryLabel: {
@@ -804,9 +797,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 15,
     borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardTint,
     borderWidth: 1,
-    borderColor: '#E3E9EF',
+    borderColor: colors.cardTintBorder,
     shadowColor: '#1E2A4A',
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -835,10 +828,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EAF3F9',
   },
 
-  patientIconText: {
-    fontSize: 22,
-  },
-
   patientInfo: {
     flex: 1,
     marginLeft: 12,
@@ -857,10 +846,16 @@ const styles = StyleSheet.create({
   },
 
   patientStatus: {
-    marginTop: 5,
     fontSize: 9,
     fontWeight: '700',
-    color: '#2F6690',
+    color: '#0B4F59',
+  },
+
+  patientStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 5,
   },
 
   patientPermission: {
@@ -881,14 +876,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     borderRadius: 17,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.cardTint,
     borderWidth: 1,
-    borderColor: '#E3E9EF',
+    borderColor: colors.cardTintBorder,
   },
 
-  emptyIcon: {
+  emptyIconWrap: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: '#EAF3F9',
     marginBottom: 8,
-    fontSize: 27,
   },
 
   emptyTitle: {

@@ -3,8 +3,10 @@ const mongoose = require('mongoose');
 
 const DoseRecord = require('../models/DoseRecord');
 const MedicationSchedule = require('../models/MedicationSchedule');
+const Medication = require('../models/Medication');
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
+const { calculateCanonicalAdherence } = require('../utils/adherence');
 
 const router = express.Router();
 
@@ -79,15 +81,51 @@ router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) =>
       return res.status(400).json({ message: 'Invalid patient ID' });
     }
 
+    const today = formatDate(new Date());
+    const now = new Date();
+
     const doseStats = await DoseRecord.aggregate([
       {
         $match: {
           userId: new mongoose.Types.ObjectId(patientId),
           scheduledDate: { $gte: range.startDate, $lte: range.endDate },
+          $expr: {
+            $lte: ['$scheduledDate', today],
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: Medication.collection.name,
+          localField: 'medicationId',
+          foreignField: '_id',
+          as: 'medication',
+        },
+      },
+      {
+        $unwind: {
+          path: '$medication',
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { 'medication.expirationDate': null },
+            { 'medication.expirationDate': '' },
+            {
+              $expr: {
+                $lte: ['$scheduledDate', '$medication.expirationDate'],
+              },
+            },
+          ],
         },
       },
       {
         $facet: {
+          records: [
+            { $project: { status: 1, scheduledDate: 1, scheduledTime: 1, medicationId: 1, medication: 1 } },
+          ],
           overall: [
             { $match: { status: { $in: ['taken', 'skipped', 'missed'] } } },
             { $group: { _id: '$status', count: { $sum: 1 } } },
@@ -108,7 +146,26 @@ router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) =>
     const counts = { taken: 0, skipped: 0, missed: 0 };
     for (const item of stats.overall || []) counts[item._id] = item.count;
 
+    const canonicalRecords = (stats.records || []).filter((dose) => {
+      const status = String(dose?.status || '').toLowerCase();
+      if (!['taken', 'skipped', 'missed', 'pending'].includes(status)) {
+        return false;
+      }
+      if (!dose?.scheduledDate) {
+        return false;
+      }
+      if (new Date(`${dose.scheduledDate}T00:00:00`) > now) {
+        return false;
+      }
+      const expirationDate = dose?.medicationId?.expirationDate || dose?.medication?.expirationDate;
+      if (expirationDate && dose.scheduledDate > expirationDate) {
+        return false;
+      }
+      return true;
+    });
+
     const totalEligible = counts.taken + counts.skipped + counts.missed;
+    const adherencePercentage = calculateCanonicalAdherence(canonicalRecords, { now });
     const timeOfDay = Object.fromEntries(TIME_BUCKETS.map((bucket) => [bucket, emptyBucket()]));
 
     for (const item of stats.timeOfDay || []) {
@@ -127,6 +184,33 @@ router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) =>
           $match: {
             userId: new mongoose.Types.ObjectId(patientId),
             enabled: true,
+          },
+        },
+        {
+          $lookup: {
+            from: Medication.collection.name,
+            localField: 'medicationId',
+            foreignField: '_id',
+            as: 'medication',
+          },
+        },
+        {
+          $unwind: {
+            path: '$medication',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $match: {
+            $or: [
+              { 'medication.expirationDate': null },
+              { 'medication.expirationDate': '' },
+              {
+                $expr: {
+                  $gte: ['$medication.expirationDate', today],
+                },
+              },
+            ],
           },
         },
         {
@@ -152,7 +236,7 @@ router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) =>
     res.json({
       dateRange: range,
       overall: {
-        adherencePercentage: percentage(counts.taken, totalEligible),
+        adherencePercentage: adherencePercentage,
         totalEligible,
         taken: counts.taken,
         skipped: counts.skipped,

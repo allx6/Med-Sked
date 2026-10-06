@@ -3,8 +3,32 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const User = require('../models/User');
+const emailService = require('../services/emailService');
+const {
+  createEmailVerificationService,
+  EmailVerificationError,
+} = require('../services/emailVerificationService');
+const {
+  createPasswordResetService,
+  PasswordResetError,
+  GENERIC_REQUEST_MESSAGE,
+} = require('../services/passwordResetService');
 
 const router = express.Router();
+const emailVerificationService = createEmailVerificationService({
+  User,
+  emailService,
+});
+const passwordResetService = createPasswordResetService({
+  User,
+  emailService,
+});
+
+const logAuthFailure = (operation, error) => {
+  console.error(`${operation} failed:`, {
+    errorName: error?.name || 'UnknownError',
+  });
+};
 
 const generatePatientId = async () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -110,6 +134,13 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({
+        message:
+          'Please enter a valid email address.',
+      });
+    }
+
 
     // =====================================================
     // CHECK DUPLICATE EMAIL
@@ -200,6 +231,7 @@ router.post('/register', async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       role,
+      emailVerified: false,
     };
 
     if (patientId) {
@@ -208,66 +240,30 @@ router.post('/register', async (req, res) => {
 
     const user = await User.create(userData);
 
-
-    // =====================================================
-    // CREATE JWT
-    // =====================================================
-
-    const token =
-      jwt.sign(
-        {
-          userId:
-            user._id.toString(),
-
-          username:
-            user.username,
-
-          role:
-            user.role,
-        },
-
-        process.env.JWT_SECRET,
-
-        {
-          expiresIn: '7d',
-        }
-      );
-
+    await emailVerificationService.sendInitialVerificationCode(normalizedEmail);
 
     // =====================================================
     // RESPONSE
     // =====================================================
 
     return res.status(201).json({
-      message:
-        'Account created successfully.',
-
-      token,
-
-      user: {
-        id:
-          user._id,
-
-        username:
-          user.username,
-
-        email:
-          user.email,
-
-        patientId:
-          user.patientId,
-
-        role:
-          user.role,
-      },
+      message: 'Verification code sent. Please verify your email to continue.',
+      verificationRequired: true,
+      email: normalizedEmail,
     });
 
   } catch (error) {
-
-    console.error(
-      'Register error:',
-      error
-    );
+    if (error instanceof EmailVerificationError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        verificationRequired: error.code === 'VERIFICATION_EMAIL_SEND_FAILED',
+        ...(error.code === 'VERIFICATION_EMAIL_SEND_FAILED'
+          ? { email: req.body.email.trim().toLowerCase() }
+          : {}),
+      });
+    }
+    logAuthFailure('Register', error);
 
     return res.status(500).json({
       message:
@@ -351,6 +347,15 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    if (user.emailVerified === false) {
+      return res.status(403).json({
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Please verify your email before logging in.',
+        verificationRequired: true,
+        email: user.email,
+      });
+    }
+
     if (user.role === 'patient' && !user.patientId) {
       user.patientId = await generatePatientId();
       await user.save();
@@ -411,15 +416,158 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-
-    console.error(
-      'Login error:',
-      error
-    );
+    logAuthFailure('Login', error);
 
     return res.status(500).json({
       message:
         'Failed to log in.',
+    });
+  }
+});
+
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { email, otp } = req.body || {};
+    if (typeof email !== 'string' || typeof otp !== 'string') {
+      return res.status(400).json({
+        code: 'VERIFICATION_INPUT_REQUIRED',
+        message: 'Email and 6-digit verification code are required.',
+      });
+    }
+
+    await emailVerificationService.verifyEmail(email, otp);
+    return res.json({
+      message: 'Email verified successfully.',
+    });
+  } catch (error) {
+    if (error instanceof EmailVerificationError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds
+          ? { retryAfterSeconds: error.retryAfterSeconds }
+          : {}),
+      });
+    }
+    logAuthFailure('Email verification', error);
+    return res.status(500).json({
+      message: 'Unable to verify your email. Please try again.',
+    });
+  }
+});
+
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    if (typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({
+        code: 'VERIFICATION_EMAIL_REQUIRED',
+        message: 'Email is required.',
+      });
+    }
+
+    await emailVerificationService.requestVerificationCode(email);
+    return res.json({
+      message: 'A new verification code has been sent.',
+    });
+  } catch (error) {
+    if (error instanceof EmailVerificationError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds
+          ? { retryAfterSeconds: error.retryAfterSeconds }
+          : {}),
+      });
+    }
+    logAuthFailure('Verification email resend', error);
+    return res.status(500).json({
+      message: 'Unable to send the verification email. Please try again.',
+    });
+  }
+});
+
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+  if (
+    typeof email !== 'string'
+    || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  ) {
+    return res.status(400).json({
+      code: 'INVALID_EMAIL',
+      message: 'Please enter a valid email address.',
+    });
+  }
+
+  try {
+    await passwordResetService.requestPasswordReset(email);
+    return res.status(202).json({
+      message: GENERIC_REQUEST_MESSAGE,
+    });
+  } catch (error) {
+    logAuthFailure('Password reset request', error);
+    return res.status(202).json({
+      message: GENERIC_REQUEST_MESSAGE,
+    });
+  }
+});
+
+router.post('/verify-password-reset', async (req, res) => {
+  try {
+    const { email, otp } = req.body || {};
+    if (
+      typeof email !== 'string'
+      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+      || typeof otp !== 'string'
+    ) {
+      return res.status(400).json({
+        code: 'PASSWORD_RESET_INPUT_INVALID',
+        message: 'Enter a valid email and 6-digit reset code.',
+      });
+    }
+
+    const resetAuthorization = await passwordResetService.verifyPasswordResetCode(
+      email,
+      otp
+    );
+    return res.json({
+      resetAuthorization,
+      expiresInSeconds: 600,
+    });
+  } catch (error) {
+    if (error instanceof PasswordResetError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds
+          ? { retryAfterSeconds: error.retryAfterSeconds }
+          : {}),
+      });
+    }
+    logAuthFailure('Password reset code verification', error);
+    return res.status(500).json({
+      message: 'Unable to verify the reset code. Please try again.',
+    });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { resetAuthorization, newPassword } = req.body || {};
+    await passwordResetService.resetPassword(resetAuthorization, newPassword);
+    return res.json({
+      message: 'Password reset successfully. Please sign in with your new password.',
+    });
+  } catch (error) {
+    if (error instanceof PasswordResetError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+      });
+    }
+    logAuthFailure('Password reset', error);
+    return res.status(500).json({
+      message: 'Unable to reset your password. Please try again.',
     });
   }
 });

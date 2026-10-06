@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getNotifications,
@@ -96,14 +97,23 @@ export default function NotificationsScreen({ token, onBack, unreadNotificationC
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />}
       >
-        <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Notifications</Text>
-            <Text style={styles.subtitle}>{unreadNotificationCount} unread</Text>
+          <View style={styles.headingGroup}>
+            {onBack ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                onPress={onBack}
+                hitSlop={8}
+                style={styles.backButton}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
+              </Pressable>
+            ) : null}
+            <View>
+              <Text style={styles.title}>Notifications</Text>
+              <Text style={styles.subtitle}>{unreadNotificationCount} unread</Text>
+            </View>
           </View>
           {unreadNotificationCount > 0 ? (
             <Pressable onPress={markAllRead} disabled={workingId === 'all'}>
@@ -154,12 +164,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.md, color: '#A9BAC0' },
-  backText: { color: '#D8E6E3', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
+  loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
+  headingGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  backButton: { width: 40, height: 40, justifyContent: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.lg },
-  title: { color: '#F2F5F1', fontSize: 28, fontWeight: '800' },
-  subtitle: { color: '#A9BAC0', fontSize: 14, marginTop: 4 },
-  markAllText: { color: '#66D6C5', fontWeight: '800', fontSize: 13, marginTop: 8 },
+  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+  subtitle: { color: '#A7CDD0', fontSize: 14, marginTop: 4 },
+  markAllText: { color: '#83DBDE', fontWeight: '800', fontSize: 13, marginTop: 8 },
   errorBox: { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
   errorText: { color: colors.dangerText, fontWeight: '600' },
   retryText: { color: colors.dangerText, fontWeight: '800', marginTop: spacing.sm },

@@ -1,45 +1,85 @@
-const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
 const User = require('../models/User');
 
-const ADMIN_EMAIL = 'admin@gmail.com';
-const ADMIN_PASSWORD = 'password123';
+class ProvisioningError extends Error {}
 
-const seedAdmin = async () => {
+const getEmailArgument = (args) => {
+  let email;
+  if (args.length === 1 && args[0].startsWith('--email=')) {
+    email = args[0].slice('--email='.length);
+  } else if (args.length === 2 && args[0] === '--email') {
+    email = args[1];
+  } else {
+    throw new ProvisioningError('Provide one valid email using --email <address> or --email=<address>.');
+  }
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    throw new ProvisioningError('Provide one valid email using --email <address> or --email=<address>.');
+  }
+
+  return email.trim().toLowerCase();
+};
+
+const promoteVerifiedUser = async (email) => {
+  if (!process.env.MONGODB_URI) {
+    throw new ProvisioningError('Database configuration is unavailable.');
+  }
+
   await mongoose.connect(process.env.MONGODB_URI);
 
-  const existingAdmin = await User.findOne({
-    email: ADMIN_EMAIL,
-  });
-
-  if (existingAdmin) {
-    if (existingAdmin.role !== 'admin') {
-      throw new Error('admin@gmail.com already belongs to a non-admin account.');
-    }
-
-    console.log('Development Admin account already exists.');
+  const user = await User.findOne({ email });
+  if (!user) {
+    throw new ProvisioningError('No existing user was found for that email.');
+  }
+  if (user.emailVerified !== true) {
+    throw new ProvisioningError('This user must verify their email before promotion.');
+  }
+  if (user.role === 'admin') {
+    console.log('The verified user is already an Admin.');
     return;
   }
 
-  const password = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  const result = await User.updateOne(
+    {
+      _id: user._id,
+      email,
+      emailVerified: true,
+    },
+    {
+      $set: {
+        role: 'admin',
+      },
+    }
+  );
 
-  await User.create({
-    username: 'admin',
-    email: ADMIN_EMAIL,
-    password,
-    role: 'admin',
-  });
+  if (result.matchedCount === 0) {
+    throw new ProvisioningError('The user changed during promotion. No account was modified.');
+  }
 
-  console.log('Development Admin account created.');
+  console.log('Verified user promoted to Admin.');
 };
 
-seedAdmin()
-  .catch((error) => {
-    console.error('Development Admin seed failed:', error.message);
+const run = async () => {
+  try {
+    const email = getEmailArgument(process.argv.slice(2));
+    await promoteVerifiedUser(email);
+  } catch (error) {
+    if (error instanceof ProvisioningError) {
+      console.error(`Admin provisioning failed: ${error.message}`);
+    } else {
+      console.error('Admin provisioning failed due to a database or configuration error.');
+    }
     process.exitCode = 1;
-  })
-  .finally(async () => {
-    await mongoose.disconnect();
-  });
+  } finally {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect().catch(() => {
+        console.error('Database connection cleanup failed.');
+        process.exitCode = 1;
+      });
+    }
+  }
+};
+
+run();

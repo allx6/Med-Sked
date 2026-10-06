@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
+import medskedLogo from '../assets/medsked.png';
 import ConfirmDialog from './ConfirmDialog';
 
 const navItems = [
@@ -35,7 +36,7 @@ export default function AdminLayout({ children }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-block">
-          <div className="brand-mark">M</div>
+          <img className="brand-logo" src={medskedLogo} alt="" />
           <div>
             <div className="brand-title">MedSked</div>
             <div className="brand-subtitle">Admin</div>

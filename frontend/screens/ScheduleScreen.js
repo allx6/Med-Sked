@@ -6,6 +6,7 @@ import React, {
 
 import {
   View,
+  Image,
   Text,
   FlatList,
   Pressable,
@@ -14,6 +15,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getSchedules,
@@ -29,7 +31,6 @@ import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function ScheduleScreen({
   token,
-  onBack,
   onAddSchedule,
   onEditSchedule,
 }) {
@@ -156,6 +157,19 @@ export default function ScheduleScreen({
     return days.join(', ');
   };
 
+  const formatDayLabel = (day) => {
+    const dayLabels = {
+      Monday: 'M',
+      Tuesday: 'T',
+      Wednesday: 'W',
+      Thursday: 'TH',
+      Friday: 'F',
+      Saturday: 'S',
+      Sunday: 'S',
+    };
+    return dayLabels[day] || String(day).slice(0, 2).toUpperCase();
+  };
+
 
   // =====================================================
   // SCHEDULE CARD
@@ -189,11 +203,7 @@ export default function ScheduleScreen({
         <View style={styles.cardHeader}>
 
           <View style={styles.medicationIcon}>
-
-            <Text style={styles.medicationIconText}>
-              💊
-            </Text>
-
+            <MaterialCommunityIcons name="pill" size={17} color="#0B4F59" />
           </View>
 
 
@@ -281,9 +291,17 @@ export default function ScheduleScreen({
               Days
             </Text>
 
-            <Text style={styles.detailValue}>
-              {formatDays(item.days)}
-            </Text>
+            {Array.isArray(item.days) && item.days.length > 0 ? (
+              <View style={styles.dayList}>
+                {item.days.map((day, index) => (
+                  <View key={`${item._id}-${index}`} style={styles.dayChip}>
+                    <Text style={styles.dayChipText}>{formatDayLabel(day)}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.detailValue}>{formatDays(item.days)}</Text>
+            )}
 
           </View>
 
@@ -325,6 +343,8 @@ export default function ScheduleScreen({
         <View style={styles.actions}>
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Edit schedule for ${medicationName}`}
             style={styles.editButton}
             onPress={() =>
               onEditSchedule(item)
@@ -339,6 +359,8 @@ export default function ScheduleScreen({
 
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Delete schedule for ${medicationName}`}
             style={styles.deleteButton}
             onPress={() =>
               handleDelete(item._id)
@@ -370,7 +392,7 @@ export default function ScheduleScreen({
 
         <ActivityIndicator
           size="large"
-          color="#2F6690"
+          color="#0B4F59"
         />
 
         <Text style={styles.loadingText}>
@@ -389,6 +411,10 @@ export default function ScheduleScreen({
   return (
 
     <View style={styles.container}>
+      <View style={styles.decorTopLeft} pointerEvents="none" />
+      <View style={styles.decorRight} pointerEvents="none" />
+      <View style={styles.decorBottomRight} pointerEvents="none" />
+      <View style={styles.content}>
 
       {/* =================================================
           HEADER
@@ -396,28 +422,18 @@ export default function ScheduleScreen({
 
       <View style={styles.header}>
 
-        <Pressable
-          onPress={onBack}
-          style={styles.backButton}
-        >
-
-          <Text style={styles.backText}>
-            Back
-          </Text>
-
-        </Pressable>
-
-
-        <View style={styles.headerTitleContainer}>
-
-          <Text style={styles.title}>
-            Medication Schedules
-          </Text>
-
-          <Text style={styles.subtitle}>
-            Manage when you take your medications.
-          </Text>
-
+        <View style={styles.brandHeader}>
+          <Image
+            accessible
+            accessibilityLabel="MedSked logo"
+            source={require('../assets/medsked.png')}
+            resizeMode="contain"
+            style={styles.logo}
+          />
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.title}>Medication Schedules</Text>
+            <Text style={styles.subtitle}>Manage when you take your medications.</Text>
+          </View>
         </View>
 
       </View>
@@ -432,9 +448,9 @@ export default function ScheduleScreen({
         onPress={onAddSchedule}
       >
 
-        <Text style={styles.addButtonIcon}>
-          +
-        </Text>
+        <View style={styles.addButtonIcon}>
+          <MaterialCommunityIcons name="plus-circle-outline" size={19} color="#D7EDF3" />
+        </View>
 
         <View>
 
@@ -503,7 +519,7 @@ export default function ScheduleScreen({
             onRefresh={() =>
               loadSchedules(true)
             }
-            tintColor="#2F6690"
+            tintColor="#0B4F59"
           />
         }
 
@@ -579,6 +595,8 @@ export default function ScheduleScreen({
         }
       />
 
+      </View>
+
       <ConfirmationDialog
         visible={showDeleteConfirm}
         title="Delete schedule?"
@@ -613,8 +631,46 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: '#09161C',
-    paddingHorizontal: 20,
+    overflow: 'hidden',
+    backgroundColor: '#116F7A',
+  },
+
+  content: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
+    paddingHorizontal: 28,
+  },
+
+  decorTopLeft: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    top: -42,
+    left: -42,
+    borderRadius: 45,
+    backgroundColor: '#3D929B',
+  },
+
+  decorRight: {
+    position: 'absolute',
+    width: 125,
+    height: 125,
+    top: 125,
+    right: -58,
+    borderRadius: 63,
+    backgroundColor: '#3D929B',
+  },
+
+  decorBottomRight: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    bottom: -68,
+    right: -30,
+    borderRadius: 55,
+    backgroundColor: '#3D929B',
   },
 
 
@@ -626,13 +682,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#09161C',
+    backgroundColor: '#116F7A',
   },
 
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
 
@@ -642,7 +698,7 @@ const styles = StyleSheet.create({
 
   header: {
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 10,
   },
 
   backButton: {
@@ -654,24 +710,38 @@ const styles = StyleSheet.create({
   backText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#D8E6E3',
+    color: '#D8F0F2',
   },
 
   headerTitleContainer: {
-    paddingRight: 20,
+    flex: 1,
+    minWidth: 0,
+  },
+
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+
+  logo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
   },
 
   title: {
-    fontSize: 25,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#D7EDF3',
   },
 
   subtitle: {
-    marginTop: 5,
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#A9BAC0',
+    marginTop: 2,
+    fontSize: 9,
+    lineHeight: 13,
+    color: '#A7CDD0',
   },
 
 
@@ -682,35 +752,34 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
-    padding: 15,
-    borderRadius: 14,
-    backgroundColor: '#2F6690',
+    marginBottom: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#0B4F59',
   },
 
   addButtonIcon: {
-    width: 38,
-    height: 38,
-    marginRight: 12,
-    borderRadius: 10,
-    textAlign: 'center',
-    lineHeight: 36,
-    fontSize: 25,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 28,
+    height: 28,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#7FB1B9',
+    borderRadius: 7,
   },
 
   addButtonTitle: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '800',
     color: '#FFFFFF',
   },
 
   addButtonSubtitle: {
     marginTop: 2,
-    fontSize: 11,
-    color: '#DCEAF2',
+    fontSize: 8,
+    color: '#A7CDD0',
   },
 
 
@@ -764,18 +833,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   listTitle: {
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#D7EDF3',
   },
 
   listCount: {
-    fontSize: 12,
-    color: '#A9BAC0',
+    fontSize: 9,
+    color: '#A7CDD0',
   },
 
 
@@ -784,20 +853,12 @@ const styles = StyleSheet.create({
   // ===================================================
 
   card: {
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 15,
-    backgroundColor: '#FFFFFF',
-
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-
-    elevation: 1,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 11,
+    backgroundColor: '#D7EDF3',
+    borderWidth: 1,
+    borderColor: '#B5D4DC',
   },
 
 
@@ -811,34 +872,31 @@ const styles = StyleSheet.create({
   },
 
   medicationIcon: {
-    width: 46,
-    height: 46,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: '#87CEEB',
-  },
-
-  medicationIconText: {
-    fontSize: 21,
+    borderRadius: 6,
+    backgroundColor: '#80AEB5',
   },
 
   medicationHeaderInfo: {
     flex: 1,
-    marginLeft: 12,
+    minWidth: 0,
+    marginLeft: 8,
     paddingRight: 8,
   },
 
   medicationName: {
-    fontSize: 16,
+    fontSize: 11,
     fontWeight: '800',
     color: '#1E2A4A',
   },
 
   dosage: {
-    marginTop: 3,
-    fontSize: 12,
-    color: '#6B7280',
+    marginTop: 1,
+    fontSize: 8,
+    color: '#7A8494',
   },
 
 
@@ -847,8 +905,8 @@ const styles = StyleSheet.create({
   // ===================================================
 
   statusBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 20,
   },
 
@@ -861,7 +919,7 @@ const styles = StyleSheet.create({
   },
 
   statusText: {
-    fontSize: 10,
+    fontSize: 7,
     fontWeight: '800',
   },
 
@@ -879,26 +937,28 @@ const styles = StyleSheet.create({
   // ===================================================
 
   timeSection: {
-    marginTop: 17,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    borderRadius: 11,
-    backgroundColor: '#F6F9FC',
+    marginTop: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#A9C9D1',
+    backgroundColor: '#EAF5F7',
   },
 
   timeLabel: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#0B4F59',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0,
   },
 
   time: {
     marginTop: 3,
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
 
@@ -907,26 +967,53 @@ const styles = StyleSheet.create({
   // ===================================================
 
   detailsContainer: {
-    marginTop: 13,
+    marginTop: 8,
   },
 
   detailRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 5,
+    minHeight: 25,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#B5D4DC',
   },
 
   detailLabel: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 9,
+    color: '#718991',
   },
 
   detailValue: {
     maxWidth: '65%',
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: '600',
     textAlign: 'right',
-    color: '#374151',
+    color: '#607981',
+  },
+
+  dayList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 5,
+    maxWidth: '75%',
+  },
+
+  dayChip: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 13,
+    backgroundColor: '#0B4F59',
+  },
+
+  dayChipText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
   },
 
 
@@ -936,39 +1023,38 @@ const styles = StyleSheet.create({
 
   actions: {
     flexDirection: 'row',
-    marginTop: 14,
-    paddingTop: 13,
+    marginTop: 8,
+    paddingTop: 0,
     borderTopWidth: 1,
-    borderTopColor: '#EEF0F3',
-    gap: 8,
+    borderTopColor: '#B5D4DC',
   },
 
   editButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 9,
-    backgroundColor: '#E8F1F7',
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
   },
 
   editText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '800',
-    color: '#2F6690',
+    color: '#0B4F59',
   },
 
   deleteButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 9,
-    backgroundColor: '#FEE2E2',
+    paddingVertical: 8,
+    borderLeftWidth: 1,
+    borderLeftColor: '#B5D4DC',
+    backgroundColor: 'transparent',
   },
 
   deleteText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '800',
     color: '#DC2626',
   },
@@ -1000,7 +1086,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#F2F5F1',
+    color: '#FFFFFF',
   },
 
   emptyText: {
@@ -1009,7 +1095,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',
-    color: '#A9BAC0',
+    color: '#A7CDD0',
   },
 
   emptyButton: {
@@ -1017,7 +1103,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 11,
     borderRadius: 9,
-    backgroundColor: '#2F6690',
+    backgroundColor: '#0B4F59',
   },
 
   emptyButtonText: {

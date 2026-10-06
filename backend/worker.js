@@ -6,7 +6,12 @@ const { detectMissedDoses } = require('./services/missedDoseService');
 const { validateEncryptionKey } = require('./services/encryptionService');
 
 try {
-  validateEncryptionKey();
+  const keyFingerprint = validateEncryptionKey();
+  console.info('Notification encryption configuration:', {
+    process: 'worker',
+    environment: process.env.NODE_ENV || 'development',
+    keyFingerprint,
+  });
 } catch (error) {
   console.error(`Encryption configuration error: ${error.message}`);
   process.exit(1);

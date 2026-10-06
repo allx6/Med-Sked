@@ -1,6 +1,7 @@
 const DoseRecord = require('../models/DoseRecord');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const Medication = require('../models/Medication');
+const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 
 const logDoseTiming = (label, startTime) => {
   const elapsed = performance.now() - startTime;
@@ -695,6 +696,10 @@ const generateDosesForDate = async (
     for (
       const doseData of dosesToCreate
     ) {
+
+      if (isDoseDateAfterExpiration(doseData.scheduledDate, medication.expirationDate)) {
+        continue;
+      }
 
       const result =
         await createDoseIfNotExists({

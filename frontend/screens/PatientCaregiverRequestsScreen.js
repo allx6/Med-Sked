@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   getCaregiverRequestsForPatient,
@@ -80,10 +81,11 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadRequests(true)} tintColor={colors.primary} />}
         contentContainerStyle={styles.content}
       >
-        <Pressable onPress={onBack} hitSlop={8} style={styles.backButton}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
-
+        {onBack ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} hitSlop={8} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
+          </Pressable>
+        ) : null}
         <Text style={styles.title}>Caregiver Requests</Text>
         <Text style={styles.subtitle}>Review who is asking to monitor your medication routine.</Text>
 
@@ -147,18 +149,17 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 32 },
+  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: spacing.lg, paddingBottom: 32 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.md, color: '#A9BAC0' },
-  backButton: { minHeight: 40, justifyContent: 'center', marginBottom: spacing.sm },
-  backText: { color: '#D8E6E3', fontSize: 15, fontWeight: '700' },
-  title: { color: '#F2F5F1', fontSize: 28, fontWeight: '800' },
-  subtitle: { color: '#A9BAC0', fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.lg },
+  loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', marginBottom: spacing.sm },
+  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+  subtitle: { color: '#A7CDD0', fontSize: 14, lineHeight: 20, marginTop: 4, marginBottom: spacing.lg },
   errorBox: { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
   errorText: { color: colors.dangerText, fontWeight: '600' },
   retryText: { color: colors.dangerText, fontWeight: '800', marginTop: spacing.sm },
-  successMessage: { color: '#66D6C5', fontWeight: '800', marginBottom: spacing.md },
-  card: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md, ...shadow.card },
+  successMessage: { color: '#83DBDE', fontWeight: '800', marginBottom: spacing.md },
+  card: { flexDirection: 'row', backgroundColor: colors.cardTint, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.cardTintBorder, padding: spacing.md, marginBottom: spacing.md, ...shadow.card },
   avatarWrap: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md },
   avatarText: { fontSize: 20 },
   cardBody: { flex: 1 },
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
   rejectText: { color: colors.dangerText, fontWeight: '800' },
   pressed: { opacity: 0.8 },
   disabled: { opacity: 0.6 },
-  emptyState: { backgroundColor: colors.card, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, alignItems: 'center', ...shadow.card },
+  emptyState: { backgroundColor: colors.cardTint, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.cardTintBorder, padding: spacing.xl, alignItems: 'center', ...shadow.card },
   emptyIcon: { fontSize: 30, marginBottom: spacing.sm },
   emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   emptyText: { color: colors.textSecondary, textAlign: 'center', lineHeight: 19, marginTop: spacing.sm },

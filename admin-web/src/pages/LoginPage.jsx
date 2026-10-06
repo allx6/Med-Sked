@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import medskedLogo from '../assets/medsked.png';
 import { loginAdmin } from '../services/api';
 
 export default function LoginPage() {
@@ -40,12 +41,14 @@ export default function LoginPage() {
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-brand">
-            <div className="brand-mark">M</div>
+            <img className="auth-logo" src={medskedLogo} alt="MedSked" />
             <div className="auth-brand-copy">
-              <strong>MedSked Admin</strong>
-              <span>Secure sign in</span>
+              <strong>MedSked</strong>
+              <span>Administration portal</span>
             </div>
           </div>
+          <h1>Admin Sign In</h1>
+          <p>Sign in with your administrator account.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -54,7 +57,7 @@ export default function LoginPage() {
             <input
               type="email"
               autoComplete="username"
-              placeholder="name@example.com"
+              placeholder="Enter admin email"
               value={email}
               onChange={(event) => {
                 setEmail(event.target.value);

@@ -10,16 +10,19 @@ export default function TextField({
   error,
   hint,
   editable = true,
+  inputStyle,
+  labelStyle,
   ...inputProps
 }) {
   return (
     <View style={styles.group}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label ? <Text style={[styles.label, labelStyle]}>{label}</Text> : null}
       <TextInput
         style={[
           styles.input,
           error && styles.inputError,
           !editable && styles.disabled,
+          inputStyle,
         ]}
         value={value}
         onChangeText={onChangeText}
@@ -35,21 +38,21 @@ export default function TextField({
 }
 
 const styles = StyleSheet.create({
-  group: { marginBottom: 14 },
+  group: { marginBottom: 10 },
   label: {
-    marginBottom: 7,
-    fontSize: 14,
+    marginBottom: 5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#374151',
   },
   input: {
-    minHeight: 52,
-    paddingHorizontal: 15,
-    borderRadius: radius.md,
+    minHeight: 40,
+    paddingHorizontal: 11,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     backgroundColor: colors.inputFill,
-    fontSize: 16,
+    fontSize: 14,
     color: colors.text,
   },
   inputError: {

@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { getAdherenceAnalytics } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
@@ -72,6 +73,14 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
   const complexity = analytics?.complexity || { activeMedicationCount: 0, scheduledDosesPerDay: 0, complexityBucket: 'low' };
   const timeOfDay = analytics?.timeOfDay || {};
   const maxTimeTotal = Math.max(...Object.values(timeOfDay).map((value) => value.total || 0), 1);
+  const timeBuckets = ['morning', 'afternoon', 'evening', 'night'].map((bucket) => {
+    const value = timeOfDay[bucket] || { total: 0, taken: 0, skipped: 0, missed: 0, adherencePercentage: 0 };
+    const percentage = Number.isFinite(Number(value.adherencePercentage))
+      ? Math.max(0, Math.min(100, Number(value.adherencePercentage)))
+      : 0;
+
+    return { bucket, value, percentage };
+  });
 
   return (
     <View style={styles.container}>
@@ -80,9 +89,17 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadAnalytics(true)} tintColor={colors.primary} />}
       >
-        <Pressable onPress={onBack} hitSlop={8}>
-          <Text style={styles.backText}>Back</Text>
-        </Pressable>
+        {onBack ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            onPress={onBack}
+            hitSlop={8}
+            style={styles.backButton}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
+          </Pressable>
+        ) : null}
         <Text style={styles.title}>Adherence Analytics</Text>
         <Text style={styles.subtitle}>Real dose outcomes for the selected period.</Text>
 
@@ -118,10 +135,27 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>By time of day</Text>
-          {['morning', 'afternoon', 'evening', 'night'].map((bucket) => {
-            const value = timeOfDay[bucket] || { total: 0, taken: 0, skipped: 0, missed: 0, adherencePercentage: 0 };
-            return (
+          <Text style={styles.sectionTitle}>Adherence by time of day</Text>
+          <Text style={styles.chartCaption}>Percentage of doses taken for each time period</Text>
+          <View style={styles.chart}>
+            {timeBuckets.map(({ bucket, value, percentage }) => (
+              <View key={bucket} style={styles.chartColumn} accessibilityLabel={`${bucket}: ${value.total > 0 ? `${percentage}% adherence` : 'no dose data'}, ${value.total} doses`}>
+                <Text style={styles.chartValue}>{value.total > 0 ? `${percentage}%` : '—'}</Text>
+                <View style={styles.chartTrack}>
+                  {value.total > 0 ? (
+                    <View style={[styles.chartBar, { height: `${percentage}%` }]} />
+                  ) : null}
+                </View>
+                <Text style={styles.chartLabel}>{bucket}</Text>
+                <Text style={styles.chartCount}>{value.total} doses</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Dose outcomes by time of day</Text>
+          {timeBuckets.map(({ bucket, value }) => (
               <View key={bucket} style={styles.timeRow}>
                 <View style={styles.timeHeader}>
                   <Text style={styles.timeLabel}>{bucket}</Text>
@@ -130,8 +164,7 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
                 <View style={styles.barTrack}><View style={[styles.barFill, { width: `${Math.round((value.total / maxTimeTotal) * 100)}%` }]} /></View>
                 <Text style={styles.timeMeta}>{value.taken} taken, {value.skipped} skipped, {value.missed} missed</Text>
               </View>
-            );
-          })}
+          ))}
         </View>
 
         <View style={styles.card}>
@@ -152,14 +185,14 @@ function Stat({ label, value, color }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.lg, paddingBottom: 32 },
+  content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: spacing.lg, paddingBottom: 32 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
-  loadingText: { marginTop: spacing.md, color: '#A9BAC0' },
-  backText: { color: '#D8E6E3', fontWeight: '700', fontSize: 15, marginBottom: spacing.md },
-  title: { color: '#F2F5F1', fontSize: 28, fontWeight: '800' },
-  subtitle: { color: '#A9BAC0', fontSize: 14, marginTop: 4, marginBottom: spacing.lg },
+  loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', marginBottom: spacing.md },
+  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+  subtitle: { color: '#A7CDD0', fontSize: 14, marginTop: 4, marginBottom: spacing.lg },
   rangeRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.lg },
-  rangeButton: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: colors.card },
+  rangeButton: { borderWidth: 1, borderColor: colors.cardTintBorder, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: colors.cardTint },
   rangeButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   rangeText: { color: colors.textSecondary, fontWeight: '700', fontSize: 12 },
   rangeTextActive: { color: colors.white },
@@ -170,12 +203,20 @@ const styles = StyleSheet.create({
   heroLabel: { color: colors.primarySoft, fontSize: 14, fontWeight: '700' },
   heroValue: { color: colors.white, fontSize: 42, fontWeight: '900', marginTop: 4 },
   heroMeta: { color: colors.primarySoft, fontSize: 13, marginTop: 4 },
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md, ...shadow.card },
+  card: { backgroundColor: colors.cardTint, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.cardTintBorder, padding: spacing.md, marginBottom: spacing.md, ...shadow.card },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginBottom: spacing.md },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   stat: { alignItems: 'center' },
   statValue: { fontSize: 23, fontWeight: '900' },
   statLabel: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
+  chartCaption: { color: colors.textSecondary, fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm },
+  chartColumn: { flex: 1, minWidth: 0, alignItems: 'center' },
+  chartValue: { color: colors.primary, fontSize: 12, fontWeight: '800', marginBottom: spacing.xs },
+  chartTrack: { width: '72%', maxWidth: 54, height: 120, justifyContent: 'flex-end', overflow: 'hidden', borderRadius: radius.sm, backgroundColor: '#C5E3EA' },
+  chartBar: { width: '100%', backgroundColor: colors.primary, borderTopLeftRadius: radius.sm, borderTopRightRadius: radius.sm },
+  chartLabel: { color: colors.text, fontSize: 11, fontWeight: '800', textTransform: 'capitalize', marginTop: spacing.sm },
+  chartCount: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
   timeRow: { marginBottom: spacing.md },
   timeHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   timeLabel: { color: colors.text, fontWeight: '800', textTransform: 'capitalize' },
