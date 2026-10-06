@@ -511,20 +511,37 @@ router.put(
         updatedMedication.quantityOnHand <= updatedMedication.refillThreshold &&
         !updatedMedication.lowRefillNotified
       ) {
-        await createMedicationNotifications({
-          patientId: updatedMedication.userId,
-          type: 'low_refill',
-          patientMessage: `${updatedMedication.name} is low on refill stock.`,
-          caregiverMessage: (patientName) => `${patientName}'s ${updatedMedication.name} is low on refill stock.`,
-          relatedEntityType: 'Medication',
-          relatedEntityId: updatedMedication._id,
-          dedupeKey: `low_refill:${updatedMedication._id}`,
-        });
-
-        await Medication.updateOne(
-          { _id: updatedMedication._id },
+        const notificationClaim = await Medication.updateOne(
+          {
+            _id: updatedMedication._id,
+            userId: updatedMedication.userId,
+            lowRefillNotified: { $ne: true },
+          },
           { $set: { lowRefillNotified: true } }
         );
+
+        if (notificationClaim.modifiedCount === 1) {
+          const patientNotification = await createMedicationNotifications({
+            patientId: updatedMedication.userId,
+            type: 'low_refill',
+            patientMessage: `${updatedMedication.name} is low on refill stock.`,
+            caregiverMessage: (patientName) => `${patientName}'s ${updatedMedication.name} is low on refill stock.`,
+            relatedEntityType: 'Medication',
+            relatedEntityId: updatedMedication._id,
+            dedupeKey: `low_refill:${updatedMedication._id}:${dose._id}`,
+          });
+
+          if (!patientNotification) {
+            await Medication.updateOne(
+              {
+                _id: updatedMedication._id,
+                userId: updatedMedication.userId,
+                lowRefillNotified: true,
+              },
+              { $set: { lowRefillNotified: false } }
+            );
+          }
+        }
       }
 
       const populatedDose = await populateDose(dose._id);

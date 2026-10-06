@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   View,
+  Text,
+  Pressable,
   StyleSheet,
 } from 'react-native';
 
@@ -12,6 +14,8 @@ import {
 
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import EmailVerificationScreen from './screens/EmailVerificationScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import LandingScreen from './screens/LandingScreen';
 import HowItWorksScreen from './screens/HowItWorksScreen';
 
@@ -58,6 +62,10 @@ export default function App() {
   const [user, setUser] = useState(null);
 
   const [token, setToken] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [verificationCooldown, setVerificationCooldown] = useState(0);
+  const [loginNotice, setLoginNotice] = useState('');
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   const unreadCountRequestRef = useRef(0);
@@ -132,9 +140,9 @@ export default function App() {
     // ROLE-BASED REDIRECT
     // -----------------------------------------------------
 
-    if (
-      loggedInUser?.role === 'caregiver'
-    ) {
+    if (loggedInUser?.role === 'admin') {
+      setScreen('adminAccess');
+    } else if (loggedInUser?.role === 'caregiver') {
 
       setScreen('caregiverDashboard');
 
@@ -146,35 +154,22 @@ export default function App() {
   }
 
 
-  // =====================================================
-  // REGISTER
-  // =====================================================
+  function handleVerificationRequired(email, message, cooldown = 0) {
+    setVerificationEmail(email);
+    setVerificationMessage(message || '');
+    setVerificationCooldown(cooldown);
+    setScreen('emailVerification');
+  }
 
-  function handleRegister(
-    registeredUser,
-    registeredToken
-  ) {
+  function handleEmailVerified() {
+    setVerificationMessage('');
+    setVerificationCooldown(0);
+    setScreen('login');
+  }
 
-    setUser(registeredUser);
-
-    setToken(registeredToken);
-
-
-    // -----------------------------------------------------
-    // ROLE-BASED REDIRECT
-    // -----------------------------------------------------
-
-    if (
-      registeredUser?.role === 'caregiver'
-    ) {
-
-      setScreen('caregiverDashboard');
-
-    } else {
-
-      setScreen('dashboard');
-
-    }
+  function handlePasswordResetComplete(message) {
+    setLoginNotice(message);
+    setScreen('login');
   }
 
 
@@ -407,6 +402,24 @@ export default function App() {
         style={styles.container}
       >
 
+      {user?.role === 'admin' ? (
+        <View style={styles.adminAccess}>
+          <Text style={styles.adminAccessTitle}>
+            Admin accounts use the MedSked Admin Web.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleLogout}
+            style={({ pressed }) => [
+              styles.adminLogoutButton,
+              pressed && styles.adminLogoutButtonPressed,
+            ]}
+          >
+            <Text style={styles.adminLogoutText}>Log Out</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
       {screen === 'landing' && !user && (
         <LandingScreen
           onSignIn={() => setScreen('login')}
@@ -429,6 +442,10 @@ export default function App() {
 
         <LoginScreen
           onLogin={handleLogin}
+          initialEmail={verificationEmail}
+          initialNotice={loginNotice}
+          onNavigateForgotPassword={() => setScreen('forgotPassword')}
+          onNavigateVerification={(email) => handleVerificationRequired(email)}
           onNavigateLanding={() => setScreen('landing')}
 
           onNavigateRegister={() =>
@@ -446,7 +463,7 @@ export default function App() {
       {screen === 'register' && (
 
         <RegisterScreen
-          onRegister={handleRegister}
+          onVerificationRequired={handleVerificationRequired}
           onNavigateLanding={() => setScreen('landing')}
 
           onNavigateLogin={() =>
@@ -454,6 +471,23 @@ export default function App() {
           }
         />
 
+      )}
+
+      {screen === 'emailVerification' && (
+        <EmailVerificationScreen
+          email={verificationEmail}
+          initialMessage={verificationMessage}
+          initialCooldownSeconds={verificationCooldown}
+          onVerified={handleEmailVerified}
+          onBackToLogin={() => setScreen('login')}
+        />
+      )}
+
+      {screen === 'forgotPassword' && (
+        <ForgotPasswordScreen
+          onBackToLogin={() => setScreen('login')}
+          onResetComplete={handlePasswordResetComplete}
+        />
       )}
 
 
@@ -948,6 +982,9 @@ export default function App() {
         />
       )}
 
+        </>
+      )}
+
       </SafeAreaView>
     </SafeAreaProvider>
 
@@ -967,6 +1004,41 @@ const styles = StyleSheet.create({
 
     backgroundColor: colors.background,
 
+  },
+
+  adminAccess: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+
+  adminAccessTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  adminLogoutButton: {
+    minWidth: 160,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    paddingHorizontal: 20,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+  },
+
+  adminLogoutButtonPressed: {
+    opacity: 0.8,
+  },
+
+  adminLogoutText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '800',
   },
 
 });

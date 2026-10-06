@@ -24,16 +24,35 @@ const handleResponse = async (response, options = {}) => {
       data.message ||
       data.error ||
       `Request failed with status ${response.status}`;
+    const verificationEmailFailure =
+      options.includeResponseData &&
+      data.verificationRequired === true;
 
-    if (response.status === 401 && !options.isLogin) {
+    if (
+      response.status === 401
+      && !options.isLogin
+      && !options.preserveSafeClientMessage
+    ) {
       throw new Error('Your session has expired. Please log in again.');
     }
 
     if (response.status === 403) {
-      throw new Error(message || 'You are not authorized to access this patient.');
+      const error = new Error(message || 'You are not authorized to access this patient.');
+      if (options.includeResponseData) {
+        error.responseData = data;
+      }
+      throw error;
     }
 
     if (response.status >= 500) {
+      if (verificationEmailFailure) {
+        const error = new Error(message);
+        error.responseData = data;
+        throw error;
+      }
+      if (options.safeServerErrorMessage) {
+        throw new Error(options.safeServerErrorMessage);
+      }
       if (options.preserveSafeServerMessage) {
         throw new Error(getRefillErrorMessage({
           message: data.message || data.error || `Request failed with status ${response.status}`,
@@ -43,7 +62,11 @@ const handleResponse = async (response, options = {}) => {
       throw new Error('Unable to connect to the Med-Sked server. Check that the backend is running and that your device is on the same network.');
     }
 
-    throw new Error(message);
+    const error = new Error(message);
+    if (options.includeResponseData) {
+      error.responseData = data;
+    }
+    throw error;
   }
 
   return data;
@@ -83,7 +106,10 @@ export const loginUser = async (email, password) => {
     }
   );
 
-  return handleResponse(response, { isLogin: true });
+  return handleResponse(response, {
+    isLogin: true,
+    includeResponseData: true,
+  });
 };
 
 
@@ -114,7 +140,77 @@ export const registerUser = async (
     }
   );
 
-  return handleResponse(response);
+  return handleResponse(response, { includeResponseData: true });
+};
+
+export const verifyEmail = async (email, otp) => {
+  const response = await fetch(`${API_URL}/api/auth/verify-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, otp }),
+  });
+
+  return handleResponse(response, { includeResponseData: true });
+};
+
+export const resendVerificationCode = async (email) => {
+  const response = await fetch(`${API_URL}/api/auth/resend-verification`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  return handleResponse(response, { includeResponseData: true });
+};
+
+export const requestPasswordReset = async (email) => {
+  const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  return handleResponse(response, {
+    includeResponseData: true,
+    safeServerErrorMessage: 'Unable to request a password reset. Please try again.',
+  });
+};
+
+export const verifyPasswordResetCode = async (email, otp) => {
+  const response = await fetch(`${API_URL}/api/auth/verify-password-reset`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, otp }),
+  });
+
+  return handleResponse(response, {
+    includeResponseData: true,
+    safeServerErrorMessage: 'Unable to verify the reset code. Please try again.',
+  });
+};
+
+export const resetPassword = async (resetAuthorization, newPassword) => {
+  const response = await fetch(`${API_URL}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ resetAuthorization, newPassword }),
+  });
+
+  return handleResponse(response, {
+    includeResponseData: true,
+    preserveSafeClientMessage: true,
+    safeServerErrorMessage: 'Unable to reset your password. Please try again.',
+  });
 };
 
 

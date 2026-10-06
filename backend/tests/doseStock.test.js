@@ -12,6 +12,7 @@ const DOSE_ID = '507f1f77bcf86cd799439014';
 const notificationServicePath = require.resolve('../services/notificationService');
 const originalNotificationService = require.cache[notificationServicePath];
 const sentNotifications = [];
+let notificationResult = true;
 require.cache[notificationServicePath] = {
   id: notificationServicePath,
   filename: notificationServicePath,
@@ -19,7 +20,7 @@ require.cache[notificationServicePath] = {
   exports: {
     createMedicationNotifications: async (notification) => {
       sentNotifications.push(notification);
-      return true;
+      return notificationResult;
     },
   },
 };
@@ -227,6 +228,7 @@ test('SKIP changes no medication quantity', async () => {
 
 test('TAKE triggers one low-stock notice when crossing threshold and honors the notification flag', async () => {
   sentNotifications.length = 0;
+  notificationResult = true;
   const first = await invokeTakeOrSkip({
     action: 'take',
     stock: 2,
@@ -238,6 +240,7 @@ test('TAKE triggers one low-stock notice when crossing threshold and honors the 
   assert.equal(first.response.statusCode, 200);
   assert.equal(sentNotifications.length, 1);
   assert.equal(first.flagUpdates[0].update.$set.lowRefillNotified, true);
+  assert.equal(sentNotifications[0].dedupeKey, `low_refill:${MEDICATION_ID}:${DOSE_ID}`);
 
   const second = await invokeTakeOrSkip({
     action: 'take',
@@ -249,4 +252,48 @@ test('TAKE triggers one low-stock notice when crossing threshold and honors the 
 
   assert.equal(second.response.statusCode, 200);
   assert.equal(sentNotifications.length, 1);
+});
+
+test('a later low-stock cycle can notify again after stock is re-armed', async () => {
+  sentNotifications.length = 0;
+  notificationResult = true;
+
+  await invokeTakeOrSkip({
+    action: 'take',
+    stock: 2,
+    refillThreshold: 1,
+    lowRefillNotified: false,
+    dose: pendingDose(),
+  });
+  await invokeTakeOrSkip({
+    action: 'take',
+    stock: 2,
+    refillThreshold: 1,
+    lowRefillNotified: false,
+    dose: pendingDose({ _id: '507f1f77bcf86cd799439015' }),
+  });
+
+  assert.equal(sentNotifications.length, 2);
+  assert.notEqual(sentNotifications[0].dedupeKey, sentNotifications[1].dedupeKey);
+});
+
+test('failed patient notification creation re-arms the low-stock notification flag', async () => {
+  sentNotifications.length = 0;
+  notificationResult = null;
+
+  try {
+    const { response, flagUpdates } = await invokeTakeOrSkip({
+      action: 'take',
+      stock: 2,
+      refillThreshold: 1,
+      lowRefillNotified: false,
+      dose: pendingDose(),
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(flagUpdates[0].update.$set.lowRefillNotified, true);
+    assert.equal(flagUpdates[1].update.$set.lowRefillNotified, false);
+  } finally {
+    notificationResult = true;
+  }
 });

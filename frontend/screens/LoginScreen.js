@@ -28,13 +28,18 @@ const medSkedLogo = require('../assets/medsked.png');
 
 export default function LoginScreen({
   onLogin,
+  onNavigateVerification,
+  onNavigateForgotPassword,
+  initialEmail = '',
+  initialNotice = '',
   onNavigateLanding,
   onNavigateRegister,
 }) {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [authError, setAuthError] = useState('');
+  const [notice, setNotice] = useState(initialNotice);
 
   const [loading, setLoading] = useState(false);
   const entranceProgress = useRef(new Animated.Value(0)).current;
@@ -66,6 +71,7 @@ export default function LoginScreen({
   const handleLogin = async () => {
     const nextErrors = {};
     setAuthError('');
+    setNotice('');
 
     if (!username.trim()) {
       nextErrors.username = 'Please enter your username.';
@@ -119,6 +125,11 @@ export default function LoginScreen({
       );
 
     } catch (error) {
+      if (error.responseData?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+        onNavigateVerification(error.responseData.email || username.trim());
+        return;
+      }
+
       const message = getSafeUserErrorMessage(
         error,
         'Unable to log in. Please check your credentials.'
@@ -189,6 +200,7 @@ export default function LoginScreen({
                 setUsername(value);
                 setErrors((current) => ({ ...current, username: '' }));
                 setAuthError('');
+                setNotice('');
               }}
               placeholder="Enter your email"
               error={errors.username}
@@ -217,10 +229,19 @@ export default function LoginScreen({
               editable={!loading}
             />
 
-            <Text style={styles.forgotPasswordText}>
-              Forgot password?
-            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onNavigateForgotPassword}
+              style={styles.forgotPasswordButton}
+            >
+              <Text style={styles.forgotPasswordText}>
+                Forgot Password?
+              </Text>
+            </Pressable>
 
+            {notice ? (
+              <Text style={styles.authNotice}>{notice}</Text>
+            ) : null}
             {authError ? (
               <Text style={styles.authError}>{authError}</Text>
             ) : null}
@@ -486,12 +507,23 @@ const styles = StyleSheet.create({
   },
 
   forgotPasswordText: {
-    alignSelf: 'flex-end',
     color: '#0B4F59',
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
     marginTop: -6,
     marginBottom: 12,
+    paddingVertical: 4,
+  },
+
+  authNotice: {
+    color: '#15803D',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
   },
 
   loginButton: {

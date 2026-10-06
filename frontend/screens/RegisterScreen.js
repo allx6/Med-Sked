@@ -22,11 +22,12 @@ import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { getSafeUserErrorMessage } from '../utils/medicationValidation';
+import { isValidEmail } from '../utils/helpers';
 
 const medSkedLogo = require('../assets/medsked.png');
 
 export default function RegisterScreen({
-  onRegister,
+  onVerificationRequired,
   onNavigateLanding,
   onNavigateLogin,
 }) {
@@ -105,12 +106,12 @@ export default function RegisterScreen({
       return;
     }
 
-    if (!/^[^\s@]+@gmail\.com$/i.test(email.trim())) {
-      nextErrors.email = 'Please enter a valid Gmail address.';
+    if (!isValidEmail(email.trim())) {
+      nextErrors.email = 'Please enter a valid email address.';
       setErrors(nextErrors);
       Alert.alert(
         'Invalid Email',
-        'Please use a Gmail address ending in @gmail.com.'
+        'Please enter a valid email address.'
       );
       return;
     }
@@ -174,21 +175,26 @@ export default function RegisterScreen({
         role
       );
 
+      if (result.verificationRequired) {
+        onVerificationRequired(
+          email.trim().toLowerCase(),
+          result.message,
+          60
+        );
+        return;
+      }
 
-      const registeredUser =
-        result.user || result;
-
-      const token =
-        result.token || '';
-
-
-      onRegister(
-        registeredUser,
-        token
-      );
-
+      throw new Error('Unable to create your account. Please try again.');
 
     } catch (error) {
+      if (error.responseData?.verificationRequired) {
+        onVerificationRequired(
+          email.trim().toLowerCase(),
+          error.message
+        );
+        return;
+      }
+
       const message = getSafeUserErrorMessage(
         error,
         'Unable to create your account.'
