@@ -1,26 +1,38 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
+
+const createEmailTransporter = () => {
+  const { EMAIL_USER, EMAIL_APP_PASSWORD } = process.env;
+
+  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+    throw new Error('Email configuration is incomplete.');
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_APP_PASSWORD,
+    },
+  });
+};
 
 const sendEmail = async (email, subject, text) => {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('Email API is not configured.');
-  }
-  if (!process.env.RESEND_FROM_EMAIL) {
+  if (!process.env.EMAIL_FROM) {
     throw new Error('Email sender is not configured.');
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const { data, error } = await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL,
-    to: email,
-    subject,
-    text,
-  });
+  const transporter = createEmailTransporter();
 
-  if (error) {
-    throw new Error('Email delivery failed.');
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject,
+      text,
+    });
+  } finally {
+    transporter.close();
   }
-
-  return data;
 };
 
 const sendVerificationEmail = (email, otp) => sendEmail(
@@ -38,6 +50,7 @@ const sendPasswordResetEmail = (email, otp) => sendEmail(
 );
 
 module.exports = {
+  createEmailTransporter,
   sendVerificationEmail,
   sendPasswordResetEmail,
 };
