@@ -1,17 +1,19 @@
 const nodemailer = require('nodemailer');
 
 const createEmailTransporter = () => {
-  const { EMAIL_USER, EMAIL_APP_PASSWORD } = process.env;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env;
 
-  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASSWORD) {
     throw new Error('Email configuration is incomplete.');
   }
 
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: false,
     auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_APP_PASSWORD,
+      user: SMTP_USER,
+      pass: SMTP_PASSWORD,
     },
   });
 };
