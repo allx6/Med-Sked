@@ -21,7 +21,7 @@ const { validateEncryptionKey } = require('./services/encryptionService');
 const app = express();
 
 const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 5 * 60 * 1000,
   limit: 5,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
