@@ -119,65 +119,65 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="stat-grid dashboard-stat-grid">
-        <div className="stat-card stat-card-primary dashboard-stat-card">
-          <DashboardMetricIcon name="users" />
-          <span>Overall adherence, last 30 days</span>
-          <strong>{formatPercent(stats?.adherence?.rate)}</strong>
-          <small>{formatNumber(stats?.adherence?.eligible)} eligible doses tracked</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
-          <DashboardMetricIcon name="patients" />
-          <span>Total Users</span>
-          <strong>{formatNumber(stats?.users?.total)}</strong>
-          <small>{formatNumber(stats?.users?.patients)} patients enrolled</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
-          <DashboardMetricIcon name="caregivers" />
-          <span>Patients</span>
-          <strong>{formatNumber(stats?.users?.patients)}</strong>
-          <small>Care recipients</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
-          <DashboardMetricIcon name="admins" />
-          <span>Caregivers</span>
-          <strong>{formatNumber(stats?.users?.caregivers)}</strong>
-          <small>Support accounts</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
-          <DashboardMetricIcon name="medications" />
-          <span>Admins</span>
-          <strong>{formatNumber(stats?.users?.admins)}</strong>
-          <small>Administrative access</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
-          <DashboardMetricIcon name="schedules" />
-          <span>Medications</span>
-          <strong>{formatNumber(stats?.medications?.total)}</strong>
-          <small>{formatNumber(stats?.medications?.zeroStock)} out of stock</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
-          <DashboardMetricIcon name="adherence" />
-          <span>Active Schedules</span>
-          <strong>{formatNumber(stats?.schedules?.enabled)}</strong>
-          <small>of {formatNumber(stats?.schedules?.total)} total</small>
-        </div>
-        <div className="stat-card dashboard-stat-card">
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-rose">
           <DashboardMetricIcon name="missed" />
           <span>Missed Doses</span>
           <strong>{formatNumber(stats?.doses?.missed)}</strong>
           <small>{formatNumber(stats?.doses?.missed)} of {formatNumber(stats?.adherence?.eligible ?? 0)} doses missed</small>
         </div>
-        <div className="stat-card dashboard-stat-card">
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-teal">
+          <DashboardMetricIcon name="users" />
+          <span>Overall adherence, last 30 days</span>
+          <strong>{formatPercent(stats?.adherence?.rate)}</strong>
+          <small>{formatNumber(stats?.adherence?.eligible)} eligible doses tracked</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-cyan">
+          <DashboardMetricIcon name="adherence" />
+          <span>Active Schedules</span>
+          <strong>{formatNumber(stats?.schedules?.enabled)}</strong>
+          <small>of {formatNumber(stats?.schedules?.total)} total</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-seafoam">
+          <DashboardMetricIcon name="medications" />
+          <span>Medications</span>
+          <strong>{formatNumber(stats?.medications?.total)}</strong>
+          <small>{formatNumber(stats?.medications?.zeroStock)} out of stock</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-blue">
+          <DashboardMetricIcon name="patients" />
+          <span>Patients</span>
+          <strong>{formatNumber(stats?.users?.patients)}</strong>
+          <small>Care recipients</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-indigo">
+          <DashboardMetricIcon name="caregivers" />
+          <span>Caregivers</span>
+          <strong>{formatNumber(stats?.users?.caregivers)}</strong>
+          <small>Support accounts</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-indigo-soft">
           <DashboardMetricIcon name="notifications" />
           <span>Notifications</span>
           <strong>{formatNumber(stats?.notifications?.total)}</strong>
           <small>System notifications</small>
         </div>
-        <div className="stat-card dashboard-stat-card">
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-violet">
           <DashboardMetricIcon name="relationships" />
           <span>Relationships</span>
           <strong>{formatNumber(stats?.relationships?.active)}</strong>
           <small>{formatNumber(stats?.relationships?.pending)} pending review</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-slate">
+          <DashboardMetricIcon name="admins" />
+          <span>Admins</span>
+          <strong>{formatNumber(stats?.users?.admins)}</strong>
+          <small>Administrative access</small>
+        </div>
+        <div className="stat-card dashboard-stat-card dashboard-stat-card-slate-soft">
+          <DashboardMetricIcon name="users" />
+          <span>Total Users</span>
+          <strong>{formatNumber(stats?.users?.total)}</strong>
+          <small>{formatNumber(stats?.users?.patients)} patients enrolled</small>
         </div>
       </div>
 
