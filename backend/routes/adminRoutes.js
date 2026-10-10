@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const User = require('../models/User');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
@@ -28,11 +29,14 @@ const ALLOWED_ROLES = [
 ];
 
 const MAX_LIMIT = 100;
-const SAFE_USER_FIELDS = '_id username email role createdAt updatedAt';
+const SAFE_USER_FIELDS = '_id username email patientId role createdAt updatedAt';
 const SAFE_RELATIONSHIP_FIELDS = '_id caregiver patient status permission createdAt updatedAt';
 const RELATIONSHIP_STATUSES = ['pending', 'active', 'revoked'];
 const AUDIT_ACTIONS = [
   'ADMIN_ROLE_CHANGED',
+  'ADMIN_USER_CREATED',
+  'ADMIN_USER_UPDATED',
+  'ADMIN_USER_DELETED',
   'ADMIN_RELATIONSHIP_REVOKED',
   'CAREGIVER_REQUEST_CREATED',
   'CAREGIVER_REQUEST_ACCEPTED',
@@ -72,6 +76,42 @@ const safeRelationshipQuery = (query) => query
   .populate('caregiver', 'username email patientId role')
   .populate('patient', 'username email patientId role')
   .select(SAFE_RELATIONSHIP_FIELDS);
+
+const normalizeUsername = (value) => {
+  const source = typeof value === 'string' ? value.trim() : '';
+  const normalized = source.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return normalized || '';
+};
+
+const normalizeEmail = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim().toLowerCase();
+};
+
+const generateAdminUsername = (value) => {
+  const source = typeof value === 'string' ? value.trim() : '';
+  const base = normalizeUsername(source || 'user');
+  return base || 'user';
+};
+
+const sanitizeUserDocument = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    _id: user._id,
+    username: user.username,
+    email: user.email,
+    patientId: user.patientId || null,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+};
 
 const parseDateFilter = (value, endOfDay = false) => {
   if (value === undefined) {
@@ -391,6 +431,323 @@ router.get('/analytics/refills', async (req, res) => {
     return res.status(500).json({
       message: 'Failed to retrieve refill analytics.',
     });
+  }
+});
+
+router.get('/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    const user = await User.findById(userId)
+      .select(SAFE_USER_FIELDS)
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    return res.json({ user: sanitizeUserDocument(user) });
+  } catch (error) {
+    console.error('Admin user detail error:', error.message);
+    return res.status(500).json({ message: 'Failed to retrieve user.' });
+  }
+});
+
+router.post('/users', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const usernameInput = typeof payload.username === 'string' ? payload.username.trim() : '';
+    const email = normalizeEmail(payload.email);
+    const password = typeof payload.password === 'string' ? payload.password : '';
+    const role = typeof payload.role === 'string' ? payload.role.trim().toLowerCase() : 'patient';
+
+    if (!email || !password || (!name && !usernameInput)) {
+      return res.status(400).json({ message: 'Name or username, email, password, and role are required.' });
+    }
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role.' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
+
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(409).json({ message: 'An account with this email already exists.' });
+    }
+
+    const baseUsername = normalizeUsername(usernameInput || name || email.split('@')[0]);
+    if (!baseUsername) {
+      return res.status(400).json({ message: 'Please enter a valid name or username.' });
+    }
+
+    let candidateUsername = baseUsername;
+    let counter = 1;
+    while (await User.exists({ username: candidateUsername })) {
+      candidateUsername = `${baseUsername}${counter}`;
+      counter += 1;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userData = {
+      username: candidateUsername,
+      email,
+      password: hashedPassword,
+      role,
+      emailVerified: true,
+    };
+
+    if (role === 'patient') {
+      userData.patientId = await (async () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let generatedPatientId = '';
+        let candidateId = '';
+        do {
+          generatedPatientId = 'MSK-';
+          for (let i = 0; i < 6; i += 1) {
+            generatedPatientId += chars[Math.floor(Math.random() * chars.length)];
+          }
+          candidateId = generatedPatientId;
+        } while (await User.exists({ patientId: candidateId }));
+        return candidateId;
+      })();
+    }
+
+    const user = await User.create(userData);
+
+    await createAuditLog({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      action: 'ADMIN_USER_CREATED',
+      targetType: 'USER',
+      targetId: user._id,
+      details: {
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
+
+    return res.status(201).json({
+      message: 'User created successfully.',
+      user: sanitizeUserDocument(user.toObject()),
+    });
+  } catch (error) {
+    console.error('Admin user create error:', error.message);
+    return res.status(500).json({ message: 'Failed to create user.' });
+  }
+});
+
+router.put('/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ message: 'Invalid user update payload.' });
+    }
+
+    const blockedKeys = Object.keys(req.body).filter((key) =>
+      key === 'password'
+      || key === 'passwordHash'
+      || key === 'emailVerificationOtpHash'
+      || key === 'emailVerificationExpires'
+      || key === 'emailVerificationAttempts'
+      || key === 'emailVerificationLastSentAt'
+      || key === 'passwordResetOtpHash'
+      || key === 'passwordResetOtpExpires'
+      || key === 'passwordResetAttempts'
+      || key === 'passwordResetLastSentAt'
+      || key === 'passwordResetAuthorizationHash'
+      || key === 'passwordResetAuthorizationExpires'
+    );
+
+    if (blockedKeys.length > 0) {
+      return res.status(400).json({ message: 'Sensitive authentication fields cannot be modified.' });
+    }
+
+    const allowedFields = ['username', 'email', 'patientId', 'role'];
+    const invalidFields = Object.keys(req.body).filter((key) => !allowedFields.includes(key));
+
+    if (invalidFields.length > 0) {
+      return res.status(400).json({ message: 'Only username, email, patientId, and role may be updated.' });
+    }
+
+    const existingUser = await User.findById(userId).select('_id username email patientId role');
+
+    if (!existingUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const updatePayload = {};
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'username')) {
+      const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+      if (!username) {
+        return res.status(400).json({ message: 'Username cannot be empty.' });
+      }
+
+      const normalizedUsername = normalizeUsername(username);
+      if (!normalizedUsername) {
+        return res.status(400).json({ message: 'Please enter a valid username.' });
+      }
+
+      if (existingUser.username !== normalizedUsername) {
+        const duplicateUser = await User.findOne({ username: normalizedUsername }).select('_id');
+        if (duplicateUser && duplicateUser._id.toString() !== userId) {
+          return res.status(409).json({ message: 'This username is already in use.' });
+        }
+      }
+
+      updatePayload.username = normalizedUsername;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'email')) {
+      const email = normalizeEmail(req.body.email);
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: 'Please enter a valid email address.' });
+      }
+
+      if (existingUser.email !== email) {
+        const duplicateEmail = await User.findOne({ email }).select('_id');
+        if (duplicateEmail && duplicateEmail._id.toString() !== userId) {
+          return res.status(409).json({ message: 'This email is already in use.' });
+        }
+      }
+
+      updatePayload.email = email;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'patientId')) {
+      const patientId = typeof req.body.patientId === 'string' ? req.body.patientId.trim().toUpperCase() : '';
+      if (!patientId) {
+        return res.status(400).json({ message: 'Patient ID cannot be empty.' });
+      }
+
+      if (existingUser.patientId !== patientId) {
+        const duplicatePatientId = await User.findOne({ patientId }).select('_id');
+        if (duplicatePatientId && duplicatePatientId._id.toString() !== userId) {
+          return res.status(409).json({ message: 'This patient ID is already in use.' });
+        }
+      }
+
+      updatePayload.patientId = patientId;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'role')) {
+      const role = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : '';
+      if (!ALLOWED_ROLES.includes(role)) {
+        return res.status(400).json({ message: 'Invalid role.' });
+      }
+
+      if (userId === req.user.userId && role !== 'admin') {
+        const adminCount = await User.countDocuments({ role: 'admin' });
+        if (adminCount <= 1) {
+          return res.status(400).json({ message: 'You cannot remove the last Admin account.' });
+        }
+      }
+
+      updatePayload.role = role;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return res.status(400).json({ message: 'No valid user fields were provided.' });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updatePayload },
+      { new: true, runValidators: true }
+    ).select(SAFE_USER_FIELDS).lean();
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    await createAuditLog({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      action: 'ADMIN_USER_UPDATED',
+      targetType: 'USER',
+      targetId: updatedUser._id,
+      details: {
+        previousUser: sanitizeUserDocument(existingUser),
+        updatedUser: sanitizeUserDocument(updatedUser),
+      },
+    });
+
+    return res.json({ user: sanitizeUserDocument(updatedUser) });
+  } catch (error) {
+    console.error('Admin user update error:', error.message);
+    return res.status(500).json({ message: 'Failed to update user.' });
+  }
+});
+
+router.delete('/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    const targetUser = await User.findById(userId).select('_id username email role');
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    if (userId === req.user.userId) {
+      return res.status(400).json({ message: 'You cannot delete your own admin account.' });
+    }
+
+    if (targetUser.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'You cannot delete the last Admin account.' });
+      }
+    }
+
+    const deletedUser = sanitizeUserDocument(targetUser.toObject());
+
+    await CaregiverRelationship.deleteMany({
+      $or: [
+        { caregiver: userId },
+        { patient: userId },
+      ],
+    });
+
+    await User.findByIdAndDelete(userId);
+
+    await createAuditLog({
+      actorId: req.user.userId,
+      actorRole: req.user.role,
+      action: 'ADMIN_USER_DELETED',
+      targetType: 'USER',
+      targetId: targetUser._id,
+      details: {
+        deletedUser,
+      },
+    });
+
+    return res.json({ message: 'User deleted successfully.', user: deletedUser });
+  } catch (error) {
+    console.error('Admin user delete error:', error.message);
+    return res.status(500).json({ message: 'Failed to delete user.' });
   }
 });
 

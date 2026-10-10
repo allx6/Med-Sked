@@ -59,6 +59,17 @@ export const loginAdmin = async (email, password) => {
   return handleResponse(response, { isLogin: true });
 };
 
+export const validateAdminSession = async (token) => {
+  const response = await fetch(`${API_URL}/api/auth/session`, {
+    method: 'GET',
+    headers: {
+      ...getAuthHeaders(token),
+    },
+  });
+
+  return handleResponse(response, { isLogin: true });
+};
+
 export const createUserAccount = async (payload) => {
   const response = await fetch(`${API_URL}/api/auth/register`, {
     method: 'POST',
@@ -87,6 +98,45 @@ export const getAdminUserRoles = async (token) => fetchWithToken('/api/admin/ana
 export const getAdminNotifications = async (token) => fetchWithToken('/api/admin/analytics/notifications', token);
 
 export const getAdminRefills = async (token) => fetchWithToken('/api/admin/analytics/refills', token);
+
+export const createAdminUser = async (token, payload) => {
+  const response = await fetch(`${API_URL}/api/admin/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(response);
+};
+
+export const getUserById = async (token, userId) => fetchWithToken(`/api/admin/users/${userId}`, token);
+
+export const updateUser = async (token, userId, payload) => {
+  const response = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(response);
+};
+
+export const deleteUser = async (token, userId) => {
+  const response = await fetch(`${API_URL}/api/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: {
+      ...getAuthHeaders(token),
+    },
+  });
+
+  return handleResponse(response);
+};
 
 export const listUsers = async (token, options = {}) => {
   const params = new URLSearchParams();

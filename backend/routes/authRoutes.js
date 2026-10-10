@@ -425,6 +425,42 @@ router.post('/login', async (req, res) => {
   }
 });
 
+router.get('/session', async (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Authentication required.' });
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select('_id username email role patientId');
+
+    if (!user) {
+      return res.status(401).json({ message: 'Session is invalid.' });
+    }
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required.' });
+    }
+
+    return res.json({
+      valid: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        patientId: user.patientId,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Session validation failed:', error.message);
+    return res.status(401).json({ message: 'Invalid or expired authentication token' });
+  }
+});
+
 router.post('/verify-email', async (req, res) => {
   try {
     const { email, otp } = req.body || {};

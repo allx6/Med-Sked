@@ -83,6 +83,11 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     localStorage.removeItem('medsked-admin-auth');
+    try {
+      sessionStorage.removeItem('medsked-admin-app-session');
+    } catch (error) {
+      // no-op
+    }
     navigate('/login', { replace: true });
   };
 
