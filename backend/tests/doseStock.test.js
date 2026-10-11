@@ -183,6 +183,12 @@ test('normal TAKE reserves exactly one unit before marking the dose taken', asyn
   assert.equal(response.body.status, 'taken');
   assert.equal(updates[0].update.$inc.quantityOnHand, -1);
   assert.equal(updates.length, 1);
+  assert.deepEqual(
+    sentNotifications.map(({ type }) => type),
+    ['dose_taken']
+  );
+  assert.equal(sentNotifications[0].patientMessage, 'Your Medication dose scheduled at 8:00 AM was marked as taken.');
+  assert.equal(sentNotifications[0].dedupeKey, `dose_taken:${DOSE_ID}`);
 });
 
 test('a repeated TAKE of an already-taken dose does not deduct again', async () => {
@@ -215,6 +221,7 @@ test('TAKE compensates a stock reservation if the dose transition fails', async 
 });
 
 test('SKIP changes no medication quantity', async () => {
+  sentNotifications.length = 0;
   const { response, updates } = await invokeTakeOrSkip({
     action: 'skip',
     stock: 3,
@@ -224,6 +231,12 @@ test('SKIP changes no medication quantity', async () => {
   assert.equal(response.statusCode, 200);
   assert.equal(response.body.status, 'skipped');
   assert.equal(updates.length, 0);
+  assert.deepEqual(
+    sentNotifications.map(({ type }) => type),
+    ['dose_skipped']
+  );
+  assert.equal(sentNotifications[0].patientMessage, 'Your Medication dose scheduled at 8:00 AM was marked as skipped.');
+  assert.equal(sentNotifications[0].dedupeKey, `dose_skipped:${DOSE_ID}`);
 });
 
 test('TAKE triggers one low-stock notice when crossing threshold and honors the notification flag', async () => {
@@ -238,9 +251,10 @@ test('TAKE triggers one low-stock notice when crossing threshold and honors the 
   });
 
   assert.equal(first.response.statusCode, 200);
-  assert.equal(sentNotifications.length, 1);
+  assert.equal(sentNotifications.filter(({ type }) => type === 'low_refill').length, 1);
+  assert.equal(sentNotifications.filter(({ type }) => type === 'dose_taken').length, 1);
   assert.equal(first.flagUpdates[0].update.$set.lowRefillNotified, true);
-  assert.equal(sentNotifications[0].dedupeKey, `low_refill:${MEDICATION_ID}:${DOSE_ID}`);
+  assert.equal(sentNotifications.find(({ type }) => type === 'low_refill').dedupeKey, `low_refill:${MEDICATION_ID}:${DOSE_ID}`);
 
   const second = await invokeTakeOrSkip({
     action: 'take',
@@ -251,7 +265,7 @@ test('TAKE triggers one low-stock notice when crossing threshold and honors the 
   });
 
   assert.equal(second.response.statusCode, 200);
-  assert.equal(sentNotifications.length, 1);
+  assert.equal(sentNotifications.filter(({ type }) => type === 'low_refill').length, 1);
 });
 
 test('a later low-stock cycle can notify again after stock is re-armed', async () => {
@@ -273,8 +287,9 @@ test('a later low-stock cycle can notify again after stock is re-armed', async (
     dose: pendingDose({ _id: '507f1f77bcf86cd799439015' }),
   });
 
-  assert.equal(sentNotifications.length, 2);
-  assert.notEqual(sentNotifications[0].dedupeKey, sentNotifications[1].dedupeKey);
+  const lowRefillNotifications = sentNotifications.filter(({ type }) => type === 'low_refill');
+  assert.equal(lowRefillNotifications.length, 2);
+  assert.notEqual(lowRefillNotifications[0].dedupeKey, lowRefillNotifications[1].dedupeKey);
 });
 
 test('failed patient notification creation re-arms the low-stock notification flag', async () => {

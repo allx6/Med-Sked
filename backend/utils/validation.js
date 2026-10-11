@@ -120,6 +120,28 @@ const validateSchedulePayload = (payload) => {
 
 const normalizeWhitespace = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
+const getExpandedNumericDigitCount = (value) => {
+  const numericText = String(value).trim().toLowerCase();
+  const match = numericText.match(/^([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/);
+
+  if (!match || (!match[2] && !match[3])) {
+    return null;
+  }
+
+  const digits = `${match[2]}${match[3] || ''}`;
+  const decimalPosition = match[2].length + Number(match[4] || 0);
+
+  if (decimalPosition <= 0) {
+    return digits.length - decimalPosition;
+  }
+
+  if (decimalPosition >= digits.length) {
+    return decimalPosition;
+  }
+
+  return digits.length;
+};
+
 const normalizeDecimalString = (value) => {
   const trimmed = normalizeWhitespace(value);
   if (!trimmed) {
@@ -220,10 +242,30 @@ const validateMedicationFields = (payload) => {
   if (!dosageMatch || Number(dosageMatch[1]) <= 0) {
     return 'Dosage must be a number greater than 0.';
   }
+  if (getExpandedNumericDigitCount(dosageMatch[1]) > 6) {
+    return 'Dosage amount cannot contain more than 6 numeric digits.';
+  }
 
   const frequencyMatch = frequency.match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i);
   if (!frequencyMatch || Number(frequencyMatch[1]) < 1) {
     return 'Frequency must be at least 1 hour or day.';
+  }
+  if (getExpandedNumericDigitCount(frequencyMatch[1]) > 6) {
+    return 'Frequency interval cannot contain more than 6 numeric digits.';
+  }
+
+  for (const [field, label] of [
+    ['quantityOnHand', 'Quantity on hand'],
+    ['refillThreshold', 'Refill threshold'],
+  ]) {
+    if (!Object.prototype.hasOwnProperty.call(payload, field)) {
+      continue;
+    }
+
+    const digitCount = getExpandedNumericDigitCount(payload[field]);
+    if (digitCount !== null && digitCount > 6) {
+      return `${label} cannot contain more than 6 numeric digits.`;
+    }
   }
 
   return null;

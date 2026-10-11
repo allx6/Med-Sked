@@ -19,6 +19,7 @@ import SecondaryButton from '../components/SecondaryButton';
 import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
+  isWithinMedicationNumericDigitLimit,
   validateMedicationFields,
   validateRefillAmount,
 } from '../utils/medicationValidation';
@@ -255,7 +256,11 @@ export default function EditMedicationScreen({
                 label="Dosage amount"
                 placeholder="e.g. 500"
                 value={dosageAmount}
-                onChangeText={setDosageAmount}
+                onChangeText={(value) => {
+                  if (isWithinMedicationNumericDigitLimit(value)) {
+                    setDosageAmount(value);
+                  }
+                }}
                 keyboardType="decimal-pad"
                 editable={!loading}
               />
@@ -287,7 +292,11 @@ export default function EditMedicationScreen({
                 label="Frequency interval"
                 placeholder="e.g. 8"
                 value={frequencyAmount}
-                onChangeText={setFrequencyAmount}
+                onChangeText={(value) => {
+                  if (isWithinMedicationNumericDigitLimit(value)) {
+                    setFrequencyAmount(value);
+                  }
+                }}
                 keyboardType="number-pad"
                 editable={!loading}
               />
@@ -306,7 +315,11 @@ export default function EditMedicationScreen({
             label="Quantity on hand"
             placeholder="e.g. 30"
             value={quantityOnHand}
-            onChangeText={setQuantityOnHand}
+            onChangeText={(value) => {
+              if (isWithinMedicationNumericDigitLimit(value)) {
+                setQuantityOnHand(value);
+              }
+            }}
             keyboardType="decimal-pad"
             editable={!loading && !refilling}
           />
@@ -350,7 +363,7 @@ export default function EditMedicationScreen({
           />
 
           <TextField
-            label="Expiration date (required)"
+            label="Expiration date (required) — YYYY-MM-DD"
             placeholder="YYYY-MM-DD"
             value={expirationDate}
             onChangeText={setExpirationDate}

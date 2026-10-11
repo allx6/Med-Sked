@@ -81,15 +81,18 @@ const createMedicationNotifications = async ({
   relatedEntityType,
   relatedEntityId,
   dedupeKey,
+  notifyPatient = true,
 }) => {
-  const patientNotification = await createNotification({
-    recipient: patientId,
-    type,
-    message: patientMessage,
-    relatedEntityType,
-    relatedEntityId,
-    dedupeKey,
-  });
+  const patientNotification = notifyPatient
+    ? await createNotification({
+      recipient: patientId,
+      type,
+      message: patientMessage,
+      relatedEntityType,
+      relatedEntityId,
+      dedupeKey,
+    })
+    : null;
 
   let patient;
   let relationships;

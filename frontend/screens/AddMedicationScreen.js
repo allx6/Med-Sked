@@ -19,6 +19,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
 import {
   getSafeUserErrorMessage,
+  isWithinMedicationNumericDigitLimit,
   validateMedicationFields,
 } from '../utils/medicationValidation';
 
@@ -147,7 +148,11 @@ export default function AddMedicationScreen({
                 label="Dosage amount"
                 placeholder="e.g. 500"
                 value={dosageAmount}
-                onChangeText={setDosageAmount}
+                onChangeText={(value) => {
+                  if (isWithinMedicationNumericDigitLimit(value)) {
+                    setDosageAmount(value);
+                  }
+                }}
                 keyboardType="decimal-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
@@ -179,7 +184,11 @@ export default function AddMedicationScreen({
                 label="Quantity on hand"
                 placeholder="e.g. 30"
                 value={quantityOnHand}
-                onChangeText={setQuantityOnHand}
+                onChangeText={(value) => {
+                  if (isWithinMedicationNumericDigitLimit(value)) {
+                    setQuantityOnHand(value);
+                  }
+                }}
                 keyboardType="decimal-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
@@ -191,7 +200,11 @@ export default function AddMedicationScreen({
                 label="Refill threshold"
                 placeholder="e.g. 5"
                 value={refillThreshold}
-                onChangeText={setRefillThreshold}
+                onChangeText={(value) => {
+                  if (isWithinMedicationNumericDigitLimit(value)) {
+                    setRefillThreshold(value);
+                  }
+                }}
                 keyboardType="decimal-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
@@ -203,7 +216,7 @@ export default function AddMedicationScreen({
           <View style={[styles.fieldRow, !wideLayout && styles.fieldRowStacked]}>
             <View style={styles.fieldColumn}>
               <TextField
-                label="Expiration date (required)"
+                label="Expiration date (required) — YYYY-MM-DD"
                 placeholder="YYYY-MM-DD"
                 value={expirationDate}
                 onChangeText={setExpirationDate}
@@ -219,7 +232,11 @@ export default function AddMedicationScreen({
                 label="Frequency interval"
                 placeholder="e.g. 8"
                 value={frequencyAmount}
-                onChangeText={setFrequencyAmount}
+                onChangeText={(value) => {
+                  if (isWithinMedicationNumericDigitLimit(value)) {
+                    setFrequencyAmount(value);
+                  }
+                }}
                 keyboardType="number-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}

@@ -1,6 +1,11 @@
 const dosagePattern = /^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i;
 const frequencyPattern = /^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_MEDICATION_NUMERIC_DIGITS = 6;
+
+export const isWithinMedicationNumericDigitLimit = (value) => (
+  (String(value).match(/[0-9]/g) || []).length <= MAX_MEDICATION_NUMERIC_DIGITS
+);
 
 const parseLocalDate = (value) => {
   const [year, month, day] = String(value || '').split('-').map(Number);

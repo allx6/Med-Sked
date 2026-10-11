@@ -13,6 +13,7 @@ const {
   buildNormalizedMedicationKey,
 } = require('../utils/validation');
 const { isMedicationExpired } = require('../utils/medicationExpiration');
+const { createMedicationNotifications } = require('../services/notificationService');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -347,6 +348,25 @@ const createMedicationForOwner = async (req, res) => {
 
       });
 
+    if (req.user.role === 'patient') {
+      try {
+        await createMedicationNotifications({
+          patientId: ownerId,
+          type: 'medication_added',
+          caregiverMessage: (patientName) => `${patientName} added a new medication to their MedSked record.`,
+          relatedEntityType: 'Medication',
+          relatedEntityId: medication._id,
+          dedupeKey: `medication_added:${medication._id}`,
+          notifyPatient: false,
+        });
+      } catch (error) {
+        console.error('Medication creation notification failed:', {
+          operation: 'notify-caregivers-of-medication-created',
+          patientId: String(ownerId),
+          errorName: error?.name || 'UnknownError',
+        });
+      }
+    }
 
     return res.status(201).json(medication);
   } catch (error) {

@@ -92,6 +92,37 @@ test('medication fields accept valid values', () => {
   assert.equal(buildNormalizedMedicationKey('Metformin', '500 mg'), 'metformin|500mg');
 });
 
+test('medication numeric fields accept up to six digits and reject longer values', () => {
+  const base = {
+    name: 'Acetaminophen',
+    dosage: '999999 mg',
+    frequency: 'Every 999999 hours',
+    expirationDate: '2026-12-31',
+    quantityOnHand: 999999,
+    refillThreshold: 0,
+  };
+
+  assert.equal(validateMedicationFields(base), null);
+  assert.equal(validateMedicationFields({
+    ...base,
+    dosage: '100 mg',
+    frequency: 'Every 8 hours',
+    quantityOnHand: 30,
+  }), null);
+  assert.equal(validateMedicationFields({
+    ...base,
+    dosage: '100.5 mg',
+    frequency: 'Every 8.5 hours',
+    quantityOnHand: 30.5,
+    refillThreshold: 0.5,
+  }), null);
+  assert.equal(validateMedicationFields({ ...base, dosage: '1000000 mg' }), 'Dosage amount cannot contain more than 6 numeric digits.');
+  assert.equal(validateMedicationFields({ ...base, frequency: 'Every 1000000 hours' }), 'Frequency interval cannot contain more than 6 numeric digits.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: 1000000 }), 'Quantity on hand cannot contain more than 6 numeric digits.');
+  assert.equal(validateMedicationFields({ ...base, refillThreshold: 1000000 }), 'Refill threshold cannot contain more than 6 numeric digits.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: '1e6' }), 'Quantity on hand cannot contain more than 6 numeric digits.');
+});
+
 test('medication fields reject invalid values and minutes', () => {
   const invalidPayloads = [
     { name: '', dosage: '500 mg', frequency: 'Every 8 hours' },
