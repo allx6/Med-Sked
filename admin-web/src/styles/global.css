@@ -485,20 +485,14 @@ button:disabled {
   margin-top: 18px;
 }
 
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(1) { --metric-accent: #b0f0e8; --metric-tint: rgba(76, 190, 181, 0.2); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(2) { --metric-accent: #a0c3d8; --metric-tint: rgba(37, 92, 135, 0.20); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(3) { --metric-accent: #a8c4d9; --metric-tint: rgba(67, 109, 156, 0.18); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(4) { --metric-accent: #d5d9e1; --metric-tint: rgba(86, 106, 135, 0.18); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(5) { --metric-accent: #c7d9ea; --metric-tint: rgba(48, 79, 111, 0.18); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(6) { --metric-accent: #f0d48d; --metric-tint: rgba(122, 104, 11, 0.14); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(7) { --metric-accent: #d8f0e4; --metric-tint: rgba(16, 101, 83, 0.12); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(8) { --metric-accent: #f5d9d3; --metric-tint: rgba(176, 101, 93, 0.14); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(9) { --metric-accent: #dfe5f4; --metric-tint: rgba(90, 109, 153, 0.12); }
-.dashboard-stat-grid > .dashboard-stat-card:nth-child(10) { --metric-accent: #d9eeef; --metric-tint: rgba(43, 120, 131, 0.12); }
+.dashboard-stat-grid > .dashboard-stat-card:nth-child(n) {
+  --metric-accent: #dff9f6;
+  --metric-tint: rgba(17, 111, 122, 0.18);
+}
 
 .dashboard-stat-grid > .dashboard-stat-card:not(.stat-card-primary) {
   border-color: rgba(177, 218, 220, 0.14);
-  background: linear-gradient(155deg, #123b48 0%, #0a2a36 100%);
+  background: linear-gradient(155deg, #0e6673 0%, #0a4455 100%);
 }
 
 .dashboard-stat-card .dashboard-stat-icon {
@@ -532,28 +526,117 @@ button:disabled {
   padding-right: 46px;
 }
 
-.dashboard-stat-grid .stat-card-primary {
-  border-color: rgba(173, 230, 226, 0.24);
-  background: linear-gradient(155deg, #1a858b 0%, #0d5966 100%);
-  box-shadow: 0 12px 26px rgba(5, 42, 48, 0.28);
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-rose {
+  background: linear-gradient(180deg, rgba(125, 76, 83, 0.98) 0%, rgba(96, 53, 62, 0.98) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.dashboard-stat-grid .stat-card-primary > * {
-  position: relative;
-  z-index: 1;
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-teal {
+  background: linear-gradient(180deg, rgba(19, 121, 127, 0.96) 0%, rgba(12, 93, 101, 0.96) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.dashboard-stat-grid .stat-card-primary span,
-.dashboard-stat-grid .stat-card-primary strong,
-.dashboard-stat-grid .stat-card-primary small {
-  color: #ffffff;
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-cyan {
+  background: linear-gradient(180deg, rgba(18, 124, 130, 0.95) 0%, rgba(14, 95, 108, 0.95) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.dashboard-stat-grid .stat-card-primary > .dashboard-stat-icon {
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-seafoam {
+  background: linear-gradient(180deg, rgba(23, 123, 118, 0.96) 0%, rgba(16, 95, 102, 0.96) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-blue {
+  background: linear-gradient(180deg, rgba(62, 92, 122, 0.94) 0%, rgba(49, 75, 103, 0.94) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo {
+  background: linear-gradient(180deg, rgba(59, 83, 110, 0.96) 0%, rgba(46, 64, 87, 0.96) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo-soft {
+  background: linear-gradient(180deg, rgba(72, 96, 126, 0.95) 0%, rgba(53, 73, 96, 0.95) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-violet {
+  background: linear-gradient(180deg, rgba(78, 92, 128, 0.95) 0%, rgba(60, 74, 104, 0.95) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate {
+  background: linear-gradient(180deg, rgba(92, 103, 116, 0.92) 0%, rgba(75, 86, 100, 0.92) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate-soft {
+  background: linear-gradient(180deg, rgba(109, 118, 130, 0.92) 0%, rgba(86, 95, 109, 0.92) 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-rose .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-teal .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-cyan .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-seafoam .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-blue .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo-soft .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-violet .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate .dashboard-stat-icon,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate-soft .dashboard-stat-icon {
   position: absolute;
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-rose span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-rose strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-rose small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-teal span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-teal strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-teal small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-cyan span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-cyan strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-cyan small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-seafoam span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-seafoam strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-seafoam small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-blue span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-blue strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-blue small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo-soft span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo-soft strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo-soft small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-violet span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-violet strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-violet small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate small,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate-soft span,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate-soft strong,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate-soft small {
+  color: #ffffff;
+}
+
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-rose > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-teal > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-cyan > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-seafoam > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-blue > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-indigo-soft > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-violet > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate > *,
+.dashboard-stat-grid > .dashboard-stat-card.dashboard-stat-card-slate-soft > * {
+  position: relative;
+  z-index: 1;
 }
 
 .stat-card span {

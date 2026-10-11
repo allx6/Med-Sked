@@ -4,6 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import medskedLogo from '../assets/medsked.png';
 import { loginAdmin } from '../services/api';
 
+const markActiveSession = () => {
+  try {
+    sessionStorage.setItem('medsked-admin-app-session', 'active');
+  } catch (error) {
+    // no-op
+  }
+};
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -27,6 +35,7 @@ export default function LoginPage() {
         'medsked-admin-auth',
         JSON.stringify({ token: result.token, user: result.user })
       );
+      markActiveSession();
 
       navigate('/dashboard', { replace: true });
     } catch (err) {
