@@ -19,7 +19,7 @@ import SecondaryButton from '../components/SecondaryButton';
 import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
-  isWithinMedicationNumericDigitLimit,
+  isValidMedicationNumericInput,
   validateMedicationFields,
   validateRefillAmount,
 } from '../utils/medicationValidation';
@@ -81,14 +81,16 @@ export default function EditMedicationScreen({
 
   const handleSubmit = async () => {
 
-    if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
-      setError('Quantity and refill threshold must be non-negative numbers.');
-      return;
-    }
-
     const dosage = legacyDosage.trim() || `${dosageAmount.trim()} ${dosageUnit}`;
     const frequency = legacyFrequency.trim() || `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
-    const medicationError = validateMedicationFields({ name, dosage, frequency, expirationDate });
+    const medicationError = validateMedicationFields({
+      name,
+      dosage,
+      frequency,
+      expirationDate,
+      quantityOnHand,
+      refillThreshold,
+    });
 
     if (medicationError) {
       setError(medicationError);
@@ -234,8 +236,13 @@ export default function EditMedicationScreen({
             label="Medication name"
             placeholder="e.g. Paracetamol"
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
+                setName(value);
+              }
+            }}
             autoCapitalize="words"
+            maxLength={100}
             editable={!loading}
           />
 
@@ -257,11 +264,12 @@ export default function EditMedicationScreen({
                 placeholder="e.g. 500"
                 value={dosageAmount}
                 onChangeText={(value) => {
-                  if (isWithinMedicationNumericDigitLimit(value)) {
+                  if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
                     setDosageAmount(value);
                   }
                 }}
                 keyboardType="decimal-pad"
+                maxLength={7}
                 editable={!loading}
               />
               <Text style={styles.unitLabel}>Dosage unit</Text>
@@ -293,11 +301,12 @@ export default function EditMedicationScreen({
                 placeholder="e.g. 8"
                 value={frequencyAmount}
                 onChangeText={(value) => {
-                  if (isWithinMedicationNumericDigitLimit(value)) {
+                  if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
                     setFrequencyAmount(value);
                   }
                 }}
                 keyboardType="number-pad"
+                maxLength={7}
                 editable={!loading}
               />
               <Text style={styles.unitLabel}>Frequency unit</Text>
@@ -316,11 +325,12 @@ export default function EditMedicationScreen({
             placeholder="e.g. 30"
             value={quantityOnHand}
             onChangeText={(value) => {
-              if (isWithinMedicationNumericDigitLimit(value)) {
+              if (isValidMedicationNumericInput(value)) {
                 setQuantityOnHand(value);
               }
             }}
-            keyboardType="decimal-pad"
+            keyboardType="number-pad"
+            maxLength={6}
             editable={!loading && !refilling}
           />
 
@@ -329,11 +339,14 @@ export default function EditMedicationScreen({
             placeholder="Enter amount to add"
             value={refillAmount}
             onChangeText={(value) => {
-              setRefillAmount(value);
-              setRefillError('');
-              setRefillSuccess('');
+              if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
+                setRefillAmount(value);
+                setRefillError('');
+                setRefillSuccess('');
+              }
             }}
             keyboardType="decimal-pad"
+            maxLength={7}
             editable={!loading && !refilling}
           />
 
@@ -357,8 +370,13 @@ export default function EditMedicationScreen({
             label="Refill threshold"
             placeholder="e.g. 5"
             value={refillThreshold}
-            onChangeText={setRefillThreshold}
-            keyboardType="decimal-pad"
+            onChangeText={(value) => {
+              if (isValidMedicationNumericInput(value)) {
+                setRefillThreshold(value);
+              }
+            }}
+            keyboardType="number-pad"
+            maxLength={6}
             editable={!loading && !refilling}
           />
 

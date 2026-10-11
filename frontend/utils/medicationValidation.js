@@ -2,10 +2,28 @@ const dosagePattern = /^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i;
 const frequencyPattern = /^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_MEDICATION_NUMERIC_DIGITS = 6;
+const COUNT_INPUT_PATTERN = /^\d*$/;
+const DECIMAL_INPUT_PATTERN = /^\d*(?:\.\d*)?$/;
 
-export const isWithinMedicationNumericDigitLimit = (value) => (
-  (String(value).match(/[0-9]/g) || []).length <= MAX_MEDICATION_NUMERIC_DIGITS
-);
+export const isValidMedicationNumericInput = (value, { allowDecimal = false } = {}) => {
+  const input = String(value);
+  const pattern = allowDecimal ? DECIMAL_INPUT_PATTERN : COUNT_INPUT_PATTERN;
+
+  return pattern.test(input)
+    && (input.match(/[0-9]/g) || []).length <= MAX_MEDICATION_NUMERIC_DIGITS;
+};
+
+const validateMedicationCount = (value, label) => {
+  if (value === undefined) {
+    return '';
+  }
+
+  if (!isValidMedicationNumericInput(value)) {
+    return `${label} must be a whole number with no more than 6 digits.`;
+  }
+
+  return '';
+};
 
 const parseLocalDate = (value) => {
   const [year, month, day] = String(value || '').split('-').map(Number);
@@ -38,14 +56,35 @@ export const validateMedicationExpirationDate = (value) => {
   return '';
 };
 
-export const validateMedicationFields = ({ name, dosage, frequency, expirationDate }) => {
+export const validateMedicationFields = ({
+  name,
+  dosage,
+  frequency,
+  expirationDate,
+  quantityOnHand,
+  refillThreshold,
+}) => {
   const expirationError = validateMedicationExpirationDate(expirationDate);
   if (expirationError) {
     return expirationError;
   }
 
-  if (String(name || '').trim().length < 2) {
+  const normalizedName = String(name || '').trim();
+  if (normalizedName.length < 2) {
     return 'Medication name must contain at least 2 characters.';
+  }
+  if (normalizedName.length > 100 || /[\u0000-\u001F\u007F]/.test(normalizedName)) {
+    return 'Medication name must be 100 characters or fewer and cannot contain control characters.';
+  }
+
+  const quantityError = validateMedicationCount(quantityOnHand, 'Quantity on hand');
+  if (quantityError) {
+    return quantityError;
+  }
+
+  const thresholdError = validateMedicationCount(refillThreshold, 'Refill threshold');
+  if (thresholdError) {
+    return thresholdError;
   }
 
   const dosageValue = String(dosage || '').trim();
@@ -63,6 +102,10 @@ export const validateMedicationFields = ({ name, dosage, frequency, expirationDa
     return 'Dosage amount must be a number greater than 0.';
   }
 
+  if ((dosageMatch[1].match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
+    return 'Dosage amount cannot contain more than 6 numeric digits.';
+  }
+
   if (Number(dosageMatch[1]) <= 0) {
     return 'Dosage amount must be greater than 0.';
   }
@@ -70,6 +113,9 @@ export const validateMedicationFields = ({ name, dosage, frequency, expirationDa
   const frequencyMatch = String(frequency || '').trim().match(frequencyPattern);
   if (!frequencyMatch || Number(frequencyMatch[1]) < 1) {
     return 'Frequency must be at least 1 hour or day.';
+  }
+  if ((frequencyMatch[1].match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
+    return 'Frequency interval cannot contain more than 6 numeric digits.';
   }
 
   return '';
@@ -123,14 +169,18 @@ export const validateRefillAmount = (value) => {
     return 'Refill amount is required.';
   }
 
-  const isNumericString = typeof value === 'string'
-    && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim());
+  const rawValue = String(value).trim();
+  const isNumericString = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawValue);
 
-  if ((typeof value !== 'number' && !isNumericString) || !Number.isFinite(Number(value))) {
+  if (!isNumericString || (rawValue.match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
+    return 'Refill amount must be a number with no more than 6 numeric digits.';
+  }
+
+  if (!Number.isFinite(Number(rawValue))) {
     return 'Refill amount must be a number greater than 0.';
   }
 
-  if (Number(value) <= 0) {
+  if (Number(rawValue) <= 0) {
     return 'Refill amount must be greater than 0.';
   }
 
