@@ -78,7 +78,7 @@ const SimpleBarChart = ({ data, color = '#2F6690', valueKey = 'count', labelKey 
   );
 };
 
-const SimpleLineChart = ({ data, valueKey = 'adherence', labelKey = 'day', color = '#2F6690' }) => {
+const SimpleTrendBarChart = ({ data, valueKey = 'adherence', labelKey = 'day', color = '#2F6690' }) => {
   if (!Array.isArray(data) || data.length === 0) {
     return <EmptyState message="No data available." />;
   }
@@ -89,21 +89,16 @@ const SimpleLineChart = ({ data, valueKey = 'adherence', labelKey = 'day', color
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const values = data.map((item) => Math.min(100, getChartValue(item, valueKey)));
-  const peakValue = Math.max(...values);
-  const points = values.map((value, index) => {
-    const x = padding.left + (index / Math.max(values.length - 1, 1)) * plotWidth;
-    const y = padding.top + ((100 - value) / 100) * plotHeight;
-    return { x, y, value, label: String(data[index][labelKey] ?? 'Unknown') };
-  });
-  const pointString = points.map(({ x, y }) => `${x},${y}`).join(' ');
-  const areaString = `${padding.left},${padding.top + plotHeight} ${pointString} ${padding.left + plotWidth},${padding.top + plotHeight}`;
+  const maxValue = 100;
+  const stepWidth = plotWidth / Math.max(data.length, 1);
+  const barWidth = Math.max(stepWidth * 0.68, 8);
   const labelIndexes = [...new Set([0, 0.25, 0.5, 0.75, 1].map((position) => Math.round((data.length - 1) * position)))];
 
   return (
     <svg className="line-chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Adherence trend by date">
       <title>Adherence trend by date</title>
       {[0, 25, 50, 75, 100].map((tick) => {
-        const y = padding.top + ((100 - tick) / 100) * plotHeight;
+        const y = padding.top + ((maxValue - tick) / maxValue) * plotHeight;
         return (
           <g key={tick}>
             <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} className="line-chart-gridline" />
@@ -111,28 +106,23 @@ const SimpleLineChart = ({ data, valueKey = 'adherence', labelKey = 'day', color
           </g>
         );
       })}
-      <polygon points={areaString} fill={color} opacity="0.1" />
-      <polyline points={pointString} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-      {points.map((point, index) => (
-        <circle
-          key={`${point.label}-${index}`}
-          cx={point.x}
-          cy={point.y}
-          r={peakValue > 0 && point.value === peakValue ? 6 : data.length > 30 ? 2.5 : 4}
-          fill={color}
-          stroke={peakValue > 0 && point.value === peakValue ? '#ffffff' : 'none'}
-          strokeWidth="2"
-        >
-          <title>{`${point.label}: ${formatPercent(point.value)}`}</title>
-        </circle>
-      ))}
-      {labelIndexes.map((index) => {
-        const label = points[index].label;
+      {values.map((value, index) => {
+        const x = padding.left + index * stepWidth + (stepWidth - barWidth) / 2;
+        const barHeight = (value / maxValue) * plotHeight;
+        const y = padding.top + plotHeight - barHeight;
+        const label = String(data[index][labelKey] ?? 'Unknown');
         const shortLabel = /^\d{4}-\d{2}-\d{2}/.test(label) ? label.slice(5, 10) : label.slice(0, 12);
+
         return (
-          <text key={`${label}-${index}`} x={points[index].x} y={height - 12} textAnchor="middle" className="line-chart-axis-label line-chart-date-label">
-            {shortLabel}
-          </text>
+          <g key={`${label}-${index}`}>
+            <rect x={x} y={y} width={barWidth} height={barHeight} rx={Math.min(12, barWidth / 2)} fill={color} opacity={index === values.length - 1 ? 1 : 0.9} />
+            <title>{`${label}: ${formatPercent(value)}`}</title>
+            {labelIndexes.includes(index) ? (
+              <text x={x + barWidth / 2} y={height - 12} textAnchor="middle" className="line-chart-axis-label line-chart-date-label">
+                {shortLabel}
+              </text>
+            ) : null}
+          </g>
         );
       })}
     </svg>
@@ -394,7 +384,7 @@ export default function AnalyticsPage() {
         </DashboardCard>
 
         <DashboardCard title="Adherence Trend" meta={trendChart.length ? `Peak ${formatPercent(analyticsSummary.peak)}` : null}>
-          {trendChart.length > 0 ? <SimpleLineChart data={trendChart} color="#2F6690" /> : <EmptyState message="No adherence data available." />}
+          {trendChart.length > 0 ? <SimpleTrendBarChart data={trendChart} color="#2F6690" /> : <EmptyState message="No adherence data available." />}
         </DashboardCard>
 
         <DashboardCard title="Time of Day">
