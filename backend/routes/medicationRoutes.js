@@ -13,6 +13,7 @@ const {
   buildNormalizedMedicationKey,
 } = require('../utils/validation');
 const { isMedicationExpired } = require('../utils/medicationExpiration');
+const { createMedicationNotifications } = require('../services/notificationService');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -45,16 +46,35 @@ const parsePositiveRefillAmount = (value) => {
     throw error;
   }
 
-  const isNumericString = typeof value === 'string'
-    && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim());
+  const rawValue = typeof value === 'number' && Number.isFinite(value)
+    ? String(value)
+    : typeof value === 'string'
+      ? value.trim()
+      : '';
+  const isNumericString = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawValue);
 
-  if ((typeof value !== 'number' && !isNumericString) || !Number.isFinite(Number(value))) {
+  if (!isNumericString) {
+    const numericValue = Number(rawValue);
+    const error = new Error(Number.isFinite(numericValue) && numericValue <= 0
+      ? 'Refill amount must be greater than 0.'
+      : 'Refill amount must be a number greater than 0.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if ((rawValue.match(/[0-9]/g) || []).length > 6) {
+    const error = new Error('Refill amount must use standard decimal notation with no more than 6 numeric digits.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Number.isFinite(Number(rawValue))) {
     const error = new Error('Refill amount must be a number greater than 0.');
     error.statusCode = 400;
     throw error;
   }
 
-  const amount = Number(value);
+  const amount = Number(rawValue);
   if (amount <= 0) {
     const error = new Error('Refill amount must be greater than 0.');
     error.statusCode = 400;
@@ -347,6 +367,25 @@ const createMedicationForOwner = async (req, res) => {
 
       });
 
+    if (req.user.role === 'patient') {
+      try {
+        await createMedicationNotifications({
+          patientId: ownerId,
+          type: 'medication_added',
+          caregiverMessage: (patientName) => `${patientName} added a new medication to their MedSked record.`,
+          relatedEntityType: 'Medication',
+          relatedEntityId: medication._id,
+          dedupeKey: `medication_added:${medication._id}`,
+          notifyPatient: false,
+        });
+      } catch (error) {
+        console.error('Medication creation notification failed:', {
+          operation: 'notify-caregivers-of-medication-created',
+          patientId: String(ownerId),
+          errorName: error?.name || 'UnknownError',
+        });
+      }
+    }
 
     return res.status(201).json(medication);
   } catch (error) {

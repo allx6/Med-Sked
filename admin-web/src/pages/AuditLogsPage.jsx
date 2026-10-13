@@ -217,7 +217,7 @@ export default function AuditLogsPage() {
           />
 
           <input
-            className="select-input"
+            className="select-input audit-date-input"
             type="date"
             aria-label="Filter from date"
             value={fromDate}
@@ -228,7 +228,7 @@ export default function AuditLogsPage() {
           />
 
           <input
-            className="select-input"
+            className="select-input audit-date-input"
             type="date"
             aria-label="Filter to date"
             value={toDate}

@@ -3,7 +3,24 @@ const assert = require('node:assert/strict');
 const DoseRecord = require('../models/DoseRecord');
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
+
+const notificationServicePath = require.resolve('../services/notificationService');
+const originalNotificationService = require.cache[notificationServicePath];
+require.cache[notificationServicePath] = {
+  id: notificationServicePath,
+  filename: notificationServicePath,
+  loaded: true,
+  exports: {
+    createMedicationNotifications: async () => true,
+  },
+};
+delete require.cache[require.resolve('../routes/doseRoutes')];
 const doseRoutes = require('../routes/doseRoutes');
+if (originalNotificationService) {
+  require.cache[notificationServicePath] = originalNotificationService;
+} else {
+  delete require.cache[notificationServicePath];
+}
 
 const USER_ID = '507f1f77bcf86cd799439012';
 const MEDICATION_ID = '507f1f77bcf86cd799439011';

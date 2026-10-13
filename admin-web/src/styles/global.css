@@ -900,6 +900,11 @@ button:disabled {
   min-width: 180px;
 }
 
+.audit-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
 .select-input.compact {
   min-width: 120px;
   min-height: 38px;

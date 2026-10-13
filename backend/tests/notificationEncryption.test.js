@@ -20,6 +20,9 @@ const notificationTypes = [
   'low_refill',
   'caregiver_request',
   'caregiver_request_accepted',
+  'medication_added',
+  'dose_taken',
+  'dose_skipped',
 ];
 
 function buildNotification() {

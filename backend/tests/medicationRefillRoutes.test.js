@@ -133,6 +133,29 @@ for (const [amount, expectedMessage] of [
   });
 }
 
+test('refill amount accepts six digits and existing decimal quantities', async () => {
+  const maximum = await invokeRefillRoute({ refillAmount: '999999' });
+  assert.equal(maximum.response.statusCode, 200);
+  assert.equal(maximum.response.body.quantityOnHand, 1000001);
+
+  const decimal = await invokeRefillRoute({ refillAmount: '1.5' });
+  assert.equal(decimal.response.statusCode, 200);
+  assert.equal(decimal.response.body.quantityOnHand, 3.5);
+});
+
+for (const amount of [
+  '9999999',
+  '2.13132132132134e+35',
+  '213213213213213213213213',
+  '1e10',
+  2.13132132132134e+35,
+]) {
+  test(`refill rejects oversized or scientific notation amount ${JSON.stringify(amount)}`, async () => {
+    const { response } = await invokeRefillRoute({ refillAmount: amount });
+    assert.equal(response.statusCode, 400);
+  });
+}
+
 test('refill is allowed on expiration day and rejected after expiration', async () => {
   const today = formatLocalDate(new Date());
   const yesterdayDate = new Date();

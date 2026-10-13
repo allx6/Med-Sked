@@ -12,7 +12,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   loginUser,
@@ -43,6 +45,9 @@ export default function LoginScreen({
 
   const [loading, setLoading] = useState(false);
   const entranceProgress = useRef(new Animated.Value(0)).current;
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 480;
+  const isShortScreen = height < 700;
 
   useEffect(() => {
     const animation = Animated.timing(entranceProgress, {
@@ -156,16 +161,21 @@ export default function LoginScreen({
 
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Back"
           onPress={onNavigateLanding}
           style={styles.backButton}
           hitSlop={10}
         >
-          <Text style={styles.backText}>←  Back</Text>
+          <MaterialCommunityIcons name="arrow-left" size={30} color="#D8F0F2" />
         </Pressable>
 
         <ScrollView
           contentContainerStyle={
-            styles.scrollContent
+            [
+              styles.scrollContent,
+              isCompact && styles.scrollContentCompact,
+              isShortScreen && styles.scrollContentShort,
+            ]
           }
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -173,7 +183,7 @@ export default function LoginScreen({
 
           {/* LOGIN CARD */}
 
-          <Animated.View style={[styles.card, entranceStyle]}>
+          <Animated.View style={[styles.card, isCompact && styles.cardCompact, entranceStyle]}>
             <View style={styles.logoSection}>
               <Image
                 accessible
@@ -289,15 +299,10 @@ const styles = StyleSheet.create({
     top: 14,
     left: 20,
     zIndex: 2,
-    minHeight: 36,
+    minWidth: 48,
+    minHeight: 48,
     justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-
-  backText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#D8F0F2',
+    alignItems: 'center',
   },
 
   safeArea: {
@@ -335,13 +340,19 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     flexGrow: 1,
-
     paddingHorizontal: 20,
-
     paddingTop: 20,
     paddingBottom: 20,
-
     justifyContent: 'center',
+  },
+
+  scrollContentCompact: {
+    paddingHorizontal: 16,
+  },
+
+  scrollContentShort: {
+    justifyContent: 'flex-start',
+    paddingTop: 76,
   },
 
   logoSection: {
@@ -401,21 +412,14 @@ const styles = StyleSheet.create({
 
   card: {
     width: '100%',
-
     maxWidth: 420,
-
     alignSelf: 'center',
-
     paddingVertical: 30,
     paddingHorizontal: 32,
-
     borderRadius: 12,
-
     backgroundColor: '#FFFFFF',
-
     borderWidth: 1,
     borderColor: '#E4EAF0',
-
     shadowColor: '#1E2A4A',
     shadowOpacity: 0.08,
     shadowRadius: 20,
@@ -425,6 +429,11 @@ const styles = StyleSheet.create({
     },
 
     elevation: 4,
+  },
+
+  cardCompact: {
+    paddingVertical: 24,
+    paddingHorizontal: 20,
   },
 
   title: {
