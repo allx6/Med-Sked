@@ -121,8 +121,8 @@ test('patient refill increments stock by a positive amount and preserves other f
 
 for (const [amount, expectedMessage] of [
   ['', 'Refill amount is required.'],
-  ['abc', 'Refill amount must be a number greater than 0.'],
-  ['0x10', 'Refill amount must be a number greater than 0.'],
+  ['abc', 'Refill amount must be a valid number greater than 0.'],
+  ['0x10', 'Refill amount must be a valid number greater than 0.'],
   [0, 'Refill amount must be greater than 0.'],
   [-2, 'Refill amount must be greater than 0.'],
 ]) {

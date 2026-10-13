@@ -31,6 +31,11 @@ import StatusBadge from '../components/StatusBadge';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import { getDoseActionErrorMessage } from '../utils/doseErrors';
 import { getSafeUserErrorMessage } from '../utils/medicationValidation';
+import {
+  filterDoseHistory,
+  getAvailableDoseDates,
+  normalizeDoseDate,
+} from '../utils/doseHistory';
 
 export default function DoseHistoryScreen({
   token,
@@ -58,6 +63,7 @@ export default function DoseHistoryScreen({
 
   const [selectedDate, setSelectedDate] =
     useState(() => formatDateForComparison(new Date()));
+  const [dateDropdownVisible, setDateDropdownVisible] = useState(false);
 
   // =====================================================
   // LOAD DOSE RECORDS
@@ -137,50 +143,29 @@ export default function DoseHistoryScreen({
   }, [doses]);
 
   const availableDates = useMemo(() => {
-    return Array.from(
-      new Set(
-        doses
-          .map((dose) => dose.scheduledDate)
-          .filter(Boolean)
-      )
-    ).sort((a, b) => parseLocalDate(a) - parseLocalDate(b));
+    return getAvailableDoseDates(doses);
   }, [doses]);
+
+  useEffect(() => {
+    if (
+      selectedDate !== 'all'
+      && availableDates.length > 0
+      && !availableDates.includes(selectedDate)
+    ) {
+      setSelectedDate(availableDates[availableDates.length - 1]);
+    }
+  }, [availableDates, selectedDate]);
 
   // =====================================================
   // FILTER DOSES
   // =====================================================
 
   const filteredDoses = useMemo(() => {
-    let result = [...doses];
-
-    // ---------------------------------------------------
-    // MEDICATION FILTER
-    // ---------------------------------------------------
-
-    if (selectedMedication !== 'all') {
-      result = result.filter(
-        (dose) =>
-          dose.medicationId?._id ===
-          selectedMedication
-      );
-    }
-
-    if (selectedDate !== 'all') {
-      result = result.filter(
-        (dose) => dose.scheduledDate === selectedDate
-      );
-    }
-
-    // ---------------------------------------------------
-    // STATUS FILTER
-    // ---------------------------------------------------
-
-    if (selectedStatus !== 'all') {
-      result = result.filter(
-        (dose) =>
-          dose.status === selectedStatus
-      );
-    }
+    const result = filterDoseHistory(doses, {
+      selectedDate,
+      selectedMedication,
+      selectedStatus,
+    });
 
     // ---------------------------------------------------
     // CHRONOLOGICAL ORDER
@@ -214,7 +199,7 @@ export default function DoseHistoryScreen({
 
     filteredDoses.forEach((dose) => {
       const date =
-        dose.scheduledDate || 'Unknown';
+        normalizeDoseDate(dose.scheduledDate) || 'Unknown';
 
       if (!groups[date]) {
         groups[date] = [];
@@ -394,6 +379,11 @@ export default function DoseHistoryScreen({
     if (!dateString) {
       return 'Unknown Date';
     }
+    if (dateString === 'all') {
+      return 'All dates';
+    }
+
+    const normalizedDate = normalizeDoseDate(dateString) || dateString;
 
     const today = new Date();
 
@@ -408,19 +398,19 @@ export default function DoseHistoryScreen({
     const yesterdayString =
       formatDateForComparison(yesterday);
 
-    if (dateString === todayString) {
+    if (normalizedDate === todayString) {
       return 'Today';
     }
 
-    if (dateString === yesterdayString) {
+    if (normalizedDate === yesterdayString) {
       return 'Yesterday';
     }
 
     const date =
-      parseLocalDate(dateString);
+      parseLocalDate(normalizedDate);
 
     if (isNaN(date.getTime())) {
-      return dateString;
+      return normalizedDate;
     }
 
     return date.toLocaleDateString(
@@ -706,31 +696,72 @@ export default function DoseHistoryScreen({
           <Text style={styles.filterTitle}>Date</Text>
 
           <View style={styles.filterRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterScroll}
+            <Pressable
+              style={styles.dateDropdownButton}
+              onPress={() => setDateDropdownVisible((current) => !current)}
             >
-              {availableDates.map((date) => (
-                <Pressable
-                  key={date}
-                  style={[
-                    styles.filterChip,
-                    selectedDate === date && styles.activeFilterChip,
-                  ]}
-                  onPress={() => setSelectedDate(date)}
+              <Text style={styles.dateDropdownText}>
+                {getDateLabel(selectedDate)}
+              </Text>
+              <MaterialCommunityIcons
+                name={dateDropdownVisible ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#D7EDF3"
+              />
+            </Pressable>
+
+            {dateDropdownVisible ? (
+              <View style={styles.dateDropdownList}>
+                <ScrollView
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator
+                  style={styles.dateDropdownScroll}
+                  contentContainerStyle={styles.dateDropdownScrollContent}
                 >
-                  <Text
+                  <Pressable
                     style={[
-                      styles.filterChipText,
-                      selectedDate === date && styles.activeFilterChipText,
+                      styles.dateDropdownItem,
+                      selectedDate === 'all' && styles.dateDropdownItemActive,
                     ]}
+                    onPress={() => {
+                      setSelectedDate('all');
+                      setDateDropdownVisible(false);
+                    }}
                   >
-                    {getDateLabel(date)}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+                    <Text
+                      style={[
+                        styles.dateDropdownItemText,
+                        selectedDate === 'all' && styles.dateDropdownItemTextActive,
+                      ]}
+                    >
+                      All dates
+                    </Text>
+                  </Pressable>
+                  {availableDates.map((date) => (
+                    <Pressable
+                      key={date}
+                      style={[
+                        styles.dateDropdownItem,
+                        selectedDate === date && styles.dateDropdownItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedDate(date);
+                        setDateDropdownVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dateDropdownItemText,
+                          selectedDate === date && styles.dateDropdownItemTextActive,
+                        ]}
+                      >
+                        {getDateLabel(date)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
           </View>
 
           {/* MEDICATION FILTER */}
@@ -934,7 +965,7 @@ export default function DoseHistoryScreen({
 
 const createDoseDate = (dose) => {
   const date =
-    dose?.scheduledDate || '';
+    normalizeDoseDate(dose?.scheduledDate) || '';
 
   const time =
     dose?.scheduledTime ||
@@ -1006,6 +1037,7 @@ const parseLocalDate = (dateString) => {
     day
   );
 };
+
 
 // -----------------------------------------------------
 // FORMAT DATE FOR COMPARISON
@@ -1232,7 +1264,70 @@ const styles = StyleSheet.create({
 
   filterRow: {
     width: '100%',
+    overflow: 'visible',
+  },
+
+  dateDropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0B4F59',
+    borderWidth: 1,
+    borderColor: '#D7EDF3',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 40,
+  },
+
+  dateDropdownText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  dateDropdownList: {
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#D7EDF3',
+    maxHeight: 260,
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+
+  dateDropdownScroll: {
+    maxHeight: 240,
+  },
+
+  dateDropdownScrollContent: {
+    paddingVertical: 6,
+  },
+
+  dateDropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5EEF1',
+  },
+
+  dateDropdownItemActive: {
+    backgroundColor: '#EAF7F8',
+  },
+
+  dateDropdownItemText: {
+    color: '#1F2937',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  dateDropdownItemTextActive: {
+    color: '#0B4F59',
   },
 
   filterTitle: {

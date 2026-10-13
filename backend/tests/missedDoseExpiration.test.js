@@ -14,6 +14,7 @@ require.cache[notificationServicePath] = {
   },
 };
 
+const doseGenerator = require('../services/doseGenerator');
 const { detectMissedDoses } = require('../services/missedDoseService');
 
 if (originalNotificationService) {
@@ -41,12 +42,16 @@ test('missed-dose detection processes expiration-day doses and leaves later reco
   };
   const originals = {
     find: DoseRecord.find,
+    scheduleFind: require('../models/MedicationSchedule').find,
     findOneAndUpdate: DoseRecord.findOneAndUpdate,
     medicationFindOneAndUpdate: Medication.findOneAndUpdate,
   };
   const transitionedIds = [];
   let stockDeductionCalled = false;
 
+  require('../models/MedicationSchedule').find = () => ({
+    lean: async () => [],
+  });
   DoseRecord.find = () => ({
     populate() {
       return this;
@@ -75,9 +80,74 @@ test('missed-dose detection processes expiration-day doses and leaves later reco
     assert.equal(expirationDayDose.status, 'pending');
     assert.equal(stockDeductionCalled, false);
   } finally {
+    require('../models/MedicationSchedule').find = originals.scheduleFind;
     DoseRecord.find = originals.find;
     DoseRecord.findOneAndUpdate = originals.findOneAndUpdate;
     Medication.findOneAndUpdate = originals.medicationFindOneAndUpdate;
+  }
+});
+
+test('missed-dose detection backfills past dates before checking pending doses', async () => {
+  const targetDate = new Date(2026, 9, 11, 9, 0);
+  const dose = {
+    _id: 'backfilled-dose',
+    userId: 'patient-id',
+    scheduledDate: '2026-10-09',
+    scheduledTime: '8:00 AM',
+    status: 'pending',
+    medicationId: { name: 'History medication' },
+  };
+  const originals = {
+    scheduleFind: require('../models/MedicationSchedule').find,
+    doseFind: DoseRecord.find,
+    findOneAndUpdate: DoseRecord.findOneAndUpdate,
+    generateDosesForDate: doseGenerator.generateDosesForDate,
+    scheduleAppliesToDate: doseGenerator.scheduleAppliesToDate,
+  };
+  const backfilledDates = [];
+  let transitioned = false;
+
+  require('../models/MedicationSchedule').find = () => ({
+    lean: async () => [{
+      _id: 'schedule-id',
+      userId: 'patient-id',
+      startDate: '2026-10-01',
+      endDate: null,
+      enabled: true,
+      days: ['Friday'],
+    }],
+  });
+  doseGenerator.generateDosesForDate = async (userId, date) => {
+    backfilledDates.push(new Date(date));
+  };
+  doseGenerator.scheduleAppliesToDate = (schedule, date) => {
+    const value = date.getFullYear() === 2026 && date.getMonth() === 9 && date.getDate() === 9;
+    return value;
+  };
+  DoseRecord.find = () => ({
+    populate() {
+      return this;
+    },
+    lean: async () => [dose],
+  });
+  DoseRecord.findOneAndUpdate = () => {
+    transitioned = true;
+    return {
+      lean: async () => ({ ...dose, status: 'missed' }),
+    };
+  };
+
+  try {
+    const result = await detectMissedDoses(targetDate);
+    assert.equal(result.markedMissed, 1);
+    assert.equal(transitioned, true);
+    assert.ok(backfilledDates.some((date) => date.getFullYear() === 2026 && date.getMonth() === 9 && date.getDate() === 9));
+  } finally {
+    require('../models/MedicationSchedule').find = originals.scheduleFind;
+    DoseRecord.find = originals.doseFind;
+    DoseRecord.findOneAndUpdate = originals.findOneAndUpdate;
+    doseGenerator.generateDosesForDate = originals.generateDosesForDate;
+    doseGenerator.scheduleAppliesToDate = originals.scheduleAppliesToDate;
   }
 });
 
@@ -94,11 +164,15 @@ test('missed-dose detection preserves legacy behavior when medication has no exp
     medicationId: { name: 'Legacy medication' },
   };
   const originals = {
+    scheduleFind: require('../models/MedicationSchedule').find,
     find: DoseRecord.find,
     findOneAndUpdate: DoseRecord.findOneAndUpdate,
   };
   let transitioned = false;
 
+  require('../models/MedicationSchedule').find = () => ({
+    lean: async () => [],
+  });
   DoseRecord.find = () => ({
     populate() {
       return this;
@@ -116,6 +190,7 @@ test('missed-dose detection preserves legacy behavior when medication has no exp
     await detectMissedDoses(new Date());
     assert.equal(transitioned, true);
   } finally {
+    require('../models/MedicationSchedule').find = originals.scheduleFind;
     DoseRecord.find = originals.find;
     DoseRecord.findOneAndUpdate = originals.findOneAndUpdate;
   }

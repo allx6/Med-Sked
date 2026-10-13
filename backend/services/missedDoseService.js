@@ -1,9 +1,75 @@
 const DoseRecord = require('../models/DoseRecord');
+const MedicationSchedule = require('../models/MedicationSchedule');
 const { createMedicationNotifications } = require('./notificationService');
+const doseGenerator = require('./doseGenerator');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 
-// A pending dose becomes missed 15 minutes after its scheduled local time.
-const MISSED_DOSE_GRACE_MINUTES = 15;
+// A pending dose becomes missed as soon as it is past its scheduled local time.
+// This keeps historical doses from staying stuck as pending on the next day.
+const MISSED_DOSE_GRACE_MINUTES = 0;
+
+const formatLocalDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const parseLocalDateString = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  if (
+    !Number.isFinite(year)
+    || !Number.isFinite(month)
+    || !Number.isFinite(day)
+  ) {
+    return null;
+  }
+
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    parsed.getFullYear() !== year
+    || parsed.getMonth() !== month - 1
+    || parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const backfillPastDoses = async (now = new Date(), userId) => {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const maxPastDate = new Date(today);
+  maxPastDate.setDate(maxPastDate.getDate() - 1);
+
+  const scheduleQuery = {
+    enabled: true,
+    startDate: { $lte: formatLocalDate(today) },
+    $or: [
+      { endDate: null },
+      { endDate: { $gte: formatLocalDate(maxPastDate) } },
+    ],
+  };
+  if (userId) {
+    scheduleQuery.userId = userId;
+  }
+
+  const schedules = await MedicationSchedule.find(scheduleQuery).lean();
+
+  for (const schedule of schedules) {
+    const startDate = parseLocalDateString(schedule.startDate) || today;
+    const cursor = new Date(startDate);
+
+    while (cursor <= today) {
+      if (doseGenerator.scheduleAppliesToDate(schedule, cursor)) {
+        await doseGenerator.generateDosesForDate(schedule.userId, cursor);
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+};
 
 const parseScheduledDateTime = (scheduledDate, scheduledTime) => {
   const dateParts = String(scheduledDate || '').split('-').map(Number);
@@ -61,8 +127,15 @@ const parseScheduledDateTime = (scheduledDate, scheduledTime) => {
   return scheduledAt;
 };
 
-const detectMissedDoses = async (now = new Date()) => {
-  const pendingDoses = await DoseRecord.find({ status: 'pending' })
+const detectMissedDoses = async (now = new Date(), userId) => {
+  await backfillPastDoses(now, userId);
+
+  const doseQuery = { status: 'pending' };
+  if (userId) {
+    doseQuery.userId = userId;
+  }
+
+  const pendingDoses = await DoseRecord.find(doseQuery)
     .populate('medicationId', 'name expirationDate')
     .lean();
 
@@ -83,11 +156,14 @@ const detectMissedDoses = async (now = new Date()) => {
       continue;
     }
 
+    const localNow = new Date(now);
     const deadline = new Date(
       scheduledAt.getTime() + MISSED_DOSE_GRACE_MINUTES * 60 * 1000
     );
+    const isPastScheduledTime = localNow.getTime() > deadline.getTime();
+    const isNewDayAfterSchedule = formatLocalDate(localNow) > dose.scheduledDate;
 
-    if (now < deadline) {
+    if (!isPastScheduledTime && !isNewDayAfterSchedule) {
       continue;
     }
 
@@ -136,5 +212,6 @@ const detectMissedDoses = async (now = new Date()) => {
 module.exports = {
   MISSED_DOSE_GRACE_MINUTES,
   parseScheduledDateTime,
+  backfillPastDoses,
   detectMissedDoses,
 };

@@ -132,7 +132,7 @@ const validateMedicationCount = (value, label) => {
   }
 
   if (rawValue.length > 6) {
-    return `${label} cannot contain more than 6 numeric digits.`;
+    return `${label} cannot exceed 6 digits.`;
   }
 
   return null;
@@ -246,10 +246,10 @@ const validateMedicationFields = (payload) => {
 
   const dosageMatch = dosage.match(/^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i);
   if (!dosageMatch || !Number.isFinite(Number(dosageMatch[1])) || Number(dosageMatch[1]) <= 0) {
-    return 'Dosage must be a number greater than 0.';
+    return 'Dosage amount must be greater than 0.';
   }
   if (exceedsMedicationNumericDigitLimit(dosageMatch[1])) {
-    return 'Dosage amount cannot contain more than 6 numeric digits.';
+    return 'Dosage amount cannot exceed 6 digits.';
   }
 
   const frequencyMatch = frequency.match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i);
@@ -257,7 +257,7 @@ const validateMedicationFields = (payload) => {
     return 'Frequency must be at least 1 hour or day.';
   }
   if (exceedsMedicationNumericDigitLimit(frequencyMatch[1])) {
-    return 'Frequency interval cannot contain more than 6 numeric digits.';
+    return 'Frequency interval cannot exceed 6 digits.';
   }
 
   for (const [field, label] of [

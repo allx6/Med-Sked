@@ -57,19 +57,19 @@ const parsePositiveRefillAmount = (value) => {
     const numericValue = Number(rawValue);
     const error = new Error(Number.isFinite(numericValue) && numericValue <= 0
       ? 'Refill amount must be greater than 0.'
-      : 'Refill amount must be a number greater than 0.');
+      : 'Refill amount must be a valid number greater than 0.');
     error.statusCode = 400;
     throw error;
   }
 
   if ((rawValue.match(/[0-9]/g) || []).length > 6) {
-    const error = new Error('Refill amount must use standard decimal notation with no more than 6 numeric digits.');
+    const error = new Error('Refill amount cannot exceed 6 digits.');
     error.statusCode = 400;
     throw error;
   }
 
   if (!Number.isFinite(Number(rawValue))) {
-    const error = new Error('Refill amount must be a number greater than 0.');
+    const error = new Error('Refill amount must be a valid number greater than 0.');
     error.statusCode = 400;
     throw error;
   }
