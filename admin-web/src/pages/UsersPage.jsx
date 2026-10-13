@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { createUserAccount, listUsers, updateUserRole } from '../services/api';
+import { createAdminUser, deleteUser, listUsers, updateUserRole } from '../services/api';
 
 const getStoredAuth = () => {
   try {
@@ -134,13 +134,53 @@ export default function UsersPage() {
     }
   };
 
+  const removeUser = async (user) => {
+    const confirmed = window.confirm(
+      `Delete ${user.username || user.email || 'this user'}? This action cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const auth = getStoredAuth();
+
+    if (!auth?.token) {
+      setError('Authentication is required.');
+      return;
+    }
+
+    try {
+      setStatusMessage('');
+      setError('');
+      await deleteUser(auth.token, user._id);
+      setStatusMessage(`${user.username || user.email || 'User'} deleted successfully.`);
+      const refreshed = await listUsers(auth.token, {
+        page,
+        limit: 20,
+        search: searchTerm,
+        role: roleFilter,
+      });
+      setUsers(refreshed?.users || []);
+      setPagination(refreshed?.pagination || pagination);
+    } catch (err) {
+      setError(err.message || 'Unable to delete user.');
+    }
+  };
+
   const createUser = async (event) => {
     event.preventDefault();
     const email = newUser.email.trim();
+    const auth = getStoredAuth();
 
-    if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
+    if (!auth?.token) {
+      setCreateError('Authentication is required.');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setCreateError('');
-      setCreateEmailError('Enter an email address ending in @gmail.com.');
+      setCreateEmailError('Enter a valid email address.');
       return;
     }
 
@@ -148,7 +188,7 @@ export default function UsersPage() {
       setCreating(true);
       setCreateError('');
       setCreateEmailError('');
-      await createUserAccount({
+      await createAdminUser(auth.token, {
         name: newUser.name.trim(),
         email,
         password: newUser.password,
@@ -240,6 +280,7 @@ export default function UsersPage() {
                   <th>Email</th>
                   <th>Role</th>
                   <th>Created</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,6 +301,15 @@ export default function UsersPage() {
                       </select>
                     </td>
                     <td>{formatDate(user.createdAt)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="secondary-button compact-button"
+                        onClick={() => removeUser(user)}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -360,6 +410,7 @@ export default function UsersPage() {
                 >
                   <option value="patient">Patient</option>
                   <option value="caregiver">Caregiver</option>
+                  <option value="admin">Admin</option>
                 </select>
               </label>
               {createError ? <div className="error-state" role="alert">{createError}</div> : null}

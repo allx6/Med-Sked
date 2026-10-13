@@ -120,6 +120,28 @@ const validateSchedulePayload = (payload) => {
 
 const normalizeWhitespace = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
+const validateMedicationCount = (value, label) => {
+  const rawValue = typeof value === 'number' && Number.isFinite(value)
+    ? String(value)
+    : typeof value === 'string'
+      ? value.trim()
+      : '';
+
+  if (!/^\d+$/.test(rawValue)) {
+    return `${label} must be a whole number.`;
+  }
+
+  if (rawValue.length > 6) {
+    return `${label} cannot exceed 6 digits.`;
+  }
+
+  return null;
+};
+
+const exceedsMedicationNumericDigitLimit = (value) => (
+  (String(value).match(/[0-9]/g) || []).length > 6
+);
+
 const normalizeDecimalString = (value) => {
   const trimmed = normalizeWhitespace(value);
   if (!trimmed) {
@@ -215,15 +237,41 @@ const validateMedicationFields = (payload) => {
   if (name.length < 2) {
     return 'Medication name must contain at least 2 characters.';
   }
+  if (name.length > 100) {
+    return 'Medication name cannot exceed 100 characters.';
+  }
+  if (/[\u0000-\u001F\u007F]/.test(name)) {
+    return 'Medication name cannot contain control characters.';
+  }
 
   const dosageMatch = dosage.match(/^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i);
-  if (!dosageMatch || Number(dosageMatch[1]) <= 0) {
-    return 'Dosage must be a number greater than 0.';
+  if (!dosageMatch || !Number.isFinite(Number(dosageMatch[1])) || Number(dosageMatch[1]) <= 0) {
+    return 'Dosage amount must be greater than 0.';
+  }
+  if (exceedsMedicationNumericDigitLimit(dosageMatch[1])) {
+    return 'Dosage amount cannot exceed 6 digits.';
   }
 
   const frequencyMatch = frequency.match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i);
-  if (!frequencyMatch || Number(frequencyMatch[1]) < 1) {
+  if (!frequencyMatch || !Number.isFinite(Number(frequencyMatch[1])) || Number(frequencyMatch[1]) < 1) {
     return 'Frequency must be at least 1 hour or day.';
+  }
+  if (exceedsMedicationNumericDigitLimit(frequencyMatch[1])) {
+    return 'Frequency interval cannot exceed 6 digits.';
+  }
+
+  for (const [field, label] of [
+    ['quantityOnHand', 'Quantity on hand'],
+    ['refillThreshold', 'Refill threshold'],
+  ]) {
+    if (!Object.prototype.hasOwnProperty.call(payload, field)) {
+      continue;
+    }
+
+    const countError = validateMedicationCount(payload[field], label);
+    if (countError) {
+      return countError;
+    }
   }
 
   return null;

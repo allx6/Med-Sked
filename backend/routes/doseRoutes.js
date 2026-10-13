@@ -9,6 +9,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
 const { createMedicationNotifications } = require('../services/notificationService');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
+const { detectMissedDoses } = require('../services/missedDoseService');
 
 const {
   generateTodayDoses,
@@ -104,6 +105,8 @@ router.get(
   authMiddleware,
   async (req, res) => {
     try {
+      await detectMissedDoses(new Date(), req.user.userId);
+
       const doses = await DoseRecord.find({
         userId: req.user.userId,
       })
@@ -423,6 +426,27 @@ router.put(
           }
         );
 
+        if (req.user.role === 'patient') {
+          try {
+            const medicationName = medication?.name || 'medication';
+            await createMedicationNotifications({
+              patientId: doseOwnerId,
+              type: 'dose_taken',
+              patientMessage: `Your ${medicationName} dose scheduled at ${existingDose.scheduledTime} was marked as taken.`,
+              caregiverMessage: (patientName) => `${patientName}'s ${medicationName} dose scheduled at ${existingDose.scheduledTime} was marked as taken.`,
+              relatedEntityType: 'DoseRecord',
+              relatedEntityId: existingDose._id,
+              dedupeKey: `dose_taken:${existingDose._id}`,
+            });
+          } catch (error) {
+            console.error('Dose status notification failed:', {
+              operation: 'notify-dose-taken',
+              patientId: String(doseOwnerId),
+              errorName: error?.name || 'UnknownError',
+            });
+          }
+        }
+
         return res.json(await populateDose(existingDose._id));
       }
 
@@ -504,6 +528,27 @@ router.put(
         return res.status(409).json({
           message: 'Only pending doses can be marked as taken',
         });
+      }
+
+      if (req.user.role === 'patient') {
+        try {
+          const medicationName = medication?.name || 'medication';
+          await createMedicationNotifications({
+            patientId: doseOwnerId,
+            type: 'dose_taken',
+            patientMessage: `Your ${medicationName} dose scheduled at ${dose.scheduledTime} was marked as taken.`,
+            caregiverMessage: (patientName) => `${patientName}'s ${medicationName} dose scheduled at ${dose.scheduledTime} was marked as taken.`,
+            relatedEntityType: 'DoseRecord',
+            relatedEntityId: dose._id,
+            dedupeKey: `dose_taken:${dose._id}`,
+          });
+        } catch (error) {
+          console.error('Dose status notification failed:', {
+            operation: 'notify-dose-taken',
+            patientId: String(doseOwnerId),
+            errorName: error?.name || 'UnknownError',
+          });
+        }
       }
 
       if (
@@ -655,6 +700,27 @@ router.put(
           message:
             'Dose record not found',
         });
+      }
+
+      if (req.user.role === 'patient') {
+        try {
+          const medicationName = dose.medicationId?.name || medication?.name || 'medication';
+          await createMedicationNotifications({
+            patientId: doseOwnerId,
+            type: 'dose_skipped',
+            patientMessage: `Your ${medicationName} dose scheduled at ${dose.scheduledTime} was marked as skipped.`,
+            caregiverMessage: (patientName) => `${patientName}'s ${medicationName} dose scheduled at ${dose.scheduledTime} was skipped.`,
+            relatedEntityType: 'DoseRecord',
+            relatedEntityId: dose._id,
+            dedupeKey: `dose_skipped:${dose._id}`,
+          });
+        } catch (error) {
+          console.error('Dose status notification failed:', {
+            operation: 'notify-dose-skipped',
+            patientId: String(doseOwnerId),
+            errorName: error?.name || 'UnknownError',
+          });
+        }
       }
 
       res.json(dose);

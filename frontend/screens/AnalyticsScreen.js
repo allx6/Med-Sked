@@ -102,7 +102,6 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         ) : null}
         <Text style={styles.title}>Adherence Analytics</Text>
         <Text style={styles.subtitle}>Real dose outcomes for the selected period.</Text>
-
         <View style={styles.rangeRow}>
           {ranges.map((range, index) => (
             <Pressable key={range.label} onPress={() => changeRange(index)} style={[styles.rangeButton, selectedRange === index && styles.rangeButtonActive]}>
@@ -142,12 +141,12 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
               <View key={bucket} style={styles.chartColumn} accessibilityLabel={`${bucket}: ${value.total > 0 ? `${percentage}% adherence` : 'no dose data'}, ${value.total} doses`}>
                 <Text style={styles.chartValue}>{value.total > 0 ? `${percentage}%` : '—'}</Text>
                 <View style={styles.chartTrack}>
-                  {value.total > 0 ? (
+                  {value.total > 0 && percentage > 0 ? (
                     <View style={[styles.chartBar, { height: `${percentage}%` }]} />
                   ) : null}
                 </View>
                 <Text style={styles.chartLabel}>{bucket}</Text>
-                <Text style={styles.chartCount}>{value.total} doses</Text>
+                <Text style={styles.chartCount}>{value.total} {value.total === 1 ? 'dose' : 'doses'}</Text>
               </View>
             ))}
           </View>
@@ -210,13 +209,13 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 23, fontWeight: '900' },
   statLabel: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
   chartCaption: { color: colors.textSecondary, fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.sm, paddingTop: spacing.sm },
-  chartColumn: { flex: 1, minWidth: 0, alignItems: 'center' },
-  chartValue: { color: colors.primary, fontSize: 12, fontWeight: '800', marginBottom: spacing.xs },
-  chartTrack: { width: '72%', maxWidth: 54, height: 120, justifyContent: 'flex-end', overflow: 'hidden', borderRadius: radius.sm, backgroundColor: '#C5E3EA' },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingTop: spacing.sm },
+  chartColumn: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'flex-end' },
+  chartValue: { color: colors.primary, fontSize: 13, fontWeight: '900', marginBottom: spacing.sm, fontVariant: ['tabular-nums'] },
+  chartTrack: { width: '100%', maxWidth: 68, height: 156, justifyContent: 'flex-end', overflow: 'hidden', backgroundColor: '#CDE8EE', borderRadius: radius.sm, borderBottomWidth: 2, borderBottomColor: '#9CCBD4' },
   chartBar: { width: '100%', backgroundColor: colors.primary, borderTopLeftRadius: radius.sm, borderTopRightRadius: radius.sm },
-  chartLabel: { color: colors.text, fontSize: 11, fontWeight: '800', textTransform: 'capitalize', marginTop: spacing.sm },
-  chartCount: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
+  chartLabel: { color: colors.text, fontSize: 13, fontWeight: '800', textTransform: 'capitalize', marginTop: spacing.md },
+  chartCount: { color: colors.textSecondary, fontSize: 11, marginTop: 3, fontVariant: ['tabular-nums'] },
   timeRow: { marginBottom: spacing.md },
   timeHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   timeLabel: { color: colors.text, fontWeight: '800', textTransform: 'capitalize' },

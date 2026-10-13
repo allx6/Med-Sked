@@ -19,6 +19,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
 import {
   getSafeUserErrorMessage,
+  isValidMedicationNumericInput,
   validateMedicationFields,
 } from '../utils/medicationValidation';
 
@@ -47,14 +48,16 @@ export default function AddMedicationScreen({
   async function handleSubmit() {
     setError('');
 
-    if (!/^\d+(\.\d+)?$/.test(quantityOnHand.trim()) || !/^\d+(\.\d+)?$/.test(refillThreshold.trim())) {
-      setError('Quantity and refill threshold must be non-negative numbers.');
-      return;
-    }
-
     const dosage = `${dosageAmount.trim()} ${dosageUnit}`;
     const frequency = `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
-    const medicationError = validateMedicationFields({ name, dosage, frequency, expirationDate });
+    const medicationError = validateMedicationFields({
+      name,
+      dosage,
+      frequency,
+      expirationDate,
+      quantityOnHand,
+      refillThreshold,
+    });
 
     if (medicationError) {
       setError(medicationError);
@@ -134,8 +137,13 @@ export default function AddMedicationScreen({
             label="Medication name"
             placeholder="e.g. Paracetamol"
             value={name}
-            onChangeText={setName}
+            onChangeText={(value) => {
+              if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
+                setName(value);
+              }
+            }}
             autoCapitalize="words"
+            maxLength={100}
             editable={!loading}
             labelStyle={styles.fieldLabel}
             inputStyle={styles.fieldInput}
@@ -147,7 +155,12 @@ export default function AddMedicationScreen({
                 label="Dosage amount"
                 placeholder="e.g. 500"
                 value={dosageAmount}
-                onChangeText={setDosageAmount}
+                onChangeText={(value) => {
+                  if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
+                    setDosageAmount(value);
+                  }
+                }}
+                maxLength={7}
                 keyboardType="decimal-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
@@ -179,8 +192,13 @@ export default function AddMedicationScreen({
                 label="Quantity on hand"
                 placeholder="e.g. 30"
                 value={quantityOnHand}
-                onChangeText={setQuantityOnHand}
-                keyboardType="decimal-pad"
+                onChangeText={(value) => {
+                  if (isValidMedicationNumericInput(value)) {
+                    setQuantityOnHand(value);
+                  }
+                }}
+                maxLength={6}
+                keyboardType="number-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
                 inputStyle={styles.fieldInput}
@@ -191,8 +209,13 @@ export default function AddMedicationScreen({
                 label="Refill threshold"
                 placeholder="e.g. 5"
                 value={refillThreshold}
-                onChangeText={setRefillThreshold}
-                keyboardType="decimal-pad"
+                onChangeText={(value) => {
+                  if (isValidMedicationNumericInput(value)) {
+                    setRefillThreshold(value);
+                  }
+                }}
+                maxLength={6}
+                keyboardType="number-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
                 inputStyle={styles.fieldInput}
@@ -200,10 +223,10 @@ export default function AddMedicationScreen({
             </View>
           </View>
 
-          <View style={[styles.fieldRow, !wideLayout && styles.fieldRowStacked]}>
+          <View style={[styles.fieldRow, styles.frequencyFieldRow, !wideLayout && styles.fieldRowStacked]}>
             <View style={styles.fieldColumn}>
               <TextField
-                label="Expiration date (required)"
+                label="Expiration date (required) — YYYY-MM-DD"
                 placeholder="YYYY-MM-DD"
                 value={expirationDate}
                 onChangeText={setExpirationDate}
@@ -219,7 +242,12 @@ export default function AddMedicationScreen({
                 label="Frequency interval"
                 placeholder="e.g. 8"
                 value={frequencyAmount}
-                onChangeText={setFrequencyAmount}
+                onChangeText={(value) => {
+                  if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
+                    setFrequencyAmount(value);
+                  }
+                }}
+                maxLength={7}
                 keyboardType="number-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
@@ -328,6 +356,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 4,
+  },
+
+  frequencyFieldRow: {
+    marginBottom: 22,
   },
 
   fieldRowStacked: {

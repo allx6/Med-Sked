@@ -40,17 +40,39 @@ const createNotification = async ({
     return null;
   }
 
+  const sourceDoseNotification = type === 'missed_dose'
+    && relatedEntityType === 'DoseRecord'
+    && relatedEntityId;
+  const notificationDedupeKey = sourceDoseNotification
+    ? `missed_dose:${relatedEntityId}:recipient:${recipient}`
+    : dedupeKey;
+
   try {
+    if (sourceDoseNotification) {
+      const existingNotification = await Notification.findOne({
+        recipient,
+        type,
+        relatedEntityType,
+        relatedEntityId,
+      })
+        .select('_id')
+        .lean();
+
+      if (existingNotification) {
+        return existingNotification;
+      }
+    }
+
     return await Notification.create({
       recipient,
       type,
       message,
       relatedEntityType,
       relatedEntityId,
-      dedupeKey,
+      dedupeKey: notificationDedupeKey,
     });
   } catch (error) {
-    if (error.code === 11000 && dedupeKey) {
+    if (error.code === 11000 && notificationDedupeKey) {
       return null;
     }
     if (failureContext) {
@@ -81,15 +103,18 @@ const createMedicationNotifications = async ({
   relatedEntityType,
   relatedEntityId,
   dedupeKey,
+  notifyPatient = true,
 }) => {
-  const patientNotification = await createNotification({
-    recipient: patientId,
-    type,
-    message: patientMessage,
-    relatedEntityType,
-    relatedEntityId,
-    dedupeKey,
-  });
+  const patientNotification = notifyPatient
+    ? await createNotification({
+      recipient: patientId,
+      type,
+      message: patientMessage,
+      relatedEntityType,
+      relatedEntityId,
+      dedupeKey,
+    })
+    : null;
 
   let patient;
   let relationships;

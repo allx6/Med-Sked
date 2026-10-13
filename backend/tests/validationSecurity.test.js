@@ -92,6 +92,72 @@ test('medication fields accept valid values', () => {
   assert.equal(buildNormalizedMedicationKey('Metformin', '500 mg'), 'metformin|500mg');
 });
 
+test('medication numeric fields accept up to six digits and reject longer values', () => {
+  const base = {
+    name: 'Acetaminophen',
+    dosage: '999999 mg',
+    frequency: 'Every 999999 hours',
+    expirationDate: '2026-12-31',
+    quantityOnHand: 999999,
+    refillThreshold: 0,
+  };
+
+  assert.equal(validateMedicationFields(base), null);
+  assert.equal(validateMedicationFields({
+    ...base,
+    dosage: '100 mg',
+    frequency: 'Every 8 hours',
+    quantityOnHand: 30,
+  }), null);
+  assert.equal(validateMedicationFields({
+    ...base,
+    dosage: '100.5 mg',
+    frequency: 'Every 8.5 hours',
+  }), null);
+  assert.equal(validateMedicationFields({ ...base, dosage: '1000000 mg' }), 'Dosage amount cannot exceed 6 digits.');
+  assert.equal(validateMedicationFields({ ...base, dosage: '1e10 mg' }), 'Dosage amount must be greater than 0.');
+  assert.equal(validateMedicationFields({ ...base, dosage: '2.13132132132134e+35 mg' }), 'Dosage amount must be greater than 0.');
+  assert.equal(validateMedicationFields({ ...base, frequency: 'Every 1000000 hours' }), 'Frequency interval cannot exceed 6 digits.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: 1000000 }), 'Quantity on hand cannot exceed 6 digits.');
+  assert.equal(validateMedicationFields({ ...base, refillThreshold: 1000000 }), 'Refill threshold cannot exceed 6 digits.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: '1e6' }), 'Quantity on hand must be a whole number.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: '2.13132132132134e+35' }), 'Quantity on hand must be a whole number.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: 2.13132132132134e+35 }), 'Quantity on hand must be a whole number.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: '213213213213213213213213' }), 'Quantity on hand cannot exceed 6 digits.');
+  assert.equal(validateMedicationFields({ ...base, quantityOnHand: 30.5 }), 'Quantity on hand must be a whole number.');
+  assert.equal(validateMedicationFields({ ...base, refillThreshold: '1E10' }), 'Refill threshold must be a whole number.');
+  assert.equal(validateMedicationFields({ ...base, refillThreshold: '9999999' }), 'Refill threshold cannot exceed 6 digits.');
+  assert.equal(validateMedicationFields({ ...base, frequency: 'Every 1e10 hours' }), 'Frequency must be at least 1 hour or day.');
+});
+
+test('medication names and units are bounded without restricting valid names', () => {
+  const base = {
+    dosage: '2.5 mg',
+    frequency: 'Every 8 hours',
+    expirationDate: '2026-12-31',
+    quantityOnHand: 30,
+    refillThreshold: 0,
+  };
+
+  for (const name of [
+    'Acetaminophen',
+    'Vitamin B12',
+    'Amoxicillin-Clavulanate',
+    'B-Complex',
+    'Ferrous Sulfate 325',
+  ]) {
+    assert.equal(validateMedicationFields({ ...base, name }), null);
+  }
+
+  assert.equal(validateMedicationFields({ ...base, name: 'M'.repeat(100) }), null);
+  assert.equal(validateMedicationFields({ ...base, name: 'A'.repeat(101) }), 'Medication name cannot exceed 100 characters.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine\u0000Name' }), 'Medication name cannot contain control characters.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', dosage: '10 mg123456' }), 'Dosage amount must be greater than 0.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', dosage: '10 aaaaaaaaaaaaaaaa' }), 'Dosage amount must be greater than 0.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', frequency: 'Every 8 hours123' }), 'Frequency must be at least 1 hour or day.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', frequency: 'Every 8 days999999' }), 'Frequency must be at least 1 hour or day.');
+});
+
 test('medication fields reject invalid values and minutes', () => {
   const invalidPayloads = [
     { name: '', dosage: '500 mg', frequency: 'Every 8 hours' },

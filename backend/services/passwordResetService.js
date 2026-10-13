@@ -32,7 +32,7 @@ const createPasswordResetService = ({
   compareOtp = bcrypt.compare,
   hashPassword = (password) => bcrypt.hash(password, 10),
   now = () => Date.now(),
-  logEmailFailure = () => console.error('Password reset email delivery failed.'),
+  logEmailFailure = (error) => console.error('Password reset email delivery failed:', error),
 }) => {
   const generateOtp = () => String(randomInt(0, 1000000)).padStart(6, '0');
 
@@ -89,7 +89,7 @@ const createPasswordResetService = ({
 
     try {
       await emailService.sendPasswordResetEmail(normalizedEmail, otp);
-    } catch {
+    } catch (error) {
       await User.updateOne(
         {
           _id: user._id,
@@ -105,7 +105,7 @@ const createPasswordResetService = ({
           },
         }
       );
-      logEmailFailure();
+      logEmailFailure(error);
     }
   };
 
