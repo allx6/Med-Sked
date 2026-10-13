@@ -19,7 +19,7 @@ const validateMedicationCount = (value, label) => {
   }
 
   if (!isValidMedicationNumericInput(value)) {
-    return `${label} must be a whole number with no more than 6 digits.`;
+    return `${label} must be a whole number.`;
   }
 
   return '';
@@ -99,11 +99,11 @@ export const validateMedicationFields = ({
       return 'Dosage amount must be greater than 0.';
     }
 
-    return 'Dosage amount must be a number greater than 0.';
+    return 'Dosage amount must be a valid number greater than 0.';
   }
 
   if ((dosageMatch[1].match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
-    return 'Dosage amount cannot contain more than 6 numeric digits.';
+    return 'Dosage amount cannot exceed 6 digits.';
   }
 
   if (Number(dosageMatch[1]) <= 0) {
@@ -115,7 +115,7 @@ export const validateMedicationFields = ({
     return 'Frequency must be at least 1 hour or day.';
   }
   if ((frequencyMatch[1].match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
-    return 'Frequency interval cannot contain more than 6 numeric digits.';
+    return 'Frequency interval cannot exceed 6 digits.';
   }
 
   return '';
@@ -173,11 +173,11 @@ export const validateRefillAmount = (value) => {
   const isNumericString = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawValue);
 
   if (!isNumericString || (rawValue.match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
-    return 'Refill amount must be a number with no more than 6 numeric digits.';
+    return 'Refill amount cannot exceed 6 digits.';
   }
 
   if (!Number.isFinite(Number(rawValue))) {
-    return 'Refill amount must be a number greater than 0.';
+    return 'Refill amount must be a valid number greater than 0.';
   }
 
   if (Number(rawValue) <= 0) {

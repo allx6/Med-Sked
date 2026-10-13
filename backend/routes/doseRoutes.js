@@ -9,6 +9,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
 const { createMedicationNotifications } = require('../services/notificationService');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
+const { detectMissedDoses } = require('../services/missedDoseService');
 
 const {
   generateTodayDoses,
@@ -104,6 +105,8 @@ router.get(
   authMiddleware,
   async (req, res) => {
     try {
+      await detectMissedDoses(new Date(), req.user.userId);
+
       const doses = await DoseRecord.find({
         userId: req.user.userId,
       })
