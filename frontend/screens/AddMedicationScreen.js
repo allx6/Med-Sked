@@ -223,7 +223,7 @@ export default function AddMedicationScreen({
             </View>
           </View>
 
-          <View style={[styles.fieldRow, !wideLayout && styles.fieldRowStacked]}>
+          <View style={[styles.fieldRow, styles.frequencyFieldRow, !wideLayout && styles.fieldRowStacked]}>
             <View style={styles.fieldColumn}>
               <TextField
                 label="Expiration date (required) — YYYY-MM-DD"
@@ -356,6 +356,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
     marginBottom: 4,
+  },
+
+  frequencyFieldRow: {
+    marginBottom: 22,
   },
 
   fieldRowStacked: {
