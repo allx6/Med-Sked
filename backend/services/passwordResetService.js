@@ -80,7 +80,7 @@ const createPasswordResetService = ({
           passwordResetAuthorizationExpires: 1,
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updatedUser) {
@@ -156,7 +156,7 @@ const createPasswordResetService = ({
           passwordResetAttempts: { $lt: MAX_ATTEMPTS },
         },
         { $inc: { passwordResetAttempts: 1 } },
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       if (!updatedUser) {
@@ -216,7 +216,7 @@ const createPasswordResetService = ({
           passwordResetOtpExpires: 1,
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!verifiedUser) {
@@ -288,7 +288,7 @@ const createPasswordResetService = ({
           passwordResetAuthorizationExpires: 1,
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updatedUser) {

@@ -26,8 +26,10 @@ import { colors, radius, spacing, shadow } from '../theme';
 export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitoring }) {
   const [connectedPatients, setConnectedPatients] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [email, setEmail] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
   const [searchResult, setSearchResult] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -64,21 +66,32 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
     loadConnections();
   }, [loadConnections]);
 
-  const searchPatientByEmail = async () => {
-    const trimmedEmail = email.trim();
+  const searchPatients = async () => {
+    const trimmedSearchTerm = searchTerm.trim();
 
-    if (!trimmedEmail) {
-      setError('Enter a patient ID or email to search.');
+    if (!trimmedSearchTerm) {
+      setError('Enter a patient ID, username, or email to search.');
       return;
     }
 
     try {
       setSearching(true);
       setError('');
-      const result = await searchPatient(token, trimmedEmail);
-      setSearchResult(result || null);
-    } catch (err) {
+      setSearchResults([]);
       setSearchResult(null);
+      setHasSearched(false);
+      const result = await searchPatient(token, trimmedSearchTerm);
+      const matches = Array.isArray(result?.patients)
+        ? result.patients
+        : result?.patient
+          ? [{ patient: result.patient, relationship: result.relationship || null }]
+          : [];
+      setSearchResults(matches);
+      setHasSearched(true);
+    } catch (err) {
+      setSearchResults([]);
+      setSearchResult(null);
+      setHasSearched(false);
       setError(err.message || 'Unable to find this patient.');
     } finally {
       setSearching(false);
@@ -95,8 +108,10 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
       setSending(true);
       setError('');
       await sendCaregiverRequest(token, searchResult.patient._id);
-      setEmail('');
+      setSearchTerm('');
       setSearchResult(null);
+      setSearchResults([]);
+      setHasSearched(false);
       await loadConnections(true);
       Alert.alert('Request sent', 'The patient can accept or reject the caregiver request.');
     } catch (err) {
@@ -203,13 +218,13 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
               </View>
               <View style={styles.searchHeadingText}>
                 <Text style={styles.searchTitle}>Find a patient</Text>
-                <Text style={styles.searchSubtitle}>Search by their patient ID or email.</Text>
+                <Text style={styles.searchSubtitle}>Search by patient ID, username, or email.</Text>
               </View>
             </View>
             <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Patient ID or email"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              placeholder="Patient ID, username, or email"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="default"
@@ -218,23 +233,51 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
 
             <Pressable
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, searching && styles.buttonDisabled]}
-              onPress={searchPatientByEmail}
+              onPress={searchPatients}
               disabled={searching}
             >
               <Text style={styles.primaryButtonText}>{searching ? 'Searching...' : 'Search Patient'}</Text>
             </Pressable>
 
-            {searchResult?.patient ? (
+            {searchResults.length > 0 ? (
               <View style={styles.searchResultBox}>
-                <Text style={styles.searchResultTitle}>{searchResult.patient.username || 'Patient'}</Text>
-                <Text style={styles.searchResultMeta}>Patient ID: {searchResult.patient.patientId || 'Not available'}</Text>
-                <Text style={styles.searchResultMeta}>{searchResult.patient.email}</Text>
+                <Text style={styles.searchResultsHeading}>
+                  {searchResults.length === 10
+                    ? 'Showing up to 10 matching patients'
+                    : searchResults.length === 1
+                      ? 'Patient found'
+                      : `${searchResults.length} patients found`}
+                </Text>
+                {searchResults.map((match) => {
+                  const patient = match.patient || match;
+                  const selected = searchResult?.patient?._id === patient?._id;
 
-                {searchResult.relationship?.status === 'active' ? (
-                  <Text style={[styles.searchResultState, styles.activeStatus]}>Already connected</Text>
-                ) : searchResult.relationship?.status === 'pending' ? (
-                  <Text style={[styles.searchResultState, styles.pendingStatus]}>Request pending</Text>
-                ) : (
+                  return (
+                    <Pressable
+                      key={patient?._id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      onPress={() => setSearchResult(match)}
+                      style={({ pressed }) => [
+                        styles.searchMatch,
+                        selected && styles.searchMatchSelected,
+                        pressed && styles.cardPressed,
+                      ]}
+                    >
+                      <Text style={styles.searchResultTitle}>{patient.username || 'Patient'}</Text>
+                      <Text style={styles.searchResultMeta}>Patient ID: {patient.patientId || 'Not available'}</Text>
+                      <Text style={styles.searchResultMeta}>{patient.email}</Text>
+                      {match.relationship?.status === 'active' ? (
+                        <Text style={[styles.searchResultState, styles.activeStatus]}>Already connected</Text>
+                      ) : match.relationship?.status === 'pending' ? (
+                        <Text style={[styles.searchResultState, styles.pendingStatus]}>Request pending</Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+
+                {searchResult?.patient && searchResult.relationship?.status !== 'active' &&
+                searchResult.relationship?.status !== 'pending' ? (
                   <Pressable
                     style={({ pressed }) => [styles.primaryButton, styles.sendButton, pressed && styles.buttonPressed, sending && styles.buttonDisabled]}
                     onPress={handleSendRequest}
@@ -242,7 +285,12 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
                   >
                     <Text style={styles.primaryButtonText}>{sending ? 'Sending...' : 'Send Connection Request'}</Text>
                   </Pressable>
-                )}
+                ) : null}
+              </View>
+            ) : null}
+            {hasSearched && searchResults.length === 0 ? (
+              <View style={styles.searchResultBox}>
+                <Text style={styles.searchResultMeta}>No matching patients found.</Text>
               </View>
             ) : null}
           </View>
@@ -324,6 +372,9 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.7 },
   sendButton: { marginTop: spacing.md },
   searchResultBox: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  searchResultsHeading: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: spacing.sm },
+  searchMatch: { padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, marginBottom: spacing.sm },
+  searchMatchSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   searchResultTitle: { fontSize: 16, fontWeight: '800', color: colors.text },
   searchResultMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
   searchResultState: { marginTop: 10, fontSize: 12, fontWeight: '800' },

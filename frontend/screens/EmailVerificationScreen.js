@@ -28,7 +28,6 @@ export default function EmailVerificationScreen({
   );
   const [cooldown, setCooldown] = useState(initialCooldownSeconds);
   const [loading, setLoading] = useState(false);
-  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) {
@@ -53,10 +52,11 @@ export default function EmailVerificationScreen({
     setMessage('');
     setMessageType('');
     try {
-      await verifyEmail(email, otp);
-      setVerified(true);
-      setMessage('Email verified successfully.');
-      setMessageType('success');
+      const authentication = await verifyEmail(email, otp);
+      if (!authentication?.token || !authentication?.user) {
+        throw new Error('Unable to establish your session. Please try again.');
+      }
+      onVerified(authentication);
     } catch (error) {
       setMessage(error.message || 'Unable to verify your email. Please try again.');
       setMessageType('error');
@@ -105,74 +105,59 @@ export default function EmailVerificationScreen({
               Enter the 6-digit code sent to {email}.
             </Text>
 
-            {!verified ? (
-              <>
-                <TextField
-                  label="Verification code"
-                  value={otp}
-                  onChangeText={(value) => {
-                    setOtp(value.replace(/\D/g, '').slice(0, 6));
-                    setMessage('');
-                    setMessageType('');
-                  }}
-                  placeholder="Enter 6-digit code"
-                  keyboardType="number-pad"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={6}
-                  editable={!loading}
-                />
+            <TextField
+              label="Verification code"
+              value={otp}
+              onChangeText={(value) => {
+                setOtp(value.replace(/\D/g, '').slice(0, 6));
+                setMessage('');
+                setMessageType('');
+              }}
+              placeholder="Enter 6-digit code"
+              keyboardType="number-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={6}
+              editable={!loading}
+            />
 
-                {message ? (
-                  <Text
-                    accessibilityLiveRegion="polite"
-                    style={[
-                      styles.message,
-                      messageType === 'error' && styles.errorMessage,
-                      messageType === 'success' && styles.successMessage,
-                    ]}
-                  >
-                    {message}
-                  </Text>
-                ) : null}
+            {message ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[
+                  styles.message,
+                  messageType === 'error' && styles.errorMessage,
+                  messageType === 'success' && styles.successMessage,
+                ]}
+              >
+                {message}
+              </Text>
+            ) : null}
 
-                <PrimaryButton
-                  label="Verify Email"
-                  onPress={handleVerify}
-                  loading={loading}
-                  style={styles.verifyButton}
-                />
+            <PrimaryButton
+              label="Verify Email"
+              onPress={handleVerify}
+              loading={loading}
+              style={styles.verifyButton}
+            />
 
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={handleResend}
-                  disabled={loading || cooldown > 0}
-                  style={styles.resendButton}
-                >
-                  <Text
-                    style={[
-                      styles.resendText,
-                      (loading || cooldown > 0) && styles.disabledText,
-                    ]}
-                  >
-                    {cooldown > 0
-                      ? `Resend code in ${cooldown}s`
-                      : 'Resend verification code'}
-                  </Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.message, styles.successMessage]}>
-                  {message}
-                </Text>
-                <PrimaryButton
-                  label="Continue to Sign In"
-                  onPress={onVerified}
-                  style={styles.verifyButton}
-                />
-              </>
-            )}
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleResend}
+              disabled={loading || cooldown > 0}
+              style={styles.resendButton}
+            >
+              <Text
+                style={[
+                  styles.resendText,
+                  (loading || cooldown > 0) && styles.disabledText,
+                ]}
+              >
+                {cooldown > 0
+                  ? `Resend code in ${cooldown}s`
+                  : 'Resend verification code'}
+              </Text>
+            </Pressable>
 
             <Pressable
               accessibilityRole="button"

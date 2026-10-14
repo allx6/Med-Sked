@@ -77,7 +77,7 @@ const newSchedulePayload = (overrides = {}) => ({
   ...overrides,
 });
 
-test('POST /api/schedules rejects null endDate for medication with expiration', async () => {
+test('POST /api/schedules rejects null endDate', async () => {
   const { response, createCalled } = await invokeScheduleHandler({
     method: 'post',
     body: newSchedulePayload({ endDate: null }),
@@ -85,7 +85,7 @@ test('POST /api/schedules rejects null endDate for medication with expiration', 
   });
 
   assert.equal(response.statusCode, 400);
-  assert.equal(response.body.message, 'End date is required because this medication has an expiration date.');
+  assert.equal(response.body.message, 'End date is required.');
   assert.equal(createCalled, false);
 });
 
@@ -102,7 +102,7 @@ test('POST /api/schedules accepts expiration-day start and end before duplicate 
   assert.equal(createCalled, false);
 });
 
-test('POST /api/schedules gives expiration-specific error for empty endDate', async () => {
+test('POST /api/schedules rejects empty endDate', async () => {
   const { response, createCalled } = await invokeScheduleHandler({
     method: 'post',
     body: newSchedulePayload({ endDate: '' }),
@@ -110,7 +110,7 @@ test('POST /api/schedules gives expiration-specific error for empty endDate', as
   });
 
   assert.equal(response.statusCode, 400);
-  assert.equal(response.body.message, 'End date is required because this medication has an expiration date.');
+  assert.equal(response.body.message, 'End date is required.');
   assert.equal(createCalled, false);
 });
 
@@ -176,7 +176,7 @@ test('PUT /api/schedules/:id rejects an edited endDate after medication expirati
   assert.equal(response.body.message, 'Schedule end date cannot be after the medication expiration date.');
 });
 
-test('PUT /api/schedules/:id rejects a missing endDate for an expiring legacy schedule', async () => {
+test('PUT /api/schedules/:id rejects a missing endDate for a legacy schedule', async () => {
   const existingSchedule = {
     _id: SCHEDULE_ID,
     medicationId: MEDICATION_ID,
@@ -196,5 +196,5 @@ test('PUT /api/schedules/:id rejects a missing endDate for an expiring legacy sc
   });
 
   assert.equal(response.statusCode, 400);
-  assert.equal(response.body.message, 'End date is required because this medication has an expiration date.');
+  assert.equal(response.body.message, 'End date is required.');
 });

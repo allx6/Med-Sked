@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import TimeSelector from '../components/TimeSelector';
@@ -291,6 +292,11 @@ export default function EditScheduleScreen({
         startDate.getMonth(),
         startDate.getDate()
       )) {
+        return;
+      }
+
+      const expirationDate = parseLocalDate(selectedMedication?.expirationDate);
+      if (expirationDate && nextDate > expirationDate) {
         return;
       }
 
@@ -609,6 +615,7 @@ export default function EditScheduleScreen({
                   ? formatDate(startDate)
                   : formatDate(todayStart)
               }
+              max={selectedMedication?.expirationDate || undefined}
               onChange={(event) => {
                 const nextDate = parseWebDateValue(event.target.value);
 
@@ -628,6 +635,11 @@ export default function EditScheduleScreen({
                   return;
                 }
 
+                const expirationDate = parseLocalDate(selectedMedication?.expirationDate);
+                if (expirationDate && nextDate > expirationDate) {
+                  return;
+                }
+
                 setEndDate(nextDate);
               }}
               disabled={saving}
@@ -636,6 +648,8 @@ export default function EditScheduleScreen({
           ) : (
             <>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose schedule end date"
                 style={styles.inputButton}
                 onPress={() =>
                   setShowEndDatePicker(true)
@@ -651,9 +665,13 @@ export default function EditScheduleScreen({
                 >
                   {endDate
                     ? formatDate(endDate)
-                    : 'No end date'}
+                    : 'Select end date'}
                 </Text>
-
+                <MaterialCommunityIcons
+                  name="calendar-month-outline"
+                  size={20}
+                  color="#0B4F59"
+                />
               </Pressable>
 
               {showEndDatePicker && (
@@ -670,6 +688,7 @@ export default function EditScheduleScreen({
                         ? startDate
                         : todayStart
                     }
+                    maximumDate={parseLocalDate(selectedMedication?.expirationDate) || undefined}
                     display={
                       Platform.OS === 'ios'
                         ? 'spinner'
@@ -918,6 +937,9 @@ const styles = StyleSheet.create({
   },
 
   inputButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D9DEE8',

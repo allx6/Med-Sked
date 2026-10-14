@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const emailService = require('../services/emailService');
 const authRoutes = require('../routes/authRoutes');
@@ -358,17 +359,51 @@ test('registration sends an OTP but does not create an authenticated session', a
       email: ' Person@example.com ',
       password: 'secure-pass',
       role: 'caregiver',
+      termsAccepted: true,
     });
     assert.equal(response.statusCode, 201);
     assert.equal(response.body.verificationRequired, true);
     assert.equal(response.body.token, undefined);
     assert.equal(response.body.email, 'person@example.com');
     assert.equal(mocks.store.get().emailVerified, false);
+    assert.equal(mocks.store.get().termsAccepted, true);
+    assert.ok(mocks.store.get().termsAcceptedAt instanceof Date);
     assert.equal(mocks.sentCodes.length, 1);
     assert.equal(JSON.stringify(response.body).includes(mocks.sentCodes[0].otp), false);
   } finally {
     mocks.restore();
   }
+});
+
+test('registration rejects missing or false terms acceptance without creating an account', async () => {
+  for (const termsAccepted of [undefined, false]) {
+    const mocks = installRouteStore(null);
+    try {
+      const response = await invokeAuthRoute('/register', {
+        name: 'Test Person',
+        email: 'person@example.com',
+        password: 'secure-pass',
+        role: 'caregiver',
+        ...(termsAccepted === undefined ? {} : { termsAccepted }),
+      });
+
+      assert.equal(response.statusCode, 400);
+      assert.equal(
+        response.body.message,
+        'You must accept the MedSked Terms & Conditions.'
+      );
+      assert.equal(mocks.store.get(), null);
+      assert.equal(mocks.sentCodes.length, 0);
+    } finally {
+      mocks.restore();
+    }
+  }
+});
+
+test('terms acceptance fields are defined with a false model default', () => {
+  assert.equal(User.schema.path('termsAccepted').instance, 'Boolean');
+  assert.equal(User.schema.path('termsAccepted').defaultValue, false);
+  assert.equal(User.schema.path('termsAcceptedAt').instance, 'Date');
 });
 
 test('registration accepts valid email addresses from different providers', async () => {
@@ -384,9 +419,12 @@ test('registration accepts valid email addresses from different providers', asyn
         email,
         password: 'secure-pass',
         role: 'caregiver',
+        termsAccepted: true,
       });
       assert.equal(response.statusCode, 201, email);
       assert.equal(mocks.store.get().email, email);
+      assert.equal(mocks.store.get().termsAccepted, true);
+      assert.ok(mocks.store.get().termsAcceptedAt instanceof Date);
       assert.equal(mocks.sentCodes.length, 1);
     } finally {
       mocks.restore();
@@ -403,6 +441,7 @@ test('registration rejects malformed and empty email addresses', async () => {
         email,
         password: 'secure-pass',
         role: 'caregiver',
+        termsAccepted: true,
       });
       assert.equal(response.statusCode, 400, JSON.stringify(email));
       assert.equal(mocks.store.get(), null);
@@ -423,6 +462,7 @@ test('registration handles email delivery failure without exposing provider deta
       email: 'person@example.com',
       password: 'secure-pass',
       role: 'caregiver',
+      termsAccepted: true,
     });
     assert.equal(response.statusCode, 503);
     assert.equal(response.body.verificationRequired, true);
@@ -463,7 +503,7 @@ test('unverified login is blocked after password validation and returns no token
   }
 });
 
-test('verified login preserves the existing token response', async () => {
+test('verified login preserves the existing token response and claims', async () => {
   const originalSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = 'email-verification-test-secret';
   const password = await bcrypt.hash('secure-pass', 4);
@@ -484,6 +524,12 @@ test('verified login preserves the existing token response', async () => {
     assert.equal(response.statusCode, 200);
     assert.equal(typeof response.body.token, 'string');
     assert.equal(response.body.user.role, 'patient');
+    const claims = jwt.verify(response.body.token, process.env.JWT_SECRET);
+    assert.deepEqual(
+      { userId: claims.userId, username: claims.username, role: claims.role },
+      { userId: 'user-1', username: 'testperson', role: 'patient' }
+    );
+    assert.ok(claims.exp - claims.iat <= 7 * 24 * 60 * 60);
   } finally {
     mocks.restore();
     if (originalSecret === undefined) {
@@ -513,10 +559,14 @@ test('resend route sends a code without returning it', async () => {
   }
 });
 
-test('verification route confirms email without returning the submitted OTP', async () => {
+test('verification route confirms email and returns the normal authenticated session', async () => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'email-verification-test-secret';
   const mocks = installRouteStore({
     _id: 'user-1',
+    username: 'testperson',
     email: 'person@example.com',
+    role: 'caregiver',
     emailVerified: false,
     emailVerificationAttempts: 0,
   });
@@ -532,8 +582,97 @@ test('verification route confirms email without returning the submitted OTP', as
     });
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.message, 'Email verified successfully.');
+    assert.equal(typeof response.body.token, 'string');
+    assert.deepEqual(response.body.user, {
+      id: 'user-1',
+      username: 'testperson',
+      email: 'person@example.com',
+      patientId: undefined,
+      role: 'caregiver',
+    });
+    const claims = jwt.verify(response.body.token, process.env.JWT_SECRET);
+    assert.deepEqual(
+      { userId: claims.userId, username: claims.username, role: claims.role },
+      { userId: 'user-1', username: 'testperson', role: 'caregiver' }
+    );
+    assert.ok(claims.exp - claims.iat <= 7 * 24 * 60 * 60);
     assert.equal(JSON.stringify(response.body).includes(otp), false);
     assert.equal(mocks.store.get().emailVerified, true);
+  } finally {
+    mocks.restore();
+    if (originalSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = originalSecret;
+    }
+  }
+});
+
+test('incorrect OTP does not verify the account or return a token', async () => {
+  const mocks = installRouteStore({
+    _id: 'user-1',
+    email: 'person@example.com',
+    emailVerified: false,
+    emailVerificationAttempts: 0,
+  });
+  try {
+    const issued = await invokeAuthRoute('/resend-verification', {
+      email: 'person@example.com',
+    });
+    assert.equal(issued.statusCode, 200);
+    const submittedOtp = mocks.sentCodes[0].otp === '000000' ? '000001' : '000000';
+    const response = await invokeAuthRoute('/verify-email', {
+      email: 'person@example.com',
+      otp: submittedOtp,
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body.token, undefined);
+    assert.equal(response.body.user, undefined);
+    assert.equal(mocks.store.get().emailVerified, false);
+  } finally {
+    mocks.restore();
+  }
+});
+
+test('expired OTP does not verify the account or return a token', async () => {
+  const otpHash = await bcrypt.hash('123456', 4);
+  const mocks = installRouteStore({
+    _id: 'user-1',
+    email: 'person@example.com',
+    emailVerified: false,
+    emailVerificationOtpHash: otpHash,
+    emailVerificationExpires: new Date(Date.now() - 1000),
+    emailVerificationAttempts: 0,
+  });
+  try {
+    const response = await invokeAuthRoute('/verify-email', {
+      email: 'person@example.com',
+      otp: '123456',
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body.token, undefined);
+    assert.equal(response.body.user, undefined);
+    assert.equal(mocks.store.get().emailVerified, false);
+  } finally {
+    mocks.restore();
+  }
+});
+
+test('missing OTP does not verify the account or return a token', async () => {
+  const mocks = installRouteStore({
+    _id: 'user-1',
+    email: 'person@example.com',
+    emailVerified: false,
+    emailVerificationAttempts: 0,
+  });
+  try {
+    const response = await invokeAuthRoute('/verify-email', {
+      email: 'person@example.com',
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.body.token, undefined);
+    assert.equal(response.body.user, undefined);
+    assert.equal(mocks.store.get().emailVerified, false);
   } finally {
     mocks.restore();
   }

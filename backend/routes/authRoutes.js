@@ -45,6 +45,32 @@ const generatePatientId = async () => {
   return candidate;
 };
 
+const ensurePatientId = async (user) => {
+  if (user.role === 'patient' && !user.patientId) {
+    user.patientId = await generatePatientId();
+    await user.save();
+  }
+};
+
+const createAuthenticationPayload = (user) => ({
+  token: jwt.sign(
+    {
+      userId: user._id.toString(),
+      username: user.username,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  ),
+  user: {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    patientId: user.patientId,
+    role: user.role,
+  },
+});
+
 
 // =====================================================
 // REGISTER
@@ -58,12 +84,19 @@ router.post('/register', async (req, res) => {
       email,
       password,
       role,
+      termsAccepted,
     } = req.body;
 
 
     // =====================================================
     // VALIDATION
     // =====================================================
+
+    if (termsAccepted !== true) {
+      return res.status(400).json({
+        message: 'You must accept the MedSked Terms & Conditions.',
+      });
+    }
 
     if (
       !name ||
@@ -232,6 +265,8 @@ router.post('/register', async (req, res) => {
       password: hashedPassword,
       role,
       emailVerified: false,
+      termsAccepted: true,
+      termsAcceptedAt: new Date(),
     };
 
     if (patientId) {
@@ -356,35 +391,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    if (user.role === 'patient' && !user.patientId) {
-      user.patientId = await generatePatientId();
-      await user.save();
-    }
-
-
-    // =====================================================
-    // CREATE JWT
-    // =====================================================
-
-    const token =
-      jwt.sign(
-        {
-          userId:
-            user._id.toString(),
-
-          username:
-            user.username,
-
-          role:
-            user.role,
-        },
-
-        process.env.JWT_SECRET,
-
-        {
-          expiresIn: '7d',
-        }
-      );
+    await ensurePatientId(user);
 
 
     // =====================================================
@@ -394,25 +401,7 @@ router.post('/login', async (req, res) => {
     return res.json({
       message:
         'Login successful.',
-
-      token,
-
-      user: {
-        id:
-          user._id,
-
-        username:
-          user.username,
-
-        email:
-          user.email,
-
-        patientId:
-          user.patientId,
-
-        role:
-          user.role,
-      },
+      ...createAuthenticationPayload(user),
     });
 
   } catch (error) {
@@ -471,9 +460,11 @@ router.post('/verify-email', async (req, res) => {
       });
     }
 
-    await emailVerificationService.verifyEmail(email, otp);
+    const verifiedUser = await emailVerificationService.verifyEmail(email, otp);
+    await ensurePatientId(verifiedUser);
     return res.json({
       message: 'Email verified successfully.',
+      ...createAuthenticationPayload(verifiedUser),
     });
   } catch (error) {
     if (error instanceof EmailVerificationError) {

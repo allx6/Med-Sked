@@ -14,6 +14,9 @@ const { generateTodayDoses } = require('../services/doseGenerator');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 
 const router = express.Router();
+const PATIENT_SEARCH_RESULT_LIMIT = 10;
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 
 // =====================================================
@@ -548,7 +551,7 @@ router.get(
 
 // =====================================================
 // SEARCH PATIENT
-// GET /api/caregiver/search-patient?email=example@email.com
+// GET /api/caregiver/search-patient?identifier=partial-patient-id-or-name-or-email
 // =====================================================
 
 router.get(
@@ -568,7 +571,7 @@ router.get(
       }
 
       // -------------------------------------------------
-      // GET EMAIL
+      // GET SEARCH TEXT
       // -------------------------------------------------
 
       const rawIdentifier =
@@ -582,68 +585,72 @@ router.get(
 
       if (!identifier) {
         return res.status(400).json({
-          message: 'Patient ID or email is required',
+          message: 'Patient ID, username, or email is required',
         });
       }
 
       const normalizedIdentifier =
         identifier.toLowerCase();
 
-      const normalizedPatientId =
-        identifier.toUpperCase();
+      const searchPattern = new RegExp(escapeRegex(normalizedIdentifier), 'i');
 
       // -------------------------------------------------
-      // FIND PATIENT
+      // FIND PATIENTS
       // -------------------------------------------------
 
-      const patient =
-        await User.findOne({
+      const patients =
+        await User.find({
           role: 'patient',
           $or: [
-            { email: normalizedIdentifier },
-            { patientId: normalizedPatientId },
+            { email: searchPattern },
+            { patientId: searchPattern },
+            { username: searchPattern },
           ],
         }).select(
           '_id username email patientId role createdAt'
-        );
+        ).limit(PATIENT_SEARCH_RESULT_LIMIT);
 
-      if (!patient) {
-        return res.status(404).json({
-          message: 'Patient not found',
+      if (!patients.length) {
+        return res.json({
+          patients: [],
         });
       }
 
       // -------------------------------------------------
-      // CHECK EXISTING RELATIONSHIP
+      // INCLUDE EXISTING RELATIONSHIP STATUS PER MATCH
       // -------------------------------------------------
 
-      const relationship =
-        await CaregiverRelationship.findOne({
+      const matches = await Promise.all(patients.map(async (patient) => {
+        const relationship = await CaregiverRelationship.findOne({
           caregiver: req.user.userId,
           patient: patient._id,
         });
+
+        return {
+          patient: {
+            _id: patient._id,
+            username: patient.username,
+            email: patient.email,
+            patientId: patient.patientId,
+            role: patient.role,
+            createdAt: patient.createdAt,
+          },
+          relationship: relationship
+            ? {
+              id: relationship._id,
+              status: relationship.status,
+            }
+            : null,
+        };
+      }));
 
       // -------------------------------------------------
       // RESPONSE
       // -------------------------------------------------
 
       res.json({
-        patient: patient
-          ? {
-              _id: patient._id,
-              username: patient.username,
-              email: patient.email,
-              patientId: patient.patientId,
-              role: patient.role,
-              createdAt: patient.createdAt,
-            }
-          : null,
-        relationship: relationship
-          ? {
-              id: relationship._id,
-              status: relationship.status,
-            }
-          : null,
+        patients: matches,
+        ...(matches.length === 1 ? matches[0] : {}),
       });
 
     } catch (error) {

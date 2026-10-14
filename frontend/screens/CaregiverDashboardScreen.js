@@ -204,6 +204,27 @@ export default function CaregiverDashboardScreen({
         </View>
 
         {/* =================================================
+            CAREGIVER ACCESS
+        ================================================= */}
+
+        <View style={styles.section}>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIcon}>
+              <MaterialCommunityIcons name="information-outline" size={20} color="#0B4F59" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>Caregiver Access</Text>
+              <Text style={styles.infoText}>
+                You can view medication,
+                schedule, and dose information
+                for patients who have an active
+                caregiver relationship with you.
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* =================================================
             ERROR
         ================================================= */}
 
@@ -472,47 +493,6 @@ export default function CaregiverDashboardScreen({
             })
 
           )}
-
-        </View>
-
-        {/* =================================================
-            INFORMATION
-        ================================================= */}
-
-        <View style={styles.section}>
-
-          <View
-            style={styles.infoCard}
-          >
-
-            <View
-              style={styles.infoIcon}
-            >
-              <MaterialCommunityIcons name="information-outline" size={20} color="#0B4F59" />
-            </View>
-
-            <View
-              style={styles.infoContent}
-            >
-
-              <Text
-                style={styles.infoTitle}
-              >
-                Caregiver Access
-              </Text>
-
-              <Text
-                style={styles.infoText}
-              >
-                You can view medication,
-                schedule, and dose information
-                for patients who have an active
-                caregiver relationship with you.
-              </Text>
-
-            </View>
-
-          </View>
 
         </View>
 

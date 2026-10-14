@@ -59,7 +59,7 @@ const createEmailVerificationService = ({
           emailVerificationLastSentAt: sentAt,
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updatedUser) {
@@ -252,7 +252,7 @@ const createEmailVerificationService = ({
           emailVerificationLastSentAt: 1,
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!verifiedUser) {
@@ -262,6 +262,8 @@ const createEmailVerificationService = ({
         'That verification code is incorrect.'
       );
     }
+
+    return verifiedUser;
   };
 
   return {

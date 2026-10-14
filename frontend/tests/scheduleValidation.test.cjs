@@ -64,7 +64,7 @@ test('frontend requires end date for expiring medication', () => {
   for (const endDate of [null, '']) {
     assert.equal(validateScheduleFields(baseSchedule({ endDate }), {
       medicationExpirationDate: '2027-10-02',
-    }), 'End date is required because this medication has an expiration date.');
+    }), 'End date is required.');
   }
 });
 
@@ -84,8 +84,11 @@ test('frontend rejects creation for already expired medication with date', () =>
   }), `Cannot create a schedule for an expired medication. This medication expired on ${expirationDate}.`);
 });
 
-test('frontend keeps legacy no-expiration schedules compatible', () => {
-  assert.equal(validateScheduleFields(baseSchedule({ endDate: null })), '');
+test('frontend requires an end date for schedules without expiration metadata', () => {
+  assert.equal(
+    validateScheduleFields(baseSchedule({ endDate: null })),
+    'End date is required.'
+  );
 });
 
 test('frontend preserves historical start date during edit validation', () => {

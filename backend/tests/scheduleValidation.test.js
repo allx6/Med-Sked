@@ -98,7 +98,7 @@ test('validateScheduleFields rejects an end date after medication expiration', (
   }), 'Schedule end date cannot be after the medication expiration date.');
 });
 
-test('validateScheduleFields requires an end date when medication expires', () => {
+test('validateScheduleFields requires an end date', () => {
   const payload = {
     ...validPayload,
     startDate: '2027-10-02',
@@ -107,7 +107,7 @@ test('validateScheduleFields requires an end date when medication expires', () =
 
   assert.equal(validateScheduleFields(payload, {
     medicationExpirationDate: '2027-10-02',
-  }), 'End date is required because this medication has an expiration date.');
+  }), 'End date is required.');
 });
 
 test('validateScheduleFields rejects creating a schedule for an expired medication', () => {
@@ -123,8 +123,11 @@ test('validateScheduleFields rejects creating a schedule for an expired medicati
   }), `Cannot create a schedule for an expired medication. This medication expired on ${formatLocalDate(yesterday)}.`);
 });
 
-test('validateScheduleFields leaves legacy medications without expiration unchanged', () => {
-  assert.equal(validateScheduleFields(validPayload), null);
+test('validateScheduleFields requires an end date even without medication expiration', () => {
+  assert.equal(validateScheduleFields({
+    ...validPayload,
+    endDate: null,
+  }), 'End date is required.');
 });
 
 test('validateScheduleFields preserves a historical start date when editing', () => {

@@ -161,10 +161,10 @@ export default function App() {
     setScreen('emailVerification');
   }
 
-  function handleEmailVerified() {
+  function handleEmailVerified(authentication) {
     setVerificationMessage('');
     setVerificationCooldown(0);
-    setScreen('login');
+    handleLogin(authentication.user, authentication.token);
   }
 
   function handlePasswordResetComplete(message) {
