@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const LoginAttemptState = require('../models/LoginAttemptState');
 const emailService = require('../services/emailService');
 const authMiddleware = require('../middleware/authMiddleware');
 const authRoutes = require('../routes/authRoutes');
@@ -129,13 +130,58 @@ const installRouteMocks = (initialUser, sendEmail = async () => {}) => {
     findOne: User.findOne,
     findOneAndUpdate: User.findOneAndUpdate,
     updateOne: User.updateOne,
+    loginStateFindById: LoginAttemptState.findById,
+    loginStateFindOneAndUpdate: LoginAttemptState.findOneAndUpdate,
+    loginStateUpdateOne: LoginAttemptState.updateOne,
+    loginStateDeleteOne: LoginAttemptState.deleteOne,
     sendPasswordResetEmail: emailService.sendPasswordResetEmail,
   };
   const store = createMemoryStore(initialUser);
   const emails = [];
+  const loginStates = new Map();
   User.findOne = store.findOne;
   User.findOneAndUpdate = store.findOneAndUpdate;
   User.updateOne = store.updateOne;
+  LoginAttemptState.findById = (key) => ({
+    lean: async () => loginStates.get(key) || null,
+  });
+  LoginAttemptState.findOneAndUpdate = (filter, update) => {
+    const key = filter._id;
+    const threshold = update[0].$set.cooldownStartedAt.$cond[0].$eq[1];
+    const now = Date.now();
+    const current = loginStates.get(key) || {
+      failedAttempts: 0,
+      cooldownStartedAt: null,
+    };
+    if (
+      current.cooldownStartedAt
+      && current.cooldownStartedAt.getTime() + (5 * 60 * 1000) <= now
+    ) {
+      current.failedAttempts = 0;
+      current.cooldownStartedAt = null;
+    }
+    current.failedAttempts += 1;
+    if (current.failedAttempts === threshold) {
+      current.cooldownStartedAt = new Date(now);
+    }
+    loginStates.set(key, current);
+    return {
+      lean: async () => ({ ...current }),
+    };
+  };
+  LoginAttemptState.updateOne = async (filter, update) => {
+    const current = loginStates.get(filter._id);
+    if (
+      current
+      && current.cooldownStartedAt?.getTime() === filter.cooldownStartedAt.getTime()
+    ) {
+      Object.assign(current, update.$set);
+    }
+    return { matchedCount: current ? 1 : 0 };
+  };
+  LoginAttemptState.deleteOne = async (filter) => ({
+    deletedCount: loginStates.delete(filter._id) ? 1 : 0,
+  });
   emailService.sendPasswordResetEmail = async (email, otp) => {
     emails.push({ email, otp });
     await sendEmail(email, otp);
@@ -148,6 +194,10 @@ const installRouteMocks = (initialUser, sendEmail = async () => {}) => {
       User.findOne = originals.findOne;
       User.findOneAndUpdate = originals.findOneAndUpdate;
       User.updateOne = originals.updateOne;
+      LoginAttemptState.findById = originals.loginStateFindById;
+      LoginAttemptState.findOneAndUpdate = originals.loginStateFindOneAndUpdate;
+      LoginAttemptState.updateOne = originals.loginStateUpdateOne;
+      LoginAttemptState.deleteOne = originals.loginStateDeleteOne;
       emailService.sendPasswordResetEmail = originals.sendPasswordResetEmail;
     },
   };
@@ -169,7 +219,7 @@ const invokeRoute = async (path, body) => {
       return this;
     },
   };
-  await handler({ body }, response);
+  await handler({ body, ip: '203.0.113.10' }, response);
   return response;
 };
 

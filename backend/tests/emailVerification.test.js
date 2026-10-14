@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const LoginAttemptState = require('../models/LoginAttemptState');
 const emailService = require('../services/emailService');
 const authRoutes = require('../routes/authRoutes');
 const {
@@ -123,10 +124,15 @@ const installRouteStore = (initialUser, sendEmail = async () => {}) => {
     updateOne: User.updateOne,
     exists: User.exists,
     create: User.create,
+    loginStateFindById: LoginAttemptState.findById,
+    loginStateFindOneAndUpdate: LoginAttemptState.findOneAndUpdate,
+    loginStateUpdateOne: LoginAttemptState.updateOne,
+    loginStateDeleteOne: LoginAttemptState.deleteOne,
     sendVerificationEmail: emailService.sendVerificationEmail,
   };
   const store = createMemoryUserStore(initialUser);
   const sentCodes = [];
+  const loginStates = new Map();
 
   User.findOne = async (filter) => {
     const current = store.get();
@@ -142,6 +148,46 @@ const installRouteStore = (initialUser, sendEmail = async () => {}) => {
     ...data,
     _id: 'user-1',
     emailVerificationAttempts: 0,
+  });
+  LoginAttemptState.findById = (key) => ({
+    lean: async () => loginStates.get(key) || null,
+  });
+  LoginAttemptState.findOneAndUpdate = (filter, update) => {
+    const key = filter._id;
+    const threshold = update[0].$set.cooldownStartedAt.$cond[0].$eq[1];
+    const now = Date.now();
+    const current = loginStates.get(key) || {
+      failedAttempts: 0,
+      cooldownStartedAt: null,
+    };
+    if (
+      current.cooldownStartedAt
+      && current.cooldownStartedAt.getTime() + (5 * 60 * 1000) <= now
+    ) {
+      current.failedAttempts = 0;
+      current.cooldownStartedAt = null;
+    }
+    current.failedAttempts += 1;
+    if (current.failedAttempts === threshold) {
+      current.cooldownStartedAt = new Date(now);
+    }
+    loginStates.set(key, current);
+    return {
+      lean: async () => ({ ...current }),
+    };
+  };
+  LoginAttemptState.updateOne = async (filter, update) => {
+    const current = loginStates.get(filter._id);
+    if (
+      current
+      && current.cooldownStartedAt?.getTime() === filter.cooldownStartedAt.getTime()
+    ) {
+      Object.assign(current, update.$set);
+    }
+    return { matchedCount: current ? 1 : 0 };
+  };
+  LoginAttemptState.deleteOne = async (filter) => ({
+    deletedCount: loginStates.delete(filter._id) ? 1 : 0,
   });
   emailService.sendVerificationEmail = async (email, otp) => {
     sentCodes.push({ email, otp });
@@ -159,8 +205,15 @@ const installRouteStore = (initialUser, sendEmail = async () => {}) => {
         exists: originals.exists,
         create: originals.create,
       });
+      Object.assign(LoginAttemptState, {
+        findById: originals.loginStateFindById,
+        findOneAndUpdate: originals.loginStateFindOneAndUpdate,
+        updateOne: originals.loginStateUpdateOne,
+        deleteOne: originals.loginStateDeleteOne,
+      });
       emailService.sendVerificationEmail = originals.sendVerificationEmail;
     },
+    loginStates,
   };
 };
 
@@ -180,8 +233,17 @@ const invokeAuthRoute = async (path, body) => {
       return this;
     },
   };
-
-  await handler({ body }, response);
+  const originalSecret = process.env.JWT_SECRET;
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = 'auth-route-test-secret';
+  }
+  try {
+    await handler({ body, ip: '203.0.113.10' }, response);
+  } finally {
+    if (originalSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    }
+  }
   return response;
 };
 
@@ -530,6 +592,7 @@ test('verified login preserves the existing token response and claims', async ()
       { userId: 'user-1', username: 'testperson', role: 'patient' }
     );
     assert.ok(claims.exp - claims.iat <= 7 * 24 * 60 * 60);
+    assert.equal(mocks.loginStates.size, 0);
   } finally {
     mocks.restore();
     if (originalSecret === undefined) {
@@ -537,6 +600,98 @@ test('verified login preserves the existing token response and claims', async ()
     } else {
       process.env.JWT_SECRET = originalSecret;
     }
+  }
+});
+
+test('failed login attempts are generic and enter account cooldown at threshold', async () => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'email-verification-test-secret';
+  const password = await bcrypt.hash('secure-pass', 4);
+  const mocks = installRouteStore({
+    _id: 'user-1',
+    username: 'testperson',
+    email: 'person@example.com',
+    password,
+    role: 'patient',
+    emailVerified: true,
+  });
+  try {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      const response = await invokeAuthRoute('/login', {
+        email: 'person@example.com',
+        password: 'incorrect',
+      });
+      assert.equal(response.statusCode, 401);
+      assert.equal(response.body.message, 'Invalid email or password.');
+      assert.equal(response.body.token, undefined);
+    }
+
+    const sixthAttempt = await invokeAuthRoute('/login', {
+      email: 'person@example.com',
+      password: 'secure-pass',
+    });
+    assert.equal(sixthAttempt.statusCode, 429);
+    assert.equal(
+      sixthAttempt.body.message,
+      'Too many failed authentication attempts. Please try again later.'
+    );
+    assert.equal(sixthAttempt.body.email, undefined);
+    assert.equal(typeof sixthAttempt.body.retryAfterSeconds, 'number');
+  } finally {
+    mocks.restore();
+    if (originalSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = originalSecret;
+    }
+  }
+});
+
+test('unknown login identifiers receive the same generic cooldown behavior', async () => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'email-verification-test-secret';
+  const mocks = installRouteStore(null);
+  try {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await invokeAuthRoute('/login', {
+        email: 'unknown@example.com',
+        password: 'incorrect',
+      });
+      assert.equal(response.statusCode, 401);
+      assert.equal(response.body.message, 'Invalid email or password.');
+    }
+
+    const locked = await invokeAuthRoute('/login', {
+      email: 'unknown@example.com',
+      password: 'anything',
+    });
+    assert.equal(locked.statusCode, 429);
+    assert.equal(
+      locked.body.message,
+      'Too many failed authentication attempts. Please try again later.'
+    );
+    assert.equal(locked.body.email, undefined);
+  } finally {
+    mocks.restore();
+    if (originalSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = originalSecret;
+    }
+  }
+});
+
+test('malformed login requests do not increment failed-login state', async () => {
+  const mocks = installRouteStore(null);
+  try {
+    const response = await invokeAuthRoute('/login', {
+      email: 'not-an-email',
+      password: 'incorrect',
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(mocks.loginStates.size, 0);
+  } finally {
+    mocks.restore();
   }
 });
 
