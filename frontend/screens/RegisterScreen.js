@@ -13,6 +13,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   registerUser,
@@ -257,15 +258,12 @@ export default function RegisterScreen({
 
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Back"
               onPress={onNavigateLanding}
               style={styles.backButton}
               hitSlop={10}
             >
-
-              <Text style={styles.backText}>
-                Back
-              </Text>
-
+              <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
             </Pressable>
 
 
@@ -594,12 +592,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 18,
     paddingHorizontal: 4,
-  },
-
-  backText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#D8F0F2',
   },
 
   logoCircle: {

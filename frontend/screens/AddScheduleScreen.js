@@ -1358,15 +1358,22 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     marginTop: 10,
-    minHeight: 48,
+    minHeight: 52,
+    width: '100%',
+    backgroundColor: '#0B4F59',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#D8F0F2',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 
   cancelButtonText: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
 });

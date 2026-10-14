@@ -461,21 +461,39 @@ export default function PatientMonitoringScreen({
                     <Text style={styles.doseName}>{medication.name || 'Medication'}</Text>
                     <Text style={styles.doseMeta}>{schedule.time || schedule.scheduledTime || 'Time not specified'}</Text>
                     <Text style={styles.doseMeta}>{days}</Text>
+                    <View style={[
+                      styles.scheduleStatusBadge,
+                      medicationExpired
+                        ? styles.scheduleStatusExpired
+                        : schedule.enabled === false
+                          ? styles.scheduleStatusInactive
+                          : styles.scheduleStatusActive,
+                    ]}>
+                      <Text style={[styles.statusText, medicationExpired ? styles.expiredSchedule : schedule.enabled === false ? styles.skipped : styles.success]}>
+                        {medicationExpired ? 'Expired' : schedule.enabled === false ? 'Inactive' : 'Active'}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={[styles.statusText, medicationExpired ? styles.expiredSchedule : schedule.enabled === false ? styles.skipped : styles.success]}>
-                    {medicationExpired ? 'Expired' : schedule.enabled === false ? 'Inactive' : 'Active'}
-                  </Text>
                   {canSupportAdherence ? (
-                    <View style={styles.resourceActions}>
-                      <Pressable onPress={() => onEditSchedule(schedule)} style={styles.inlineAction}><Text style={styles.inlineActionText}>Edit</Text></Pressable>
+                    <View style={styles.scheduleResourceActions}>
                       <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit schedule for ${medication.name || 'medication'}`}
+                        onPress={() => onEditSchedule(schedule)}
+                        style={styles.scheduleEditAction}
+                      >
+                        <Text style={styles.inlineActionText}>Edit</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete schedule for ${medication.name || 'medication'}`}
                         onPress={() => setConfirmation({
                           type: 'schedule',
                           item: schedule,
                           title: 'Delete schedule?',
                           message: 'This will remove this patient\'s schedule and related dose records where applicable.',
                         })}
-                        style={styles.inlineDanger}
+                        style={styles.scheduleDeleteAction}
                       >
                         <Text style={styles.inlineDangerText}>Delete</Text>
                       </Pressable>
@@ -586,16 +604,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadow.card,
   },
-  scheduleCard: { flexDirection: 'column', alignItems: 'stretch' },
+  scheduleCard: { flexDirection: 'row', alignItems: 'flex-start' },
   historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.cardTintBorder, padding: spacing.md, marginBottom: spacing.sm },
   historyRowWrapper: { marginBottom: spacing.sm },
   doseTime: { width: 72, fontSize: 14, fontWeight: '800', color: colors.primary },
-  doseInfo: { flex: 1 },
+  doseInfo: { flex: 1, minWidth: 0 },
   doseName: { fontSize: 15, fontWeight: '700', color: colors.text },
   doseMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   expiredMeta: { color: colors.dangerText, fontWeight: '700' },
   doseDate: { fontSize: 14, color: colors.textSecondary, marginTop: 3 },
   resourceActions: { marginLeft: spacing.sm, gap: 5 },
+  scheduleResourceActions: { width: 72, marginLeft: spacing.md, gap: 8 },
+  scheduleStatusBadge: { alignSelf: 'flex-start', marginTop: 7, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  scheduleStatusActive: { backgroundColor: colors.successSoft },
+  scheduleStatusInactive: { backgroundColor: colors.skippedSoft },
+  scheduleStatusExpired: { backgroundColor: colors.dangerSoft },
+  scheduleEditAction: { minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  scheduleDeleteAction: { minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.dangerSoft },
   inlineAction: { paddingVertical: 4, paddingHorizontal: 5 },
   inlineActionText: { color: colors.primary, fontSize: 11, fontWeight: '800' },
   inlineDanger: { paddingVertical: 4, paddingHorizontal: 5 },

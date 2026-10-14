@@ -588,94 +588,101 @@ export default function EditScheduleScreen({
           End Date
         </Text>
 
-        {selectedMedication?.expirationDate ? (
-          <Text style={styles.expirationHint}>
-            End date is required because this medication expires on {selectedMedication.expirationDate}.
-          </Text>
-        ) : null}
+        <View style={styles.endDateCard}>
+          {selectedMedication?.expirationDate ? (
+            <View style={styles.expirationNotice}>
+              <Text style={styles.expirationTitle}>
+                Medication expiration
+              </Text>
+              <Text style={styles.expirationHint}>
+                An end date is required. This medication expires on {selectedMedication.expirationDate}.
+              </Text>
+            </View>
+          ) : null}
 
-        {isWeb ? (
-          <input
-            type="date"
-            value={endDate ? formatDate(endDate) : ''}
-            min={
-              startDate > todayStart
-                ? formatDate(startDate)
-                : formatDate(todayStart)
-            }
-            onChange={(event) => {
-              const nextDate = parseWebDateValue(event.target.value);
-
-              if (!nextDate) {
-                return;
+          {isWeb ? (
+            <input
+              type="date"
+              value={endDate ? formatDate(endDate) : ''}
+              min={
+                startDate > todayStart
+                  ? formatDate(startDate)
+                  : formatDate(todayStart)
               }
+              onChange={(event) => {
+                const nextDate = parseWebDateValue(event.target.value);
 
-              if (nextDate < todayStart) {
-                return;
-              }
+                if (!nextDate) {
+                  return;
+                }
 
-              if (startDate && nextDate < new Date(
-                startDate.getFullYear(),
-                startDate.getMonth(),
-                startDate.getDate()
-              )) {
-                return;
-              }
+                if (nextDate < todayStart) {
+                  return;
+                }
 
-              setEndDate(nextDate);
-            }}
-            disabled={saving}
-            style={styles.webDateInput}
-          />
-        ) : (
-          <>
-            <Pressable
-              style={styles.inputButton}
-              onPress={() =>
-                setShowEndDatePicker(true)
-              }
-            >
+                if (startDate && nextDate < new Date(
+                  startDate.getFullYear(),
+                  startDate.getMonth(),
+                  startDate.getDate()
+                )) {
+                  return;
+                }
 
-              <Text
-                style={
-                  endDate
-                    ? styles.inputText
-                    : styles.placeholderText
+                setEndDate(nextDate);
+              }}
+              disabled={saving}
+              style={styles.webDateInput}
+            />
+          ) : (
+            <>
+              <Pressable
+                style={styles.inputButton}
+                onPress={() =>
+                  setShowEndDatePicker(true)
                 }
               >
-                {endDate
-                  ? formatDate(endDate)
-                  : 'No end date'}
-              </Text>
 
-            </Pressable>
+                <Text
+                  style={
+                    endDate
+                      ? styles.inputText
+                      : styles.placeholderText
+                  }
+                >
+                  {endDate
+                    ? formatDate(endDate)
+                    : 'No end date'}
+                </Text>
 
-            {showEndDatePicker && (
-              <View style={styles.pickerContainer}>
-                <DateTimePicker
-                  value={
-                    endDate ||
-                    startDate ||
-                    new Date()
-                  }
-                  mode="date"
-                  minimumDate={
-                    startDate > todayStart
-                      ? startDate
-                      : todayStart
-                  }
-                  display={
-                    Platform.OS === 'ios'
-                      ? 'spinner'
-                      : 'default'
-                  }
-                  onValueChange={handleEndDateChange}
-                  onDismiss={() => setShowEndDatePicker(false)}
-                />
-              </View>
-            )}
-          </>
-        )}
+              </Pressable>
+
+              {showEndDatePicker && (
+                <View style={styles.pickerContainer}>
+                  <DateTimePicker
+                    value={
+                      endDate ||
+                      startDate ||
+                      new Date()
+                    }
+                    mode="date"
+                    minimumDate={
+                      startDate > todayStart
+                        ? startDate
+                        : todayStart
+                    }
+                    display={
+                      Platform.OS === 'ios'
+                        ? 'spinner'
+                        : 'default'
+                    }
+                    onValueChange={handleEndDateChange}
+                    onDismiss={() => setShowEndDatePicker(false)}
+                  />
+                </View>
+              )}
+            </>
+          )}
+        </View>
 
         {/* =================================================
             STATUS
@@ -837,11 +844,31 @@ const styles = StyleSheet.create({
   },
 
   expirationHint: {
-    marginTop: -3,
-    marginBottom: 8,
-    color: '#D8F0F2',
+    color: '#375B63',
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
+  },
+
+  endDateCard: {
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    padding: 14,
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#B8DDE1',
+    backgroundColor: '#EAF5F6',
+  },
+
+  expirationNotice: {
+    gap: 3,
+  },
+
+  expirationTitle: {
+    color: '#0B4F59',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   medicationList: {
@@ -903,15 +930,18 @@ const styles = StyleSheet.create({
 
   webDateInput: {
     width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     minHeight: 50,
+    display: 'block',
     backgroundColor: '#FFFFFF',
-    borderColor: '#D9DEE8',
+    borderColor: '#B8C9CE',
     borderRadius: 10,
     borderWidth: 1,
     color: '#1E2A4A',
     fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     boxSizing: 'border-box',
   },
 

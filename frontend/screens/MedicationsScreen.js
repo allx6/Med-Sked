@@ -760,7 +760,6 @@ export default function MedicationsScreen({
         >
 
           <View style={styles.pageTitleRow}>
-            <Text style={styles.pageTitle}>My Medication</Text>
             <Image
               accessible
               accessibilityLabel="MedSked logo"
@@ -768,15 +767,20 @@ export default function MedicationsScreen({
               resizeMode="contain"
               style={styles.pageLogo}
             />
+            <View style={styles.pageTitleGroup}>
+              <Text
+                style={styles.pageTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                Medications
+              </Text>
+              <Text style={styles.pageSubtitle}>
+                Manage your current medications.
+              </Text>
+            </View>
           </View>
-
-          <Text
-            style={
-              styles.pageSubtitle
-            }
-          >
-            Manage your current medications.
-          </Text>
 
         </View>
 
@@ -1117,9 +1121,14 @@ const styles = StyleSheet.create({
 
   pageTitleRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     gap: 8,
+  },
+
+  pageTitleGroup: {
+    flex: 1,
+    minWidth: 0,
   },
 
   pageLogo: {
@@ -1127,16 +1136,19 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 17,
     backgroundColor: '#FFFFFF',
+    flexShrink: 0,
   },
 
   pageTitle: {
-    fontSize: 25,
+    flexShrink: 1,
+    minWidth: 0,
+    fontSize: 23,
     fontWeight: '900',
     color: '#D7EDF3',
   },
 
   pageSubtitle: {
-    marginTop: 2,
+    marginTop: 1,
     fontSize: 12,
     lineHeight: 16,
     color: '#A7CDD0',
