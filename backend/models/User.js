@@ -41,6 +41,15 @@ const userSchema = new mongoose.Schema(
       default: 'patient',
     },
 
+    termsAccepted: {
+      type: Boolean,
+      default: false,
+    },
+
+    termsAcceptedAt: {
+      type: Date,
+    },
+
     emailVerified: {
       type: Boolean,
     },

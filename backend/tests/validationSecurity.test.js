@@ -92,6 +92,18 @@ test('medication fields accept valid values', () => {
   assert.equal(buildNormalizedMedicationKey('Metformin', '500 mg'), 'metformin|500mg');
 });
 
+test('medication validation rejects an expiration date before today', () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  assert.equal(validateMedicationFields({
+    name: 'Paracetamol',
+    dosage: '500 mg',
+    frequency: 'Every 8 hours',
+    expirationDate: formatLocalDate(yesterday),
+  }), 'Expiration date cannot be earlier than today.');
+});
+
 test('medication numeric fields accept up to six digits and reject longer values', () => {
   const base = {
     name: 'Acetaminophen',
@@ -193,6 +205,20 @@ test('schedule fields accept valid values', () => {
     endDate: formatLocalDate(tomorrow),
     enabled: true,
   }), null);
+});
+
+test('schedule validation requires an end date even for medications without expiration', () => {
+  const today = new Date();
+
+  assert.equal(validateScheduleFields({
+    medicationId: '507f1f77bcf86cd799439011',
+    time: '08:00',
+    dose: '500 mg',
+    days: ['Monday'],
+    startDate: formatLocalDate(today),
+    endDate: null,
+    enabled: true,
+  }), 'End date is required.');
 });
 
 test('schedule fields reject invalid time, days, dates, and enabled state', () => {

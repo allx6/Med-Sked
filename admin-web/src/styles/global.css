@@ -1345,6 +1345,65 @@ button:disabled {
   font-weight: 600;
 }
 
+.analytics-page .eyebrow,
+.analytics-page .analytics-page-title,
+.analytics-page .page-intro,
+.analytics-page .panel h3,
+.analytics-page .summary-highlight > span,
+.analytics-page .summary-highlight strong,
+.analytics-page .summary-highlight small,
+.analytics-page .bar-chart-heading,
+.analytics-page .bar-chart-label,
+.analytics-page .bar-chart-heading strong,
+.analytics-page .donut-chart-legend li,
+.analytics-page .donut-chart-legend li > strong,
+.analytics-page .donut-chart-legend li > strong span {
+  color: #ffffff;
+}
+
+.analytics-page .segmented-button {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.analytics-page .segmented-button.active {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.analytics-page .chart-panel-meta {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.analytics-page .loading-state,
+.analytics-page .empty-state {
+  border-color: var(--color-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.analytics-page .error-state {
+  border-color: rgba(252, 165, 165, 0.45);
+  background: rgba(185, 28, 28, 0.2);
+  color: #ffffff;
+}
+
+.analytics-page .line-chart-axis-label,
+.analytics-page .line-chart-percentage-label,
+.analytics-page .donut-chart-total,
+.analytics-page .donut-chart-caption {
+  fill: #ffffff;
+}
+
+.analytics-page .trend-positive,
+.analytics-page .trend-negative {
+  color: #ffffff !important;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -1397,7 +1456,7 @@ button:disabled {
 .audit-table th {
   padding: 14px 16px;
   background: #1b2938;
-  color: #9bb9dc;
+  color: #ffffff;
   font-size: 0.82rem;
   text-transform: none;
   letter-spacing: 0;
@@ -1437,7 +1496,7 @@ button:disabled {
   display: inline-block;
   max-width: 170px;
   overflow: hidden;
-  color: #526579;
+  color: #ffffff;
   font-size: 0.8rem;
   text-overflow: ellipsis;
   vertical-align: bottom;

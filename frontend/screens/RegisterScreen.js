@@ -9,10 +9,12 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  Modal,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import {
   registerUser,
@@ -46,6 +48,8 @@ export default function RegisterScreen({
     useState('');
 
   const [role, setRole] = useState('patient');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsVisible, setTermsVisible] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -160,6 +164,12 @@ export default function RegisterScreen({
       return;
     }
 
+    if (!termsAccepted) {
+      nextErrors.termsAccepted = 'You must agree to the MedSked Terms & Conditions to create an account.';
+      setErrors(nextErrors);
+      return;
+    }
+
     setErrors(nextErrors);
 
 
@@ -172,7 +182,8 @@ export default function RegisterScreen({
         name.trim(),
         email.trim(),
         password,
-        role
+        role,
+        termsAccepted
       );
 
       if (result.verificationRequired) {
@@ -257,15 +268,12 @@ export default function RegisterScreen({
 
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Back"
               onPress={onNavigateLanding}
               style={styles.backButton}
               hitSlop={10}
             >
-
-              <Text style={styles.backText}>
-                Back
-              </Text>
-
+              <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
             </Pressable>
 
 
@@ -319,7 +327,7 @@ export default function RegisterScreen({
               label="Username"
               value={name}
               onChangeText={(value) => {
-                setName(value);
+                setName(value.replace(/\s/g, ''));
                 setErrors((current) => ({ ...current, name: '' }));
                 setAuthError('');
               }}
@@ -474,6 +482,37 @@ export default function RegisterScreen({
               editable={!loading}
             />
 
+            <View style={styles.termsGroup}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: termsAccepted }}
+                onPress={() => {
+                  setTermsAccepted((accepted) => !accepted);
+                  setErrors((current) => ({ ...current, termsAccepted: '' }));
+                }}
+                disabled={loading}
+                style={styles.termsCheckboxRow}
+              >
+                <MaterialCommunityIcons
+                  name={termsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                  size={22}
+                  color={termsAccepted ? '#0B4F59' : '#6B7280'}
+                />
+                <Text style={styles.termsCheckboxText}>I agree to the MedSked</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => setTermsVisible(true)}
+                disabled={loading}
+                style={styles.termsLinkButton}
+              >
+                <Text style={styles.termsLink}>Terms &amp; Conditions</Text>
+              </Pressable>
+              {errors.termsAccepted ? (
+                <Text style={styles.termsError}>{errors.termsAccepted}</Text>
+              ) : null}
+            </View>
+
             {authError ? (
               <Text style={styles.authError}>{authError}</Text>
             ) : null}
@@ -529,6 +568,153 @@ export default function RegisterScreen({
         </ScrollView>
 
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={termsVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setTermsVisible(false)}
+      >
+        <View style={styles.termsModal}>
+          <View style={styles.termsModalHeader}>
+            <Text style={styles.termsModalTitle}>MedSked Terms &amp; Conditions</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close Terms & Conditions"
+              onPress={() => setTermsVisible(false)}
+              hitSlop={10}
+            >
+              <MaterialCommunityIcons name="close" size={26} color="#1E2A4A" />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.termsScroll}
+            contentContainerStyle={styles.termsScrollContent}
+            showsVerticalScrollIndicator
+          >
+            <Text style={styles.termsDocument}>
+              {`MedSked Terms & Conditions
+
+Welcome to MedSked — Medication Management & Adherence Support System.
+
+These Terms & Conditions govern your use of MedSked, including its website and mobile application. By creating an account or using MedSked, you acknowledge that you have read, understood, and agreed to these Terms & Conditions.
+
+1. Purpose of MedSked
+
+MedSked is designed to help users organize and manage medication-related information, schedules, reminders, dose records, adherence information, and refill-related information.
+
+MedSked may also provide features that allow authorized caregivers or family members to assist with medication management and monitoring.
+
+MedSked is intended as a medication management and adherence support tool.
+
+2. Not a Medical Service
+
+MedSked does not provide medical diagnosis, treatment, prescribing, or professional medical advice.
+
+MedSked does not replace a doctor, pharmacist, nurse, or other qualified healthcare professional.
+
+Users should consult an appropriate healthcare professional regarding their medications, dosages, treatment decisions, medical conditions, or other health concerns.
+
+MedSked does not independently determine whether a medication or dosage is medically appropriate.
+
+3. Medication Information
+
+Users are responsible for ensuring that the medication information they enter into MedSked is accurate and up to date.
+
+This may include medication names, dosage information, medication schedules, start and expiration dates, dose records, and refill information.
+
+Users should verify medication information against their prescription, medication label, or healthcare professional's instructions.
+
+MedSked should not be used as the sole source of information for making medical decisions.
+
+4. User Accounts
+
+Users are responsible for providing accurate information when creating an account.
+
+Users are responsible for maintaining the confidentiality of their account credentials and for activities performed through their account.
+
+Users should not share their password, verification codes, or other authentication information with unauthorized individuals.
+
+5. Caregiver Access
+
+MedSked may allow a patient to establish a connection with an authorized caregiver or family member.
+
+A caregiver's access to patient information is determined by the permissions and relationship established within MedSked.
+
+Users should only grant caregiver access to individuals they trust.
+
+Caregivers must only access and use patient information for legitimate medication-management and support purposes.
+
+6. Privacy and Personal Information
+
+MedSked may process information provided by users in connection with their accounts and medication-management activities.
+
+This may include account information, medication information, schedules, dose records, caregiver relationships, and related system activity.
+
+MedSked is designed to apply security measures to protect stored information and restrict access according to user roles and permissions.
+
+Users should avoid entering information that is unnecessary for the intended use of the system.
+
+7. Notifications and Reminders
+
+MedSked may provide medication reminders, dose-related notifications, caregiver notifications, and other system notifications.
+
+Notifications may be affected by device settings, Internet connectivity, application availability, operating-system restrictions, server interruptions, or other technical factors.
+
+Users should not rely solely on MedSked notifications to take medication.
+
+8. Accuracy and Availability
+
+MedSked is provided as a medication-management support system.
+
+While reasonable efforts may be made to maintain accurate information and system availability, MedSked does not guarantee that the system will always be available, uninterrupted, error-free, or completely accurate.
+
+Users remain responsible for verifying important medication information.
+
+9. Appropriate Use
+
+Users agree to use MedSked only for its intended purposes.
+
+Users must not:
+- Attempt to access another user's account without authorization.
+- Circumvent system security or access controls.
+- Misuse caregiver permissions.
+- Enter intentionally misleading information.
+- Attempt to disrupt or damage the system.
+- Use the system for unlawful activities.
+
+10. Account and Access Restrictions
+
+MedSked administrators may restrict, suspend, or deactivate an account when necessary to protect the system, users, or the security of the service, including cases involving suspected misuse or unauthorized access.
+
+11. Changes to MedSked
+
+MedSked may be updated or modified to improve functionality, security, usability, or system performance.
+
+These changes may include modifications to existing features or the addition or removal of features.
+
+Updated Terms & Conditions may be presented to users when necessary.
+
+12. Acceptance
+
+By selecting "I Agree" and creating a MedSked account, you confirm that:
+- You have read and understood these Terms & Conditions.
+- You agree to follow these Terms & Conditions.
+- You understand that MedSked is a medication-management support system and not a replacement for professional medical advice.
+- You understand that you are responsible for the accuracy of information you provide to MedSked.
+
+If you do not agree to these Terms & Conditions, you should not create or use a MedSked account.`}
+            </Text>
+          </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setTermsVisible(false)}
+            style={styles.termsCloseButton}
+          >
+            <Text style={styles.termsCloseButtonText}>Close</Text>
+          </Pressable>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -594,12 +780,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 18,
     paddingHorizontal: 4,
-  },
-
-  backText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#D8F0F2',
   },
 
   logoCircle: {
@@ -733,6 +913,96 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
     marginTop: -4,
+  },
+
+  termsGroup: {
+    marginTop: 2,
+    marginBottom: 14,
+  },
+
+  termsCheckboxRow: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  termsCheckboxText: {
+    marginLeft: 8,
+    fontSize: 13,
+    color: '#374151',
+  },
+
+  termsLinkButton: {
+    alignSelf: 'flex-start',
+    marginLeft: 30,
+    marginTop: -2,
+  },
+
+  termsLink: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0B4F59',
+    textDecorationLine: 'underline',
+  },
+
+  termsError: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B42318',
+  },
+
+  termsModal: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'web' ? 18 : 24,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+
+  termsModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E4EAF0',
+  },
+
+  termsModalTitle: {
+    flex: 1,
+    marginRight: 12,
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#1E2A4A',
+  },
+
+  termsScroll: {
+    flex: 1,
+  },
+
+  termsScrollContent: {
+    paddingVertical: 16,
+  },
+
+  termsDocument: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#374151',
+  },
+
+  termsCloseButton: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+    backgroundColor: '#0B4F59',
+  },
+
+  termsCloseButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   registerButton: {

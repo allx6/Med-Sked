@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
-const { rateLimit } = require('express-rate-limit');
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
@@ -19,17 +18,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const { validateEncryptionKey } = require('./services/encryptionService');
 
 const app = express();
-
-const authRateLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  limit: 5,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-  message: {
-    message: 'Too many failed authentication attempts. Please try again later.',
-  },
-});
+app.set('trust proxy', 1);
 
 
 // =====================================================
@@ -51,7 +40,6 @@ app.use(
 
 app.use(
   '/api/auth',
-  authRateLimiter,
   authRoutes
 );
 

@@ -10,6 +10,8 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { refillMedication, updateMedication } from '../services/api';
 
@@ -61,6 +63,9 @@ export default function EditMedicationScreen({
   const [refillThreshold, setRefillThreshold] = useState(String(medication.refillThreshold ?? 0));
   const [refillAmount, setRefillAmount] = useState('');
   const [expirationDate, setExpirationDate] = useState(medication.expirationDate || '');
+  const [showExpirationDatePicker, setShowExpirationDatePicker] = useState(false);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
   const [legacyDosage, setLegacyDosage] = useState(parsedDosage ? '' : medication.dosage || '');
   const [legacyFrequency, setLegacyFrequency] = useState(parsedFrequency ? '' : medication.frequency || '');
 
@@ -380,15 +385,51 @@ export default function EditMedicationScreen({
             editable={!loading && !refilling}
           />
 
-          <TextField
-            label="Expiration date (required) — YYYY-MM-DD"
-            placeholder="YYYY-MM-DD"
-            value={expirationDate}
-            onChangeText={setExpirationDate}
-            keyboardType="default"
-            editable={!loading}
-            maxLength={10}
-          />
+          <Text style={styles.fieldLabel}>Expiration date (required) — YYYY-MM-DD</Text>
+          {Platform.OS === 'web' ? (
+            <input
+              type="date"
+              value={expirationDate}
+              min={formatDateOnly(todayStart)}
+              onChange={(event) => setExpirationDate(event.target.value)}
+              disabled={loading}
+              style={styles.webDateInput}
+            />
+          ) : (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose expiration date"
+                onPress={() => setShowExpirationDatePicker(true)}
+                disabled={loading}
+                style={styles.expirationDateButton}
+              >
+                <Text style={expirationDate ? styles.expirationDateText : styles.expirationDatePlaceholder}>
+                  {expirationDate || 'YYYY-MM-DD'}
+                </Text>
+                <MaterialCommunityIcons
+                  name="calendar-month-outline"
+                  size={20}
+                  color="#0B4F59"
+                />
+              </Pressable>
+              {showExpirationDatePicker ? (
+                <DateTimePicker
+                  value={parseDateOnly(expirationDate) || todayStart}
+                  mode="date"
+                  minimumDate={todayStart}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onValueChange={(date) => {
+                    setShowExpirationDatePicker(false);
+                    if (date) {
+                      setExpirationDate(formatDateOnly(date));
+                    }
+                  }}
+                  onDismiss={() => setShowExpirationDatePicker(false)}
+                />
+              ) : null}
+            </>
+          )}
 
 
           {/* ERROR */}
@@ -478,9 +519,54 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
-
     elevation: 2,
+  },
 
+  fieldLabel: {
+    fontSize: 12,
+    color: '#374151',
+    marginBottom: 5,
+    fontWeight: '700',
+  },
+
+  expirationDateButton: {
+    width: '100%',
+    minWidth: 0,
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderRadius: 10,
+    borderColor: '#A8C7CC',
+    backgroundColor: '#F7FBFB',
+  },
+
+  expirationDateText: {
+    color: '#17313A',
+    fontSize: 14,
+  },
+
+  expirationDatePlaceholder: {
+    color: '#9AA3AF',
+    fontSize: 14,
+  },
+
+  webDateInput: {
+    width: '100%',
+    minWidth: 0,
+    height: 40,
+    display: 'block',
+    boxSizing: 'border-box',
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#A8C7CC',
+    borderRadius: 10,
+    backgroundColor: '#F7FBFB',
+    fontSize: 14,
+    color: '#17313A',
   },
 
   unitLabel: {
@@ -654,3 +740,19 @@ const styles = StyleSheet.create({
   },
 
 });
+
+const formatDateOnly = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const parseDateOnly = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) {
+    return null;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+    ? date
+    : null;
+};

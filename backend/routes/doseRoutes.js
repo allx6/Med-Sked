@@ -747,21 +747,38 @@ router.put(
 router.delete(
   '/:id',
   authMiddleware,
+  (req, res, next) => {
+    if (req.user.role === 'caregiver') {
+      return caregiverMiddleware.requirePermission('ADHERENCE_SUPPORT')(req, res, next);
+    }
+    return next();
+  },
   async (req, res) => {
     try {
       validateDoseId(req.params.id);
 
+      const doseOwnerId = req.user.role === 'caregiver'
+        ? req.body?.patientId
+        : req.user.userId;
+
+      if (
+        req.user.role === 'caregiver'
+        && !mongoose.Types.ObjectId.isValid(doseOwnerId)
+      ) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
+
       const dose =
         await DoseRecord.findOneAndDelete({
           _id: req.params.id,
-          userId: req.user.userId,
+          userId: doseOwnerId,
           status: 'pending',
         });
 
       if (!dose) {
         const existingDose = await DoseRecord.findOne({
           _id: req.params.id,
-          userId: req.user.userId,
+          userId: doseOwnerId,
         });
 
         if (existingDose) {

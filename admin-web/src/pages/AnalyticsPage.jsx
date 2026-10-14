@@ -305,7 +305,7 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="page-stack">
+      <div className="page-stack analytics-page">
         <div className="panel page-header">
           <div>
             <p className="eyebrow">Overview</p>
@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
 
   if (error) {
     return (
-      <div className="page-stack">
+      <div className="page-stack analytics-page">
         <div className="panel page-header">
           <div>
             <p className="eyebrow">Overview</p>
@@ -332,7 +332,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack analytics-page">
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Decision support</p>

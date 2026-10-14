@@ -13,6 +13,11 @@ const {
   PasswordResetError,
   GENERIC_REQUEST_MESSAGE,
 } = require('../services/passwordResetService');
+const LoginAttemptState = require('../models/LoginAttemptState');
+const {
+  createLoginAttemptProtection,
+  createMongoLoginAttemptStore,
+} = require('../services/loginAttemptProtection');
 
 const router = express.Router();
 const emailVerificationService = createEmailVerificationService({
@@ -22,6 +27,10 @@ const emailVerificationService = createEmailVerificationService({
 const passwordResetService = createPasswordResetService({
   User,
   emailService,
+});
+const loginAttemptProtection = createLoginAttemptProtection({
+  store: createMongoLoginAttemptStore(LoginAttemptState),
+  secret: () => process.env.JWT_SECRET,
 });
 
 const logAuthFailure = (operation, error) => {
@@ -45,6 +54,32 @@ const generatePatientId = async () => {
   return candidate;
 };
 
+const ensurePatientId = async (user) => {
+  if (user.role === 'patient' && !user.patientId) {
+    user.patientId = await generatePatientId();
+    await user.save();
+  }
+};
+
+const createAuthenticationPayload = (user) => ({
+  token: jwt.sign(
+    {
+      userId: user._id.toString(),
+      username: user.username,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  ),
+  user: {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    patientId: user.patientId,
+    role: user.role,
+  },
+});
+
 
 // =====================================================
 // REGISTER
@@ -58,12 +93,19 @@ router.post('/register', async (req, res) => {
       email,
       password,
       role,
+      termsAccepted,
     } = req.body;
 
 
     // =====================================================
     // VALIDATION
     // =====================================================
+
+    if (termsAccepted !== true) {
+      return res.status(400).json({
+        message: 'You must accept the MedSked Terms & Conditions.',
+      });
+    }
 
     if (
       !name ||
@@ -232,6 +274,8 @@ router.post('/register', async (req, res) => {
       password: hashedPassword,
       role,
       emailVerified: false,
+      termsAccepted: true,
+      termsAcceptedAt: new Date(),
     };
 
     if (patientId) {
@@ -280,19 +324,19 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   try {
-
     const {
       email,
       password,
     } = req.body;
-
 
     // =====================================================
     // VALIDATION
     // =====================================================
 
     if (
-      !email ||
+      typeof email !== 'string' ||
+      !email.trim() ||
+      typeof password !== 'string' ||
       !password
     ) {
       return res.status(400).json({
@@ -306,8 +350,24 @@ router.post('/login', async (req, res) => {
     // NORMALIZE EMAIL
     // =====================================================
 
-    const normalizedEmail =
-      email.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({
+        message: 'Please enter a valid email address.',
+      });
+    }
+
+    const retryAfterSeconds = await loginAttemptProtection.getRetryAfter(
+      normalizedEmail,
+      req.ip
+    );
+    if (retryAfterSeconds > 0) {
+      return res.status(429).json({
+        code: 'LOGIN_ATTEMPTS_EXCEEDED',
+        message: 'Too many failed authentication attempts. Please try again later.',
+        retryAfterSeconds,
+      });
+    }
 
 
     // =====================================================
@@ -322,6 +382,7 @@ router.post('/login', async (req, res) => {
 
 
     if (!user) {
+      await loginAttemptProtection.recordFailedLogin(normalizedEmail, req.ip);
       return res.status(401).json({
         message:
           'Invalid email or password.',
@@ -341,6 +402,7 @@ router.post('/login', async (req, res) => {
 
 
     if (!passwordMatches) {
+      await loginAttemptProtection.recordFailedLogin(normalizedEmail, req.ip);
       return res.status(401).json({
         message:
           'Invalid email or password.',
@@ -356,35 +418,9 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    if (user.role === 'patient' && !user.patientId) {
-      user.patientId = await generatePatientId();
-      await user.save();
-    }
-
-
-    // =====================================================
-    // CREATE JWT
-    // =====================================================
-
-    const token =
-      jwt.sign(
-        {
-          userId:
-            user._id.toString(),
-
-          username:
-            user.username,
-
-          role:
-            user.role,
-        },
-
-        process.env.JWT_SECRET,
-
-        {
-          expiresIn: '7d',
-        }
-      );
+    await ensurePatientId(user);
+    const authentication = createAuthenticationPayload(user);
+    await loginAttemptProtection.clearAccountFailures(normalizedEmail);
 
 
     // =====================================================
@@ -394,25 +430,7 @@ router.post('/login', async (req, res) => {
     return res.json({
       message:
         'Login successful.',
-
-      token,
-
-      user: {
-        id:
-          user._id,
-
-        username:
-          user.username,
-
-        email:
-          user.email,
-
-        patientId:
-          user.patientId,
-
-        role:
-          user.role,
-      },
+      ...authentication,
     });
 
   } catch (error) {
@@ -471,9 +489,11 @@ router.post('/verify-email', async (req, res) => {
       });
     }
 
-    await emailVerificationService.verifyEmail(email, otp);
+    const verifiedUser = await emailVerificationService.verifyEmail(email, otp);
+    await ensurePatientId(verifiedUser);
     return res.json({
       message: 'Email verified successfully.',
+      ...createAuthenticationPayload(verifiedUser),
     });
   } catch (error) {
     if (error instanceof EmailVerificationError) {

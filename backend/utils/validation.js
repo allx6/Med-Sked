@@ -217,7 +217,16 @@ const requireMedicationExpirationDate = (value) => {
     return 'Expiration date is required.';
   }
 
-  return validateMedicationExpirationDate(value);
+  const validationError = validateMedicationExpirationDate(value);
+  if (validationError) {
+    return validationError;
+  }
+
+  if (value.trim() < getTodayDateString()) {
+    return 'Expiration date cannot be earlier than today.';
+  }
+
+  return null;
 };
 
 const validateMedicationFields = (payload) => {
@@ -357,10 +366,10 @@ const validateScheduleFields = (payload, {
     return 'Schedule start date cannot be after the medication expiration date.';
   }
 
-  if (hasMedicationExpiration && (payload.endDate === null
+  if (payload.endDate === null
     || payload.endDate === undefined
-    || (typeof payload.endDate === 'string' && payload.endDate.trim() === ''))) {
-    return 'End date is required because this medication has an expiration date.';
+    || (typeof payload.endDate === 'string' && payload.endDate.trim() === '')) {
+    return 'End date is required.';
   }
 
   if (payload.endDate !== null && payload.endDate !== undefined

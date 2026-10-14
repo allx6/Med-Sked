@@ -97,11 +97,11 @@ export const validateScheduleFields = (schedule, {
     if (validateStartDateExpiration && schedule.startDate > medicationExpirationDate) {
       return 'Schedule start date cannot be after the medication expiration date.';
     }
+  }
 
-    if (schedule.endDate === null || schedule.endDate === undefined
-      || (typeof schedule.endDate === 'string' && schedule.endDate.trim() === '')) {
-      return 'End date is required because this medication has an expiration date.';
-    }
+  if (schedule.endDate === null || schedule.endDate === undefined
+    || (typeof schedule.endDate === 'string' && schedule.endDate.trim() === '')) {
+    return 'End date is required.';
   }
 
   if (schedule.endDate !== null && schedule.endDate !== undefined

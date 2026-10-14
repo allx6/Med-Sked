@@ -604,7 +604,7 @@ router.post('/:id/refill', authMiddleware, authorizeMedicationMutation, async (r
           updatedAt: new Date(),
         },
       },
-      { new: true, timestamps: false }
+      { returnDocument: 'after', timestamps: false }
     );
 
     if (!updatedMedication) {
