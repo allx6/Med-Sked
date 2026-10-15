@@ -458,39 +458,39 @@ const styles = StyleSheet.create({
   },
 
   expirationDateButton: {
-    minHeight: 40,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderRadius: 8,
-    borderColor: '#8EBAC5',
-    backgroundColor: '#EAF5F7',
+    borderRadius: 12,
+    borderColor: '#8A9CA3',
+    backgroundColor: '#FFFFFF',
   },
 
   expirationDateText: {
     color: '#17313A',
-    fontSize: 13,
+    fontSize: 16,
   },
 
   expirationDatePlaceholder: {
     color: '#8A9CA3',
-    fontSize: 13,
+    fontSize: 16,
   },
 
   webDateInput: {
-    height: 40,
+    height: 64,
     width: '100%',
     display: 'block',
     boxSizing: 'border-box',
-    paddingHorizontal: 11,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#8EBAC5',
-    backgroundColor: '#EAF5F7',
-    fontSize: 13,
+    borderColor: '#8A9CA3',
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
     color: '#17313A',
   },
 

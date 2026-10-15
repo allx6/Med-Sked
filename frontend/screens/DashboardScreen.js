@@ -30,6 +30,7 @@ import {
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
 import { getDoseActionErrorMessage } from '../utils/doseErrors';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 const medSkedLogo = require('../assets/medsked.png');
 
@@ -77,6 +78,11 @@ export default function DashboardScreen({
     error,
     setError,
   ] = useState('');
+
+  const [
+    pendingSkipDoseId,
+    setPendingSkipDoseId,
+  ] = useState(null);
 
 
   // =====================================================
@@ -320,67 +326,28 @@ export default function DashboardScreen({
   // SKIP DOSE
   // =====================================================
 
-  const handleSkipDose =
-    async (doseId) => {
+  const handleSkipDose = (doseId) => {
+    setPendingSkipDoseId(doseId);
+  };
 
-      Alert.alert(
+  const confirmSkipDose = async () => {
+    const doseId = pendingSkipDoseId;
+    setPendingSkipDoseId(null);
 
-        'Skip Dose',
+    if (!doseId) {
+      return;
+    }
 
-        'Are you sure you want to skip this dose?',
+    try {
+      const updatedDose = await skipDose(token, doseId);
 
-        [
-
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-
-          {
-
-            text: 'Skip',
-
-            style: 'destructive',
-
-            onPress:
-              async () => {
-
-                try {
-
-                  const updatedDose =
-                    await skipDose(
-                      token,
-                      doseId
-                    );
-
-                  setDoses(
-                    previous =>
-                      previous.map(
-                        dose =>
-                          dose._id === doseId
-                            ? updatedDose
-                            : dose
-                      )
-                  );
-
-                } catch (err) {
-
-                  Alert.alert(
-                    'Error',
-                    getDoseActionErrorMessage(err)
-                  );
-
-                }
-
-              },
-
-          },
-
-        ]
-
-      );
-
-    };
+      setDoses((previous) => previous.map((dose) => (
+        dose._id === doseId ? updatedDose : dose
+      )));
+    } catch (err) {
+      Alert.alert('Error', getDoseActionErrorMessage(err));
+    }
+  };
 
 
   // =====================================================
@@ -1540,6 +1507,17 @@ export default function DashboardScreen({
         />
 
       </ScrollView>
+
+      <ConfirmationDialog
+        visible={Boolean(pendingSkipDoseId)}
+        title="Skip Dose"
+        message="Are you sure you want to skip this dose?"
+        confirmLabel="Skip"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={confirmSkipDose}
+        onCancel={() => setPendingSkipDoseId(null)}
+      />
 
     </View>
 
