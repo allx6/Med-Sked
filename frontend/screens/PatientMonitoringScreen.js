@@ -30,6 +30,7 @@ import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
+import { isMedicationLowStock } from '../utils/medicationStock';
 import { getDoseActionErrorMessage } from '../utils/doseErrors';
 import {
   filterDoseHistory,
@@ -455,6 +456,7 @@ export default function PatientMonitoringScreen({
             medications.map((medication) => {
               const expirationState = getMedicationExpirationState(medication?.expirationDate);
               const isExpired = expirationState.expired;
+              const isLowStock = isMedicationLowStock(medication);
 
               return (
                 <View key={medication._id || medication.id} style={styles.doseCardContainer}>
@@ -465,10 +467,10 @@ export default function PatientMonitoringScreen({
                       {isExpired ? (
                         <Text style={[styles.doseMeta, styles.expiredMeta]}>Expired • {expirationState.expirationDate}</Text>
                       ) : expirationState.expirationDate ? (
-                        <Text style={styles.doseMeta}>Expires: {expirationState.expirationDate}</Text>
+                        <Text style={[styles.doseMeta, styles.expirationMeta]}>Expires: {expirationState.expirationDate}</Text>
                       ) : null}
                       <Text style={styles.doseMeta}>
-                        Refill: {Number(medication.quantityOnHand ?? 0) <= 0 ? 'Out of stock' : Number(medication.quantityOnHand ?? 0) <= Number(medication.refillThreshold ?? 0) ? 'Low stock' : 'In stock'} ({Number(medication.quantityOnHand ?? 0)} on hand, threshold {Number(medication.refillThreshold ?? 0)})
+                        Refill: <Text style={isLowStock ? styles.lowStockMeta : styles.inStockMeta}>{isLowStock ? 'Low Stock' : 'In Stock'}</Text>
                       </Text>
                     </View>
                     {canSupportAdherence ? (
@@ -933,7 +935,10 @@ const styles = StyleSheet.create({
   doseInfo: { flex: 1, minWidth: 0 },
   doseName: { fontSize: 15, fontWeight: '700', color: colors.text },
   doseMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  expirationMeta: { color: colors.primary, fontWeight: '600' },
   expiredMeta: { color: colors.dangerText, fontWeight: '700' },
+  lowStockMeta: { color: colors.dangerText, fontWeight: '700' },
+  inStockMeta: { color: colors.success, fontWeight: '700' },
   doseDate: { fontSize: 14, color: colors.textSecondary, marginTop: 3 },
   resourceActions: { marginLeft: spacing.sm, gap: 5 },
   scheduleResourceActions: { width: 72, marginLeft: spacing.md, gap: 8 },

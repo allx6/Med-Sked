@@ -14,7 +14,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import TimeSelector from '../components/TimeSelector';
 import {
@@ -280,6 +280,20 @@ export default function AddScheduleScreen({
     }
 
     return nextDate;
+  };
+
+  const openStartDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: startDate,
+        mode: 'date',
+        minimumDate: todayStart,
+        onValueChange: handleStartDateChange,
+      });
+      return;
+    }
+
+    setShowStartDatePicker(true);
   };
 
   // =====================================================
@@ -764,9 +778,7 @@ export default function AddScheduleScreen({
         <>
           <Pressable
             style={styles.inputButton}
-            onPress={() =>
-              setShowStartDatePicker(true)
-            }
+            onPress={openStartDatePicker}
           >
 
             <Text style={styles.inputIcon}>
@@ -793,9 +805,7 @@ export default function AddScheduleScreen({
                     ? 'spinner'
                     : 'default'
                 }
-                onValueChange={(selectedDate) =>
-                  handleStartDateChange(undefined, selectedDate)
-                }
+                onValueChange={handleStartDateChange}
                 onDismiss={() => setShowStartDatePicker(false)}
               />
 

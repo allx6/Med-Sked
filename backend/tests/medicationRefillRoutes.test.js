@@ -2,7 +2,28 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Medication = require('../models/Medication');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
+const notificationServicePath = require.resolve('../services/notificationService');
+const originalNotificationService = require.cache[notificationServicePath];
+const lowRefillNotificationCalls = [];
+require.cache[notificationServicePath] = {
+  id: notificationServicePath,
+  filename: notificationServicePath,
+  loaded: true,
+  exports: {
+    createMedicationNotifications: async () => null,
+    notifyLowRefill: async (payload) => {
+      lowRefillNotificationCalls.push(payload);
+      return null;
+    },
+  },
+};
+delete require.cache[require.resolve('../routes/medicationRoutes')];
 const medicationRoutes = require('../routes/medicationRoutes');
+if (originalNotificationService) {
+  require.cache[notificationServicePath] = originalNotificationService;
+} else {
+  delete require.cache[notificationServicePath];
+}
 
 const MEDICATION_ID = '507f1f77bcf86cd799439011';
 const PATIENT_ID = '507f1f77bcf86cd799439012';
@@ -48,6 +69,7 @@ const invokeRefillRoute = async ({
     captured.medicationQuery = query;
     return medication;
   };
+  lowRefillNotificationCalls.length = 0;
   Medication.findOneAndUpdate = async (filter, update) => {
     captured.updateFilter = filter;
     captured.updateData = update;
@@ -89,7 +111,7 @@ const invokeRefillRoute = async ({
     CaregiverRelationship.findOne = originals.relationshipFindOne;
   }
 
-  return { response, captured };
+  return { response, captured, lowRefillNotificationCalls: [...lowRefillNotificationCalls] };
 };
 
 test('patient refill increments stock by a positive amount and preserves other fields', async () => {
@@ -117,6 +139,26 @@ test('patient refill increments stock by a positive amount and preserves other f
   assert.equal(String(captured.medicationQuery.userId), PATIENT_ID);
   assert.equal(captured.updateData.$inc.quantityOnHand, 10);
   assert.equal(captured.updateData.$set.lowRefillNotified, false);
+});
+
+test('refill in a still-low stock state invokes the low-refill notification flow', async () => {
+  const { response, lowRefillNotificationCalls: calls } = await invokeRefillRoute({
+    refillAmount: 1,
+    medication: {
+      _id: MEDICATION_ID,
+      userId: PATIENT_ID,
+      name: 'Medicine',
+      quantityOnHand: 2,
+      refillThreshold: 5,
+      expirationDate: null,
+      lowRefillNotified: false,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.quantityOnHand, 3);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].medication.quantityOnHand, 3);
 });
 
 for (const [amount, expectedMessage] of [

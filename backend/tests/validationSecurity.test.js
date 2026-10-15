@@ -108,7 +108,7 @@ test('medication numeric fields accept up to six digits and reject longer values
   const base = {
     name: 'Acetaminophen',
     dosage: '999999 mg',
-    frequency: 'Every 999999 hours',
+    frequency: 'Every 99 hours',
     expirationDate: '2026-12-31',
     quantityOnHand: 999999,
     refillThreshold: 0,
@@ -124,12 +124,11 @@ test('medication numeric fields accept up to six digits and reject longer values
   assert.equal(validateMedicationFields({
     ...base,
     dosage: '100.5 mg',
-    frequency: 'Every 8.5 hours',
+    frequency: 'Every 8 hours',
   }), null);
   assert.equal(validateMedicationFields({ ...base, dosage: '1000000 mg' }), 'Dosage amount cannot exceed 6 digits.');
   assert.equal(validateMedicationFields({ ...base, dosage: '1e10 mg' }), 'Dosage amount must be greater than 0.');
   assert.equal(validateMedicationFields({ ...base, dosage: '2.13132132132134e+35 mg' }), 'Dosage amount must be greater than 0.');
-  assert.equal(validateMedicationFields({ ...base, frequency: 'Every 1000000 hours' }), 'Frequency interval cannot exceed 6 digits.');
   assert.equal(validateMedicationFields({ ...base, quantityOnHand: 1000000 }), 'Quantity on hand cannot exceed 6 digits.');
   assert.equal(validateMedicationFields({ ...base, refillThreshold: 1000000 }), 'Refill threshold cannot exceed 6 digits.');
   assert.equal(validateMedicationFields({ ...base, quantityOnHand: '1e6' }), 'Quantity on hand must be a whole number.');
@@ -139,7 +138,41 @@ test('medication numeric fields accept up to six digits and reject longer values
   assert.equal(validateMedicationFields({ ...base, quantityOnHand: 30.5 }), 'Quantity on hand must be a whole number.');
   assert.equal(validateMedicationFields({ ...base, refillThreshold: '1E10' }), 'Refill threshold must be a whole number.');
   assert.equal(validateMedicationFields({ ...base, refillThreshold: '9999999' }), 'Refill threshold cannot exceed 6 digits.');
-  assert.equal(validateMedicationFields({ ...base, frequency: 'Every 1e10 hours' }), 'Frequency must be at least 1 hour or day.');
+  for (const frequency of [
+    'Every 0 hours',
+    'Every -1 hours',
+    'Every 100 hours',
+    'Every 101 hours',
+    'Every 999 hours',
+    'Every 1.5 hours',
+    'Every 0.5 hours',
+    'Every abc hours',
+    'Every 4abc hours',
+    'Every 1e2 hours',
+    'Every @ hours',
+    'Every  hours',
+    'Every 00 hours',
+    'Every 01 hours',
+  ]) {
+    assert.equal(
+      validateMedicationFields({ ...base, frequency }),
+      'Frequency must be a whole number from 1 to 99 hours or days.',
+      frequency
+    );
+  }
+  for (const frequency of [
+    'Every 1 hours',
+    'Every 2 hours',
+    'Every 9 hours',
+    'Every 10 hours',
+    'Every 12 hours',
+    'Every 24 hours',
+    'Every 48 hours',
+    'Every 72 hours',
+    'Every 99 days',
+  ]) {
+    assert.equal(validateMedicationFields({ ...base, frequency }), null, frequency);
+  }
 });
 
 test('medication names and units are bounded without restricting valid names', () => {
@@ -166,8 +199,8 @@ test('medication names and units are bounded without restricting valid names', (
   assert.equal(validateMedicationFields({ ...base, name: 'Medicine\u0000Name' }), 'Medication name cannot contain control characters.');
   assert.equal(validateMedicationFields({ ...base, name: 'Medicine', dosage: '10 mg123456' }), 'Dosage amount must be greater than 0.');
   assert.equal(validateMedicationFields({ ...base, name: 'Medicine', dosage: '10 aaaaaaaaaaaaaaaa' }), 'Dosage amount must be greater than 0.');
-  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', frequency: 'Every 8 hours123' }), 'Frequency must be at least 1 hour or day.');
-  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', frequency: 'Every 8 days999999' }), 'Frequency must be at least 1 hour or day.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', frequency: 'Every 8 hours123' }), 'Frequency must be a whole number from 1 to 99 hours or days.');
+  assert.equal(validateMedicationFields({ ...base, name: 'Medicine', frequency: 'Every 8 days999999' }), 'Frequency must be a whole number from 1 to 99 hours or days.');
 });
 
 test('medication fields reject invalid values and minutes', () => {
