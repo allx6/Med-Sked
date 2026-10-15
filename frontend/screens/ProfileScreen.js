@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 
 import { getCaregiverRequestsForPatient } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
@@ -10,6 +11,15 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
   const patientId = user?.patientId || 'Not assigned';
   const [pendingRequestCount, setPendingRequestCount] = useState(null);
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+
+  const handleCopyPatientId = async () => {
+    try {
+      await Clipboard.setStringAsync(patientId);
+      Alert.alert('Copied', 'Patient ID copied to clipboard.');
+    } catch (error) {
+      Alert.alert('Copy failed', 'Unable to copy the Patient ID. Please try again.');
+    }
+  };
 
   useEffect(() => {
     if (!token || user?.role === 'caregiver') {
@@ -85,7 +95,20 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
             {user?.role !== 'caregiver' ? (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Patient ID</Text>
-                <Text style={styles.infoValue}>{patientId}</Text>
+                <View style={styles.patientIdValueRow}>
+                  {user?.patientId ? (
+                    <Pressable
+                      onPress={handleCopyPatientId}
+                      style={({ pressed }) => [styles.copyButton, pressed && styles.buttonPressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Copy patient ID"
+                      hitSlop={8}
+                    >
+                      <MaterialCommunityIcons name="content-copy" size={17} color={colors.primary} />
+                    </Pressable>
+                  ) : null}
+                  <Text style={styles.infoValue}>{patientId}</Text>
+                </View>
               </View>
             ) : null}
 
@@ -221,6 +244,13 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '700' },
   infoValue: { fontSize: 13, color: colors.text, fontWeight: '700', maxWidth: '60%', textAlign: 'right' },
+  patientIdValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  copyButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   requestsButton: {
     marginTop: spacing.xl,
     backgroundColor: colors.cardTint,

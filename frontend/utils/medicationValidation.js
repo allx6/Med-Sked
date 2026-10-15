@@ -53,6 +53,12 @@ export const validateMedicationExpirationDate = (value) => {
     return 'Expiration date must be a valid YYYY-MM-DD date.';
   }
 
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (trimmed < todayString) {
+    return 'Expiration date cannot be earlier than today.';
+  }
+
   return '';
 };
 

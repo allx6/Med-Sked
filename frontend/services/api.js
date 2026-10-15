@@ -122,7 +122,8 @@ export const registerUser = async (
   name,
   email,
   password,
-  role
+  role,
+  termsAccepted
 ) => {
   const response = await fetch(
     `${API_URL}/api/auth/register`,
@@ -136,6 +137,7 @@ export const registerUser = async (
         email,
         password,
         role,
+        termsAccepted,
       }),
     }
   );
@@ -768,13 +770,21 @@ export const skipPatientDose = async (
 
 export const deleteDoseRecord = async (
   token,
-  doseId
+  doseId,
+  patientId
 ) => {
+  const headers = patientId
+    ? {
+      'Content-Type': 'application/json',
+      ...authHeaders(token),
+    }
+    : authHeaders(token);
   const response = await fetch(
     `${API_URL}/api/doses/${doseId}`,
     {
       method: 'DELETE',
-      headers: authHeaders(token),
+      headers,
+      ...(patientId ? { body: JSON.stringify({ patientId }) } : {}),
     }
   );
 
@@ -935,7 +945,7 @@ export const getPatientAdherence = async (
 // =====================================================
 
 // -----------------------------------------------------
-// GET /api/caregiver/search-patient?email=...
+// GET /api/caregiver/search-patient?identifier=patient-ID-username-or-email
 // -----------------------------------------------------
 
 export const searchPatient = async (

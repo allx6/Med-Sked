@@ -31,6 +31,7 @@ import {
 } from '../services/api';
 import {
   getScheduleSubmissionErrorMessage,
+  parseLocalDate,
   validateScheduleFields,
 } from '../utils/scheduleValidation';
 
@@ -105,9 +106,6 @@ export default function AddScheduleScreen({
 
   const [endDate, setEndDate] =
     useState(null);
-
-  const [hasEndDate, setHasEndDate] =
-    useState(false);
 
   const [showEndDatePicker, setShowEndDatePicker] =
     useState(false);
@@ -252,6 +250,13 @@ export default function AddScheduleScreen({
   const selectMedication = (medication) => {
     setSelectedMedication(medication);
     setDose(medication?.dosage || '');
+    const expiration = parseLocalDate(medication?.expirationDate);
+    const earliestEndDate = startDate > todayStart ? startDate : todayStart;
+    setEndDate(
+      expiration && expiration >= earliestEndDate
+        ? expiration
+        : null
+    );
   };
 
   const todayDate = new Date();
@@ -343,6 +348,11 @@ export default function AddScheduleScreen({
         return;
       }
 
+      const expirationDate = parseLocalDate(selectedMedication?.expirationDate);
+      if (expirationDate && nextDate > expirationDate) {
+        return;
+      }
+
       setEndDate(nextDate);
     }
 
@@ -381,9 +391,7 @@ export default function AddScheduleScreen({
           formatDate(startDate),
 
         endDate:
-          hasEndDate
-            ? formatDate(endDate)
-            : null,
+          endDate ? formatDate(endDate) : null,
 
         enabled,
 
@@ -802,34 +810,7 @@ export default function AddScheduleScreen({
           END DATE
       ================================================= */}
 
-      <View style={styles.endDateHeader}>
-
-        <Text style={styles.label}>
-          End Date
-        </Text>
-
-        <View style={styles.endDateToggle}>
-
-          <Text style={styles.noEndText}>
-            No end date
-          </Text>
-
-          <Switch
-            value={!hasEndDate}
-            onValueChange={(value) => {
-
-              setHasEndDate(!value);
-
-              if (value) {
-                setEndDate(null);
-              }
-
-            }}
-          />
-
-        </View>
-
-      </View>
+      <Text style={styles.label}>End Date (required)</Text>
 
       {selectedMedication?.expirationDate ? (
         <Text style={styles.expirationHint}>
@@ -838,9 +819,7 @@ export default function AddScheduleScreen({
       ) : null}
 
 
-      {hasEndDate && (
-
-        isWeb ? (
+      {isWeb ? (
           <input
             type="date"
             value={endDate ? formatDate(endDate) : ''}
@@ -849,6 +828,7 @@ export default function AddScheduleScreen({
                 ? formatDate(startDate)
                 : formatDate(todayStart)
             }
+            max={selectedMedication?.expirationDate || undefined}
             onChange={(event) => {
               const nextDate = parseWebDateValue(event.target.value);
 
@@ -865,6 +845,11 @@ export default function AddScheduleScreen({
                 startDate.getMonth(),
                 startDate.getDate()
               )) {
+                return;
+              }
+
+              const expirationDate = parseLocalDate(selectedMedication?.expirationDate);
+              if (expirationDate && nextDate > expirationDate) {
                 return;
               }
 
@@ -914,6 +899,7 @@ export default function AddScheduleScreen({
                       ? startDate
                       : todayStart
                   }
+                  maximumDate={parseLocalDate(selectedMedication?.expirationDate) || undefined}
                   display={
                     Platform.OS === 'ios'
                       ? 'spinner'
@@ -928,9 +914,7 @@ export default function AddScheduleScreen({
             )}
 
           </>
-        )
-
-      )}
+        )}
 
 
       {/* =================================================
@@ -1297,24 +1281,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  endDateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  endDateToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 18,
-  },
-
-  noEndText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginRight: 6,
-  },
-
   enabledRow: {
     marginTop: 25,
     padding: 15,
@@ -1358,15 +1324,22 @@ const styles = StyleSheet.create({
 
   cancelButton: {
     marginTop: 10,
-    minHeight: 48,
+    minHeight: 52,
+    width: '100%',
+    backgroundColor: '#0B4F59',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#D8F0F2',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
 
   cancelButtonText: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
 });

@@ -110,13 +110,20 @@ export default function NotificationsScreen({ token, onBack, unreadNotificationC
                 <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
               </Pressable>
             ) : null}
-            <View>
-              <Text style={styles.title}>Notifications</Text>
+            <View style={styles.titleGroup}>
+              <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                Notifications
+              </Text>
               <Text style={styles.subtitle}>{unreadNotificationCount} unread</Text>
             </View>
           </View>
           {unreadNotificationCount > 0 ? (
-            <Pressable onPress={markAllRead} disabled={workingId === 'all'}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={markAllRead}
+              disabled={workingId === 'all'}
+              style={styles.markAllButton}
+            >
               <Text style={styles.markAllText}>{workingId === 'all' ? 'Working...' : 'Mark all read'}</Text>
             </Pressable>
           ) : null}
@@ -165,12 +172,14 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 32, width: '100%', maxWidth: 900, alignSelf: 'center' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
-  headingGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  backButton: { width: 40, height: 40, justifyContent: 'center' },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: spacing.lg },
-  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
-  subtitle: { color: '#A7CDD0', fontSize: 14, marginTop: 4 },
-  markAllText: { color: '#83DBDE', fontWeight: '800', fontSize: 13, marginTop: 8 },
+  headingGroup: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  backButton: { width: 36, height: 40, flexShrink: 0, justifyContent: 'center' },
+  titleGroup: { flex: 1, minWidth: 0 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  title: { color: '#FFFFFF', fontSize: 23, fontWeight: '800' },
+  subtitle: { color: '#A7CDD0', fontSize: 12, marginTop: 3 },
+  markAllButton: { flexShrink: 0, minHeight: 36, justifyContent: 'center', paddingHorizontal: 10, borderRadius: radius.pill, backgroundColor: 'rgba(255, 255, 255, 0.12)' },
+  markAllText: { color: '#A8E7E8', fontWeight: '800', fontSize: 11 },
   errorBox: { backgroundColor: colors.dangerSoft, borderColor: colors.danger, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
   errorText: { color: colors.dangerText, fontWeight: '600' },
   retryText: { color: colors.dangerText, fontWeight: '800', marginTop: spacing.sm },

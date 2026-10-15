@@ -11,6 +11,8 @@ import {
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { createMedication } from '../services/api';
 
@@ -40,6 +42,9 @@ export default function AddMedicationScreen({
   const [quantityOnHand, setQuantityOnHand] = useState('0');
   const [refillThreshold, setRefillThreshold] = useState('0');
   const [expirationDate, setExpirationDate] = useState('');
+  const [showExpirationDatePicker, setShowExpirationDatePicker] = useState(false);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -225,17 +230,51 @@ export default function AddMedicationScreen({
 
           <View style={[styles.fieldRow, styles.frequencyFieldRow, !wideLayout && styles.fieldRowStacked]}>
             <View style={styles.fieldColumn}>
-              <TextField
-                label="Expiration date (required) — YYYY-MM-DD"
-                placeholder="YYYY-MM-DD"
-                value={expirationDate}
-                onChangeText={setExpirationDate}
-                keyboardType="default"
-                editable={!loading}
-                maxLength={10}
-                labelStyle={styles.fieldLabel}
-                inputStyle={styles.fieldInput}
-              />
+              <Text style={styles.fieldLabel}>Expiration date (required) — YYYY-MM-DD</Text>
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={expirationDate}
+                  min={formatDateOnly(todayStart)}
+                  onChange={(event) => setExpirationDate(event.target.value)}
+                  disabled={loading}
+                  style={styles.webDateInput}
+                />
+              ) : (
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose expiration date"
+                    onPress={() => setShowExpirationDatePicker(true)}
+                    disabled={loading}
+                    style={styles.expirationDateButton}
+                  >
+                    <Text style={expirationDate ? styles.expirationDateText : styles.expirationDatePlaceholder}>
+                      {expirationDate || 'YYYY-MM-DD'}
+                    </Text>
+                    <MaterialCommunityIcons
+                      name="calendar-month-outline"
+                      size={20}
+                      color="#0B4F59"
+                    />
+                  </Pressable>
+                  {showExpirationDatePicker ? (
+                    <DateTimePicker
+                      value={parseDateOnly(expirationDate) || todayStart}
+                      mode="date"
+                      minimumDate={todayStart}
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onValueChange={(date) => {
+                        setShowExpirationDatePicker(false);
+                        if (date) {
+                          setExpirationDate(formatDateOnly(date));
+                        }
+                      }}
+                      onDismiss={() => setShowExpirationDatePicker(false)}
+                    />
+                  ) : null}
+                </>
+              )}
             </View>
             <View style={styles.fieldColumn}>
               <TextField
@@ -388,6 +427,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  expirationDateButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    borderColor: '#8EBAC5',
+    backgroundColor: '#EAF5F7',
+  },
+
+  expirationDateText: {
+    color: '#17313A',
+    fontSize: 13,
+  },
+
+  expirationDatePlaceholder: {
+    color: '#8A9CA3',
+    fontSize: 13,
+  },
+
+  webDateInput: {
+    height: 40,
+    width: '100%',
+    display: 'block',
+    boxSizing: 'border-box',
+    paddingHorizontal: 11,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#8EBAC5',
+    backgroundColor: '#EAF5F7',
+    fontSize: 13,
+    color: '#17313A',
+  },
+
   unitLabel: {
     marginBottom: 5,
     fontSize: 12,
@@ -523,3 +599,19 @@ const styles = StyleSheet.create({
   },
 
 });
+
+const formatDateOnly = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+const parseDateOnly = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) {
+    return null;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+    ? date
+    : null;
+};

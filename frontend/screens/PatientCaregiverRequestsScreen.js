@@ -17,6 +17,7 @@ import {
 } from '../services/api';
 
 import { colors, radius, spacing, shadow } from '../theme';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function PatientCaregiverRequestsScreen({ token, onBack }) {
   const [requests, setRequests] = useState([]);
@@ -25,6 +26,7 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
   const [actionId, setActionId] = useState(null);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [confirmation, setConfirmation] = useState(null);
 
   const loadRequests = useCallback(async (isRefresh = false) => {
     try {
@@ -62,6 +64,31 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
       setError(requestError.message || 'Unable to update this request.');
     } finally {
       setActionId(null);
+    }
+  };
+
+  const requestResponseConfirmation = (request, action) => {
+    const caregiver = request.caregiver || {};
+    const caregiverName = caregiver.username || caregiver.name || 'This caregiver';
+    const accepting = action === 'accept';
+
+    setConfirmation({
+      request,
+      action,
+      title: accepting ? 'Accept caregiver request?' : 'Decline caregiver request?',
+      message: accepting
+        ? `${caregiverName} will be connected and able to access your medication routine.`
+        : `Are you sure you want to decline ${caregiverName}'s request to access your medication routine?`,
+    });
+  };
+
+  const confirmRequestResponse = async () => {
+    const current = confirmation;
+    setConfirmation(null);
+
+    if (current) {
+      const relationshipId = current.request._id || current.request.relationshipId;
+      await respondToRequest(relationshipId, current.action);
     }
   };
 
@@ -123,14 +150,14 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
                   <Text style={styles.pendingText}>Requesting caregiver access</Text>
                   <View style={styles.actions}>
                     <Pressable
-                      onPress={() => respondToRequest(relationshipId, 'accept')}
+                      onPress={() => requestResponseConfirmation(request, 'accept')}
                       disabled={busy}
                       style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed, busy && styles.disabled]}
                     >
                       <Text style={styles.acceptText}>{busy ? 'Working...' : 'Accept'}</Text>
                     </Pressable>
                     <Pressable
-                      onPress={() => respondToRequest(relationshipId, 'reject')}
+                      onPress={() => requestResponseConfirmation(request, 'reject')}
                       disabled={busy}
                       style={({ pressed }) => [styles.rejectButton, pressed && styles.pressed, busy && styles.disabled]}
                     >
@@ -143,6 +170,16 @@ export default function PatientCaregiverRequestsScreen({ token, onBack }) {
           })
         )}
       </ScrollView>
+      <ConfirmationDialog
+        visible={Boolean(confirmation)}
+        title={confirmation?.title || ''}
+        message={confirmation?.message || ''}
+        confirmLabel={confirmation?.action === 'accept' ? 'Accept request' : 'Decline request'}
+        cancelLabel="Cancel"
+        danger={confirmation?.action === 'reject'}
+        onConfirm={confirmRequestResponse}
+        onCancel={() => setConfirmation(null)}
+      />
     </View>
   );
 }

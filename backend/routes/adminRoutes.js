@@ -671,7 +671,7 @@ router.put('/users/:userId', async (req, res) => {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: updatePayload },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).select(SAFE_USER_FIELDS).lean();
 
     if (!updatedUser) {

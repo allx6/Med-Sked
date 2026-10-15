@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const medSkedLogo = require('../assets/medsked.png');
 
@@ -68,7 +69,7 @@ export default function HowItWorksScreen({ onBack }) {
             onPress={onBack}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
           >
-            <Text style={styles.backText}>← Back</Text>
+            <MaterialCommunityIcons name="arrow-left" size={25} color="#D8F0F2" />
           </Pressable>
           <View style={styles.brand}>
             <Image
@@ -109,7 +110,6 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: 28 },
   header: { minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#3A858D' },
   backButton: { minHeight: 44, justifyContent: 'center', paddingRight: 12 },
-  backText: { color: '#D8F0F2', fontSize: 14, fontWeight: '600' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logo: { width: 42, height: 42 },
   brandName: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },

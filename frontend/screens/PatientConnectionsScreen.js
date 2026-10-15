@@ -23,6 +23,12 @@ import {
 import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 
+const getPermissionLabel = (permission) => (
+  permission === 'ADHERENCE_SUPPORT'
+    ? 'Adherence support'
+    : 'View only'
+);
+
 export default function PatientConnectionsScreen({ token, onBack }) {
   const [caregivers, setCaregivers] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -121,6 +127,7 @@ export default function PatientConnectionsScreen({ token, onBack }) {
   const requestPermissionChange = (relationship, nextPermission) => {
     const caregiver = relationship.caregiver || relationship;
     const currentPermission = relationship.permission || 'VIEW_ONLY';
+    const caregiverName = caregiver.username || caregiver.name || 'This caregiver';
 
     if (currentPermission === nextPermission) return;
 
@@ -129,7 +136,23 @@ export default function PatientConnectionsScreen({ token, onBack }) {
       relationship,
       nextPermission,
       title: 'Change caregiver permission?',
-      message: `${caregiver.username || caregiver.email || 'This caregiver'}: ${currentPermission} -> ${nextPermission}`,
+      message: `Change ${caregiverName}'s access from ${getPermissionLabel(currentPermission)} to ${getPermissionLabel(nextPermission)}?\n\nView only lets them see your medication routine. Adherence support lets them help manage medications, schedules, and dose tracking.`,
+    });
+  };
+
+  const requestCaregiverResponse = (request, action) => {
+    const caregiver = request.caregiver || {};
+    const caregiverName = caregiver.username || caregiver.name || 'This caregiver';
+    const accepting = action === 'accept';
+
+    setConfirmation({
+      type: 'request',
+      request,
+      action,
+      title: accepting ? 'Accept caregiver request?' : 'Reject caregiver request?',
+      message: accepting
+        ? `${caregiverName} will be connected and able to access your medication routine.`
+        : `Are you sure you want to reject ${caregiverName}'s request to access your medication routine?`,
     });
   };
 
@@ -146,7 +169,13 @@ export default function PatientConnectionsScreen({ token, onBack }) {
   const confirmConnectionAction = async () => {
     const current = confirmation;
     setConfirmation(null);
-    if (current.type === 'permission') {
+    if (current.type === 'request') {
+      if (current.action === 'accept') {
+        await handleAccept(current.request._id || current.request.relationshipId);
+      } else {
+        await handleReject(current.request._id || current.request.relationshipId);
+      }
+    } else if (current.type === 'permission') {
       await handlePermissionChange(current.relationship._id, current.nextPermission);
     } else {
       await handleRevoke(current.relationship._id);
@@ -226,7 +255,7 @@ export default function PatientConnectionsScreen({ token, onBack }) {
           <View style={styles.actionRow}>
             <Pressable
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, actionId === relationshipId && styles.buttonDisabled]}
-              onPress={() => handleAccept(relationshipId)}
+              onPress={() => requestCaregiverResponse(request, 'accept')}
               disabled={actionId === relationshipId}
             >
               <Text style={styles.primaryButtonText}>{actionId === relationshipId ? 'Working...' : 'Accept'}</Text>
@@ -234,7 +263,7 @@ export default function PatientConnectionsScreen({ token, onBack }) {
 
             <Pressable
               style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed, actionId === relationshipId && styles.buttonDisabled]}
-              onPress={() => handleReject(relationshipId)}
+              onPress={() => requestCaregiverResponse(request, 'reject')}
               disabled={actionId === relationshipId}
             >
               <Text style={styles.secondaryButtonText}>Reject</Text>
@@ -309,9 +338,15 @@ export default function PatientConnectionsScreen({ token, onBack }) {
         visible={Boolean(confirmation)}
         title={confirmation?.title || ''}
         message={confirmation?.message || ''}
-        confirmLabel={confirmation?.type === 'revoke' ? 'Revoke access' : 'Confirm change'}
+        confirmLabel={
+          confirmation?.type === 'revoke'
+            ? 'Revoke access'
+            : confirmation?.type === 'request'
+              ? confirmation.action === 'accept' ? 'Accept request' : 'Reject request'
+              : 'Confirm change'
+        }
         cancelLabel="Cancel"
-        danger={confirmation?.type === 'revoke'}
+        danger={confirmation?.type === 'revoke' || (confirmation?.type === 'request' && confirmation.action === 'reject')}
         onConfirm={confirmConnectionAction}
         onCancel={() => setConfirmation(null)}
       />

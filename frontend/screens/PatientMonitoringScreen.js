@@ -1,4 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -17,6 +22,7 @@ import {
   getPatientOverview,
   takePatientDose,
   skipPatientDose,
+  deleteDoseRecord,
 } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
@@ -25,6 +31,11 @@ import {
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
 import { getDoseActionErrorMessage } from '../utils/doseErrors';
+import {
+  filterDoseHistory,
+  getAvailableDoseDates,
+  normalizeDoseDate,
+} from '../utils/doseHistory';
 
 export default function PatientMonitoringScreen({
   token,
@@ -44,6 +55,11 @@ export default function PatientMonitoringScreen({
   const [actionId, setActionId] = useState(null);
   const [selectedSection, setSelectedSection] = useState('medications');
   const [confirmation, setConfirmation] = useState(null);
+  const [selectedDoseDate, setSelectedDoseDate] = useState(getTodayDateString);
+  const [selectedDoseMedication, setSelectedDoseMedication] = useState('all');
+  const [selectedDoseStatus, setSelectedDoseStatus] = useState('all');
+  const [dateDropdownVisible, setDateDropdownVisible] = useState(false);
+  const [medicationDropdownVisible, setMedicationDropdownVisible] = useState(false);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (!patient?._id) return;
@@ -76,15 +92,6 @@ export default function PatientMonitoringScreen({
     loadOverview();
   }, [loadOverview]);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading patient summary...</Text>
-      </View>
-    );
-  }
-
   const patientName = patient?.username || patient?.name || 'Patient';
   const patientId = patient?.patientId || patient?._id || 'Unknown';
   const permission = overview?.relationship?.permission || 'VIEW_ONLY';
@@ -94,6 +101,37 @@ export default function PatientMonitoringScreen({
   const doseHistory = overview?.doses || [];
   const medications = overview?.medications || [];
   const schedules = overview?.schedules || [];
+  const availableDoseDates = useMemo(
+    () => getAvailableDoseDates(doseHistory),
+    [doseHistory]
+  );
+  const filteredDoseHistory = useMemo(
+    () => filterDoseHistory(doseHistory, {
+      selectedDate: selectedDoseDate,
+      selectedMedication: selectedDoseMedication,
+      selectedStatus: selectedDoseStatus,
+    }),
+    [doseHistory, selectedDoseDate, selectedDoseMedication, selectedDoseStatus]
+  );
+
+  useEffect(() => {
+    if (
+      selectedDoseDate !== 'all'
+      && availableDoseDates.length > 0
+      && !availableDoseDates.includes(selectedDoseDate)
+    ) {
+      setSelectedDoseDate(availableDoseDates[availableDoseDates.length - 1]);
+    }
+  }, [availableDoseDates, selectedDoseDate]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading patient summary...</Text>
+      </View>
+    );
+  }
 
   const handleDoseAction = async (doseId, action) => {
     try {
@@ -177,6 +215,42 @@ export default function PatientMonitoringScreen({
     }
   };
 
+  const handleDeleteDose = async (dose) => {
+    try {
+      setActionId(dose._id);
+      await deleteDoseRecord(token, dose._id, patient?._id);
+      setOverview((current) => {
+        if (!current) return current;
+
+        const isTodayPending = normalizeDoseDate(dose.scheduledDate) === getTodayDateString()
+          && dose.status === 'pending';
+        const todayDoses = (current.todayDoses || []).filter((item) => item._id !== dose._id);
+
+        return {
+          ...current,
+          doses: (current.doses || []).filter((item) => item._id !== dose._id),
+          todayDoses,
+          adherence: isTodayPending
+            ? {
+              ...current.adherence,
+              total: Math.max(0, (current.adherence?.total || 0) - 1),
+              pending: Math.max(0, (current.adherence?.pending || 0) - 1),
+            }
+            : current.adherence,
+        };
+      });
+    } catch (err) {
+      setError(
+        getSafeUserErrorMessage(
+          err,
+          'Unable to delete this pending dose. Please try again.'
+        )
+      );
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const confirmAction = async () => {
     const current = confirmation;
     setConfirmation(null);
@@ -187,6 +261,8 @@ export default function PatientMonitoringScreen({
       await handleDeleteSchedule(current.item);
     } else if (current?.type === 'dose') {
       await handleDoseAction(current.doseId, current.action);
+    } else if (current?.type === 'dose-delete') {
+      await handleDeleteDose(current.item);
     }
   };
 
@@ -289,10 +365,46 @@ export default function PatientMonitoringScreen({
                   <View style={styles.todayDoseInfo}>
                     <Text style={styles.todayDoseName}>{medication.name || 'Medication'}</Text>
                     <Text style={styles.todayDoseTime}>{dose.scheduledTime || 'Time not specified'}</Text>
+                    <View style={styles.todayDoseActionRow}>
+                      <Text style={[styles.todayDoseStatus, dose.status === 'taken' ? styles.success : dose.status === 'skipped' ? styles.skipped : dose.status === 'missed' ? styles.missed : styles.pending]}>
+                        {dose.status || 'pending'}
+                      </Text>
+                      {canSupportAdherence && dose.status === 'pending' ? (
+                        <View style={styles.inlineDoseActions}>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Take ${medication.name || 'medication'}`}
+                            disabled={actionId === dose._id}
+                            onPress={() => setConfirmation({
+                              doseId: dose._id,
+                              action: 'take',
+                              type: 'dose',
+                              title: 'Mark dose as taken?',
+                              message: 'Confirm that this dose was taken.',
+                            })}
+                            style={[styles.takeButton, actionId === dose._id && styles.buttonDisabled]}
+                          >
+                            <Text style={styles.takeButtonText}>Take</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Skip ${medication.name || 'medication'}`}
+                            disabled={actionId === dose._id}
+                            onPress={() => setConfirmation({
+                              doseId: dose._id,
+                              action: 'skip',
+                              type: 'dose',
+                              title: 'Skip this dose?',
+                              message: 'Confirm that this dose should be skipped.',
+                            })}
+                            style={[styles.skipButton, actionId === dose._id && styles.buttonDisabled]}
+                          >
+                            <Text style={styles.skipButtonText}>Skip</Text>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  <Text style={[styles.todayDoseStatus, dose.status === 'taken' ? styles.success : dose.status === 'skipped' ? styles.skipped : dose.status === 'missed' ? styles.missed : styles.pending]}>
-                    {dose.status || 'pending'}
-                  </Text>
                 </View>
               );
             })
@@ -360,16 +472,25 @@ export default function PatientMonitoringScreen({
                       </Text>
                     </View>
                     {canSupportAdherence ? (
-                      <View style={styles.resourceActions}>
-                        <Pressable onPress={() => onEditMedication(medication)} style={styles.inlineAction}><Text style={styles.inlineActionText}>Edit</Text></Pressable>
+                      <View style={styles.scheduleResourceActions}>
                         <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Edit ${medication.name || 'medication'}`}
+                          onPress={() => onEditMedication(medication)}
+                          style={styles.scheduleEditAction}
+                        >
+                          <Text style={styles.inlineActionText}>Edit</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete ${medication.name || 'medication'}`}
                           onPress={() => setConfirmation({
                             type: 'medication',
                             item: medication,
                             title: 'Delete medication?',
                             message: 'This will remove this patient\'s medication and its related records where applicable.',
                           })}
-                          style={styles.inlineDanger}
+                          style={styles.scheduleDeleteAction}
                         >
                           <Text style={styles.inlineDangerText}>Delete</Text>
                         </Pressable>
@@ -386,11 +507,175 @@ export default function PatientMonitoringScreen({
         {selectedSection === 'doses' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Dose History</Text>
+          {doseHistory.length > 0 ? (
+            <View style={styles.doseFilterCard}>
+              <Text style={styles.filterLabel}>Date</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose dose history date"
+                onPress={() => {
+                  setDateDropdownVisible((visible) => !visible);
+                  setMedicationDropdownVisible(false);
+                }}
+                style={styles.filterDropdownButton}
+              >
+                <Text style={styles.filterDropdownText}>{formatDoseDateLabel(selectedDoseDate)}</Text>
+                <MaterialCommunityIcons
+                  name={dateDropdownVisible ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color={colors.primary}
+                />
+              </Pressable>
+              {dateDropdownVisible ? (
+                <View style={styles.filterDropdownList}>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={styles.filterDropdownScroll}
+                  >
+                    <Pressable
+                      onPress={() => {
+                        setSelectedDoseDate('all');
+                        setDateDropdownVisible(false);
+                      }}
+                      style={styles.filterDropdownOption}
+                    >
+                      <Text style={styles.filterDropdownOptionText}>All dates</Text>
+                    </Pressable>
+                    {availableDoseDates.map((date) => (
+                      <Pressable
+                        key={date}
+                        onPress={() => {
+                          setSelectedDoseDate(date);
+                          setDateDropdownVisible(false);
+                        }}
+                        style={[
+                          styles.filterDropdownOption,
+                          selectedDoseDate === date && styles.filterDropdownOptionActive,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterDropdownOptionText,
+                          selectedDoseDate === date && styles.filterDropdownOptionTextActive,
+                        ]}>
+                          {formatDoseDateLabel(date)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+
+              <Text style={styles.filterLabel}>Medication</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose medication"
+                onPress={() => {
+                  setMedicationDropdownVisible((visible) => !visible);
+                  setDateDropdownVisible(false);
+                }}
+                style={styles.filterDropdownButton}
+              >
+                <Text style={styles.filterDropdownText}>
+                  {getDoseMedicationLabel(doseHistory, selectedDoseMedication)}
+                </Text>
+                <MaterialCommunityIcons
+                  name={medicationDropdownVisible ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color={colors.primary}
+                />
+              </Pressable>
+              {medicationDropdownVisible ? (
+                <View style={styles.filterDropdownList}>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={styles.filterDropdownScroll}
+                  >
+                    <Pressable
+                      onPress={() => {
+                        setSelectedDoseMedication('all');
+                        setMedicationDropdownVisible(false);
+                      }}
+                      style={[
+                        styles.filterDropdownOption,
+                        selectedDoseMedication === 'all' && styles.filterDropdownOptionActive,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.filterDropdownOptionText,
+                        selectedDoseMedication === 'all' && styles.filterDropdownOptionTextActive,
+                      ]}>
+                        All Medications
+                      </Text>
+                    </Pressable>
+                    {getDoseMedicationOptions(doseHistory).map((medication) => (
+                      <Pressable
+                        key={medication.id}
+                        onPress={() => {
+                          setSelectedDoseMedication(medication.id);
+                          setMedicationDropdownVisible(false);
+                        }}
+                        style={[
+                          styles.filterDropdownOption,
+                          selectedDoseMedication === medication.id && styles.filterDropdownOptionActive,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterDropdownOptionText,
+                          selectedDoseMedication === medication.id && styles.filterDropdownOptionTextActive,
+                        ]}>
+                          {medication.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+
+              <Text style={styles.filterLabel}>Status</Text>
+              <View style={styles.statusFilterOptions}>
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'pending', label: 'Pending' },
+                  { key: 'taken', label: 'Taken' },
+                  { key: 'skipped', label: 'Skipped' },
+                  { key: 'missed', label: 'Missed' },
+                ].map((status) => (
+                  <Pressable
+                    key={status.key}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: selectedDoseStatus === status.key }}
+                    onPress={() => setSelectedDoseStatus(status.key)}
+                    style={[
+                      styles.statusFilterChip,
+                      selectedDoseStatus === status.key && styles.statusFilterChipActive,
+                    ]}
+                  >
+                    <Text style={[
+                      styles.statusFilterChipText,
+                      selectedDoseStatus === status.key && styles.statusFilterChipTextActive,
+                    ]}>
+                      {status.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={styles.filterResultCount}>
+                Showing {filteredDoseHistory.length} {filteredDoseHistory.length === 1 ? 'dose' : 'doses'}
+              </Text>
+            </View>
+          ) : null}
           {doseHistory.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No dose history yet.</Text>
             </View>
-          ) : doseHistory.slice(0, 20).map((dose) => {
+          ) : filteredDoseHistory.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No matching doses.</Text>
+              <Text style={styles.emptyDescription}>Try changing the date, medication, or status filters.</Text>
+            </View>
+          ) : filteredDoseHistory.map((dose) => {
             const medication = dose.medicationId || {};
 
             return (
@@ -404,18 +689,54 @@ export default function PatientMonitoringScreen({
                     </Text>
                   </View>
                   {canSupportAdherence && dose.status === 'pending' ? (
-                    <View style={styles.inlineDoseActions}>
+                    <View style={styles.historyActions}>
                       <Pressable
-                        onPress={() => setConfirmation({ doseId: dose._id, action: 'take', type: 'dose', title: 'Mark dose as taken?', message: 'Confirm that this dose was taken.' })}
-                        style={styles.takeButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Take ${medication.name || 'medication'} dose`}
+                        disabled={actionId === dose._id}
+                        onPress={() => setConfirmation({
+                          doseId: dose._id,
+                          action: 'take',
+                          type: 'dose',
+                          title: 'Mark dose as taken?',
+                          message: 'Confirm that this dose was taken.',
+                        })}
+                        style={[styles.takeButton, actionId === dose._id && styles.buttonDisabled]}
                       >
                         <Text style={styles.takeButtonText}>Take</Text>
                       </Pressable>
                       <Pressable
-                        onPress={() => setConfirmation({ doseId: dose._id, action: 'skip', type: 'dose', title: 'Skip this dose?', message: 'Confirm that this dose should be skipped.' })}
-                        style={styles.skipButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Skip ${medication.name || 'medication'} dose`}
+                        disabled={actionId === dose._id}
+                        onPress={() => setConfirmation({
+                          doseId: dose._id,
+                          action: 'skip',
+                          type: 'dose',
+                          title: 'Skip this dose?',
+                          message: 'Confirm that this dose should be skipped.',
+                        })}
+                        style={[styles.skipButton, actionId === dose._id && styles.buttonDisabled]}
                       >
                         <Text style={styles.skipButtonText}>Skip</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete pending ${medication.name || 'medication'} dose`}
+                        disabled={actionId === dose._id}
+                        onPress={() => setConfirmation({
+                          type: 'dose-delete',
+                          item: dose,
+                          title: 'Delete pending dose?',
+                          message: 'This will delete only this pending dose record. Medication and schedule information will remain unchanged.',
+                        })}
+                        style={[styles.historyDeleteAction, actionId === dose._id && styles.buttonDisabled]}
+                      >
+                        <MaterialCommunityIcons
+                          name="delete-outline"
+                          size={19}
+                          color={colors.dangerText}
+                        />
                       </Pressable>
                     </View>
                   ) : null}
@@ -461,21 +782,39 @@ export default function PatientMonitoringScreen({
                     <Text style={styles.doseName}>{medication.name || 'Medication'}</Text>
                     <Text style={styles.doseMeta}>{schedule.time || schedule.scheduledTime || 'Time not specified'}</Text>
                     <Text style={styles.doseMeta}>{days}</Text>
+                    <View style={[
+                      styles.scheduleStatusBadge,
+                      medicationExpired
+                        ? styles.scheduleStatusExpired
+                        : schedule.enabled === false
+                          ? styles.scheduleStatusInactive
+                          : styles.scheduleStatusActive,
+                    ]}>
+                      <Text style={[styles.statusText, medicationExpired ? styles.expiredSchedule : schedule.enabled === false ? styles.skipped : styles.success]}>
+                        {medicationExpired ? 'Expired' : schedule.enabled === false ? 'Inactive' : 'Active'}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={[styles.statusText, medicationExpired ? styles.expiredSchedule : schedule.enabled === false ? styles.skipped : styles.success]}>
-                    {medicationExpired ? 'Expired' : schedule.enabled === false ? 'Inactive' : 'Active'}
-                  </Text>
                   {canSupportAdherence ? (
-                    <View style={styles.resourceActions}>
-                      <Pressable onPress={() => onEditSchedule(schedule)} style={styles.inlineAction}><Text style={styles.inlineActionText}>Edit</Text></Pressable>
+                    <View style={styles.scheduleResourceActions}>
                       <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit schedule for ${medication.name || 'medication'}`}
+                        onPress={() => onEditSchedule(schedule)}
+                        style={styles.scheduleEditAction}
+                      >
+                        <Text style={styles.inlineActionText}>Edit</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete schedule for ${medication.name || 'medication'}`}
                         onPress={() => setConfirmation({
                           type: 'schedule',
                           item: schedule,
                           title: 'Delete schedule?',
                           message: 'This will remove this patient\'s schedule and related dose records where applicable.',
                         })}
-                        style={styles.inlineDanger}
+                        style={styles.scheduleDeleteAction}
                       >
                         <Text style={styles.inlineDangerText}>Delete</Text>
                       </Pressable>
@@ -563,6 +902,7 @@ const styles = StyleSheet.create({
   todayDoseName: { color: colors.text, fontSize: 14, fontWeight: '700' },
   todayDoseTime: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   todayDoseStatus: { fontSize: 12, fontWeight: '800', textTransform: 'capitalize' },
+  todayDoseActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 7 },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.md },
@@ -586,16 +926,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadow.card,
   },
-  scheduleCard: { flexDirection: 'column', alignItems: 'stretch' },
+  scheduleCard: { flexDirection: 'row', alignItems: 'flex-start' },
   historyRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.cardTintBorder, padding: spacing.md, marginBottom: spacing.sm },
   historyRowWrapper: { marginBottom: spacing.sm },
   doseTime: { width: 72, fontSize: 14, fontWeight: '800', color: colors.primary },
-  doseInfo: { flex: 1 },
+  doseInfo: { flex: 1, minWidth: 0 },
   doseName: { fontSize: 15, fontWeight: '700', color: colors.text },
   doseMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   expiredMeta: { color: colors.dangerText, fontWeight: '700' },
   doseDate: { fontSize: 14, color: colors.textSecondary, marginTop: 3 },
   resourceActions: { marginLeft: spacing.sm, gap: 5 },
+  scheduleResourceActions: { width: 72, marginLeft: spacing.md, gap: 8 },
+  scheduleStatusBadge: { alignSelf: 'flex-start', marginTop: 7, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  scheduleStatusActive: { backgroundColor: colors.successSoft },
+  scheduleStatusInactive: { backgroundColor: colors.skippedSoft },
+  scheduleStatusExpired: { backgroundColor: colors.dangerSoft },
+  scheduleEditAction: { minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  scheduleDeleteAction: { minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.dangerSoft },
   inlineAction: { paddingVertical: 4, paddingHorizontal: 5 },
   inlineActionText: { color: colors.primary, fontSize: 11, fontWeight: '800' },
   inlineDanger: { paddingVertical: 4, paddingHorizontal: 5 },
@@ -619,11 +966,30 @@ const styles = StyleSheet.create({
   pending: { color: colors.pending },
   doseActions: { width: 70, marginLeft: spacing.sm, gap: 4 },
   inlineDoseActions: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 8 },
+  historyActions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: spacing.sm, justifyContent: 'center' },
+  historyDeleteAction: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.dangerSoft },
   takeButton: { backgroundColor: colors.primary, borderRadius: radius.sm, paddingVertical: 5, paddingHorizontal: 10, alignItems: 'center' },
   takeButtonText: { color: colors.white, fontSize: 11, fontWeight: '800' },
   skipButton: { backgroundColor: colors.dangerSoft, borderRadius: radius.sm, paddingVertical: 5, paddingHorizontal: 10, alignItems: 'center' },
   skipButtonText: { color: colors.dangerText, fontSize: 11, fontWeight: '800' },
   buttonDisabled: { opacity: 0.6 },
+  doseFilterCard: { backgroundColor: colors.cardTint, borderWidth: 1, borderColor: colors.cardTintBorder, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md },
+  filterLabel: { color: colors.text, fontSize: 13, fontWeight: '800', marginBottom: 6, marginTop: spacing.sm },
+  filterDropdownButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: radius.sm, paddingHorizontal: 12 },
+  filterDropdownText: { flex: 1, color: colors.text, fontSize: 14, marginRight: spacing.sm },
+  filterDropdownList: { marginTop: 5, marginBottom: 3, maxHeight: 180, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: radius.sm, overflow: 'hidden' },
+  filterDropdownScroll: { maxHeight: 178 },
+  filterDropdownOption: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  filterDropdownOptionActive: { backgroundColor: colors.primarySoft },
+  filterDropdownOptionText: { color: colors.text, fontSize: 13 },
+  filterDropdownOptionTextActive: { color: colors.primary, fontWeight: '800' },
+  statusFilterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  statusFilterChip: { minHeight: 34, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 11, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.inputBorder, backgroundColor: colors.white },
+  statusFilterChipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  statusFilterChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
+  statusFilterChipTextActive: { color: colors.white },
+  filterResultCount: { color: colors.textSecondary, fontSize: 12, marginTop: spacing.md },
+  emptyDescription: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 6 },
   emptyState: {
     backgroundColor: colors.cardTint,
     borderRadius: radius.lg,
@@ -647,3 +1013,53 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
 });
+
+const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDoseDateLabel = (value) => {
+  if (value === 'all') {
+    return 'All dates';
+  }
+
+  const normalizedDate = normalizeDoseDate(value);
+  if (!normalizedDate) {
+    return 'Unknown date';
+  }
+
+  const [year, month, day] = normalizedDate.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const getDoseMedicationOptions = (doses) => {
+  const medicationMap = new Map();
+
+  doses.forEach((dose) => {
+    const medication = dose.medicationId;
+    const id = medication?._id || medication?.id;
+    if (id && medication?.name) {
+      medicationMap.set(String(id), medication.name);
+    }
+  });
+
+  return Array.from(medicationMap, ([id, name]) => ({ id, name }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+};
+
+const getDoseMedicationLabel = (doses, selectedId) => {
+  if (selectedId === 'all') {
+    return 'All Medications';
+  }
+
+  return getDoseMedicationOptions(doses)
+    .find((medication) => medication.id === selectedId)?.name || 'All Medications';
+};

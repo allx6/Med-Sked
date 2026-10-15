@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import TimeSelector from '../components/TimeSelector';
@@ -291,6 +292,11 @@ export default function EditScheduleScreen({
         startDate.getMonth(),
         startDate.getDate()
       )) {
+        return;
+      }
+
+      const expirationDate = parseLocalDate(selectedMedication?.expirationDate);
+      if (expirationDate && nextDate > expirationDate) {
         return;
       }
 
@@ -588,94 +594,114 @@ export default function EditScheduleScreen({
           End Date
         </Text>
 
-        {selectedMedication?.expirationDate ? (
-          <Text style={styles.expirationHint}>
-            End date is required because this medication expires on {selectedMedication.expirationDate}.
-          </Text>
-        ) : null}
+        <View style={styles.endDateCard}>
+          {selectedMedication?.expirationDate ? (
+            <View style={styles.expirationNotice}>
+              <Text style={styles.expirationTitle}>
+                Medication expiration
+              </Text>
+              <Text style={styles.expirationHint}>
+                An end date is required. This medication expires on {selectedMedication.expirationDate}.
+              </Text>
+            </View>
+          ) : null}
 
-        {isWeb ? (
-          <input
-            type="date"
-            value={endDate ? formatDate(endDate) : ''}
-            min={
-              startDate > todayStart
-                ? formatDate(startDate)
-                : formatDate(todayStart)
-            }
-            onChange={(event) => {
-              const nextDate = parseWebDateValue(event.target.value);
-
-              if (!nextDate) {
-                return;
+          {isWeb ? (
+            <input
+              type="date"
+              value={endDate ? formatDate(endDate) : ''}
+              min={
+                startDate > todayStart
+                  ? formatDate(startDate)
+                  : formatDate(todayStart)
               }
+              max={selectedMedication?.expirationDate || undefined}
+              onChange={(event) => {
+                const nextDate = parseWebDateValue(event.target.value);
 
-              if (nextDate < todayStart) {
-                return;
-              }
+                if (!nextDate) {
+                  return;
+                }
 
-              if (startDate && nextDate < new Date(
-                startDate.getFullYear(),
-                startDate.getMonth(),
-                startDate.getDate()
-              )) {
-                return;
-              }
+                if (nextDate < todayStart) {
+                  return;
+                }
 
-              setEndDate(nextDate);
-            }}
-            disabled={saving}
-            style={styles.webDateInput}
-          />
-        ) : (
-          <>
-            <Pressable
-              style={styles.inputButton}
-              onPress={() =>
-                setShowEndDatePicker(true)
-              }
-            >
+                if (startDate && nextDate < new Date(
+                  startDate.getFullYear(),
+                  startDate.getMonth(),
+                  startDate.getDate()
+                )) {
+                  return;
+                }
 
-              <Text
-                style={
-                  endDate
-                    ? styles.inputText
-                    : styles.placeholderText
+                const expirationDate = parseLocalDate(selectedMedication?.expirationDate);
+                if (expirationDate && nextDate > expirationDate) {
+                  return;
+                }
+
+                setEndDate(nextDate);
+              }}
+              disabled={saving}
+              style={styles.webDateInput}
+            />
+          ) : (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose schedule end date"
+                style={styles.inputButton}
+                onPress={() =>
+                  setShowEndDatePicker(true)
                 }
               >
-                {endDate
-                  ? formatDate(endDate)
-                  : 'No end date'}
-              </Text>
 
-            </Pressable>
-
-            {showEndDatePicker && (
-              <View style={styles.pickerContainer}>
-                <DateTimePicker
-                  value={
-                    endDate ||
-                    startDate ||
-                    new Date()
+                <Text
+                  style={
+                    endDate
+                      ? styles.inputText
+                      : styles.placeholderText
                   }
-                  mode="date"
-                  minimumDate={
-                    startDate > todayStart
-                      ? startDate
-                      : todayStart
-                  }
-                  display={
-                    Platform.OS === 'ios'
-                      ? 'spinner'
-                      : 'default'
-                  }
-                  onValueChange={handleEndDateChange}
-                  onDismiss={() => setShowEndDatePicker(false)}
+                >
+                  {endDate
+                    ? formatDate(endDate)
+                    : 'Select end date'}
+                </Text>
+                <MaterialCommunityIcons
+                  name="calendar-month-outline"
+                  size={20}
+                  color="#0B4F59"
                 />
-              </View>
-            )}
-          </>
-        )}
+              </Pressable>
+
+              {showEndDatePicker && (
+                <View style={styles.pickerContainer}>
+                  <DateTimePicker
+                    value={
+                      endDate ||
+                      startDate ||
+                      new Date()
+                    }
+                    mode="date"
+                    minimumDate={
+                      startDate > todayStart
+                        ? startDate
+                        : todayStart
+                    }
+                    maximumDate={parseLocalDate(selectedMedication?.expirationDate) || undefined}
+                    display={
+                      Platform.OS === 'ios'
+                        ? 'spinner'
+                        : 'default'
+                    }
+                    onValueChange={handleEndDateChange}
+                    onDismiss={() => setShowEndDatePicker(false)}
+                  />
+                </View>
+              )}
+            </>
+          )}
+        </View>
 
         {/* =================================================
             STATUS
@@ -837,11 +863,31 @@ const styles = StyleSheet.create({
   },
 
   expirationHint: {
-    marginTop: -3,
-    marginBottom: 8,
-    color: '#D8F0F2',
+    color: '#375B63',
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
+  },
+
+  endDateCard: {
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    padding: 14,
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#B8DDE1',
+    backgroundColor: '#EAF5F6',
+  },
+
+  expirationNotice: {
+    gap: 3,
+  },
+
+  expirationTitle: {
+    color: '#0B4F59',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   medicationList: {
@@ -891,6 +937,9 @@ const styles = StyleSheet.create({
   },
 
   inputButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D9DEE8',
@@ -903,15 +952,18 @@ const styles = StyleSheet.create({
 
   webDateInput: {
     width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     minHeight: 50,
+    display: 'block',
     backgroundColor: '#FFFFFF',
-    borderColor: '#D9DEE8',
+    borderColor: '#B8C9CE',
     borderRadius: 10,
     borderWidth: 1,
     color: '#1E2A4A',
     fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     boxSizing: 'border-box',
   },
 

@@ -7,8 +7,10 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { getAdherenceAnalytics } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
@@ -28,6 +30,7 @@ const getRange = (days) => {
 };
 
 export default function AnalyticsScreen({ token, patientId, onBack }) {
+  const { width: viewportWidth } = useWindowDimensions();
   const [selectedRange, setSelectedRange] = useState(1);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -79,8 +82,14 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
       ? Math.max(0, Math.min(100, Number(value.adherencePercentage)))
       : 0;
 
-    return { bucket, value, percentage };
+    return {
+      bucket,
+      value: { ...value, total: Math.max(0, Number(value.total) || 0) },
+      percentage,
+    };
   });
+  const totalTimeDoses = timeBuckets.reduce((total, { value }) => total + value.total, 0);
+  const pieSize = Math.min(220, Math.max(150, viewportWidth - 80));
 
   return (
     <View style={styles.container}>
@@ -134,22 +143,13 @@ export default function AnalyticsScreen({ token, patientId, onBack }) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Adherence by time of day</Text>
-          <Text style={styles.chartCaption}>Percentage of doses taken for each time period</Text>
-          <View style={styles.chart}>
-            {timeBuckets.map(({ bucket, value, percentage }) => (
-              <View key={bucket} style={styles.chartColumn} accessibilityLabel={`${bucket}: ${value.total > 0 ? `${percentage}% adherence` : 'no dose data'}, ${value.total} doses`}>
-                <Text style={styles.chartValue}>{value.total > 0 ? `${percentage}%` : '—'}</Text>
-                <View style={styles.chartTrack}>
-                  {value.total > 0 && percentage > 0 ? (
-                    <View style={[styles.chartBar, { height: `${percentage}%` }]} />
-                  ) : null}
-                </View>
-                <Text style={styles.chartLabel}>{bucket}</Text>
-                <Text style={styles.chartCount}>{value.total} {value.total === 1 ? 'dose' : 'doses'}</Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>Doses by time of day</Text>
+          <Text style={styles.chartCaption}>Share of doses in each period. Adherence is shown below.</Text>
+          <DoseTimePieChart
+            buckets={timeBuckets}
+            size={pieSize}
+            total={totalTimeDoses}
+          />
         </View>
 
         <View style={styles.card}>
@@ -182,6 +182,119 @@ function Stat({ label, value, color }) {
   return <View style={styles.stat}><Text style={[styles.statValue, { color }]}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
 }
 
+const timeBucketColors = {
+  morning: '#defc36',
+  afternoon: '#ef9b9b',
+  evening: '#15608f',
+  night: '#8A78B8',
+};
+
+function DoseTimePieChart({ buckets, size, total }) {
+  const center = size / 2;
+  const radius = size * 0.46;
+  let currentAngle = -90;
+
+  const segments = buckets
+    .filter(({ value }) => value.total > 0)
+    .map(({ bucket, value }) => {
+      const sweep = (value.total / total) * 360;
+      const startAngle = currentAngle;
+      currentAngle += sweep;
+
+      if (sweep >= 360) {
+        return {
+          bucket,
+          color: timeBucketColors[bucket],
+          path: null,
+          fullCircle: true,
+        };
+      }
+
+      const endAngle = currentAngle;
+      const startRadians = (startAngle * Math.PI) / 180;
+      const endRadians = (endAngle * Math.PI) / 180;
+      const startX = center + radius * Math.cos(startRadians);
+      const startY = center + radius * Math.sin(startRadians);
+      const endX = center + radius * Math.cos(endRadians);
+      const endY = center + radius * Math.sin(endRadians);
+
+      return {
+        bucket,
+        color: timeBucketColors[bucket],
+        path: `M ${center} ${center} L ${startX} ${startY} A ${radius} ${radius} 0 ${sweep > 180 ? 1 : 0} 1 ${endX} ${endY} Z`,
+        fullCircle: false,
+      };
+    });
+
+  return (
+    <View>
+      <View
+        style={styles.pieWrap}
+        accessibilityRole="image"
+        accessibilityLabel={
+          total > 0
+            ? `Dose distribution by time of day, ${buckets.filter(({ value }) => value.total > 0).map(({ bucket, value }) => `${bucket}: ${value.total}`).join(', ')}`
+            : 'No dose data by time of day'
+        }
+      >
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {total > 0 ? (
+            segments.map((segment) => (
+              segment.fullCircle ? (
+                <Circle
+                  key={segment.bucket}
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  fill={segment.color}
+                />
+              ) : (
+                <Path
+                  key={segment.bucket}
+                  d={segment.path}
+                  fill={segment.color}
+                  stroke={colors.cardTint}
+                  strokeWidth={2}
+                />
+              )
+            ))
+          ) : (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="#CDE8EE"
+            />
+          )}
+        </Svg>
+      </View>
+      {total === 0 ? (
+        <Text style={styles.noChartData}>No dose data for this period</Text>
+      ) : null}
+      <View style={styles.pieLegend}>
+        {buckets.map(({ bucket, value, percentage }) => {
+          const share = total > 0 ? Math.round((value.total / total) * 100) : 0;
+
+          return (
+            <View key={bucket} style={styles.pieLegendItem}>
+              <View style={[styles.pieLegendDot, { backgroundColor: timeBucketColors[bucket] }]} />
+              <View style={styles.pieLegendCopy}>
+                <Text style={styles.pieLegendLabel}>
+                  {bucket.charAt(0).toUpperCase() + bucket.slice(1)}
+                  <Text style={styles.pieLegendCount}> · {value.total} {value.total === 1 ? 'dose' : 'doses'} ({share}%)</Text>
+                </Text>
+                <Text style={styles.pieLegendMeta}>
+                  {value.total > 0 ? `${percentage}% adherence` : 'No dose data'}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { width: '100%', maxWidth: 1000, alignSelf: 'center', padding: spacing.lg, paddingBottom: 32 },
@@ -209,13 +322,15 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 23, fontWeight: '900' },
   statLabel: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
   chartCaption: { color: colors.textSecondary, fontSize: 12, marginTop: -spacing.sm, marginBottom: spacing.md },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, paddingTop: spacing.sm },
-  chartColumn: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'flex-end' },
-  chartValue: { color: colors.primary, fontSize: 13, fontWeight: '900', marginBottom: spacing.sm, fontVariant: ['tabular-nums'] },
-  chartTrack: { width: '100%', maxWidth: 68, height: 156, justifyContent: 'flex-end', overflow: 'hidden', backgroundColor: '#CDE8EE', borderRadius: radius.sm, borderBottomWidth: 2, borderBottomColor: '#9CCBD4' },
-  chartBar: { width: '100%', backgroundColor: colors.primary, borderTopLeftRadius: radius.sm, borderTopRightRadius: radius.sm },
-  chartLabel: { color: colors.text, fontSize: 13, fontWeight: '800', textTransform: 'capitalize', marginTop: spacing.md },
-  chartCount: { color: colors.textSecondary, fontSize: 11, marginTop: 3, fontVariant: ['tabular-nums'] },
+  pieWrap: { alignSelf: 'center', marginVertical: spacing.md },
+  noChartData: { color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginBottom: spacing.md },
+  pieLegend: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md, columnGap: spacing.sm },
+  pieLegendItem: { width: '48%', minWidth: 130, flexGrow: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  pieLegendDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  pieLegendCopy: { flex: 1, minWidth: 0 },
+  pieLegendLabel: { color: colors.text, fontSize: 12, fontWeight: '800' },
+  pieLegendCount: { color: colors.textSecondary, fontWeight: '600' },
+  pieLegendMeta: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   timeRow: { marginBottom: spacing.md },
   timeHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   timeLabel: { color: colors.text, fontWeight: '800', textTransform: 'capitalize' },

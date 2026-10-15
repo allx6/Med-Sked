@@ -23,10 +23,12 @@ let filterDoseRecordsByMedicationExpiration;
 let getDoseActionErrorMessage;
 let validateRefillAmount;
 let getRefillErrorMessage;
+let validateMedicationExpirationDate;
 
 test('load medication expiration helpers', async () => {
   const helpers = await import(moduleUrl);
   getMedicationExpirationState = helpers.getMedicationExpirationState;
+  validateMedicationExpirationDate = helpers.validateMedicationExpirationDate;
   filterDoseRecordsByMedicationExpiration = helpers.filterDoseRecordsByMedicationExpiration;
   validateRefillAmount = helpers.validateRefillAmount;
   ({ getDoseActionErrorMessage } = await import(doseErrorsModuleUrl));
@@ -45,6 +47,18 @@ test('expiration today is valid; yesterday is expired; tomorrow is not expired',
   assert.equal(getMedicationExpirationState(formatLocalDate(today)).expired, false);
   assert.equal(getMedicationExpirationState(formatLocalDate(yesterday)).expired, true);
   assert.equal(getMedicationExpirationState(formatLocalDate(tomorrow)).expired, false);
+});
+
+test('medication expiration validation rejects past dates and accepts today', () => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  assert.equal(validateMedicationExpirationDate(formatLocalDate(today)), '');
+  assert.equal(
+    validateMedicationExpirationDate(formatLocalDate(yesterday)),
+    'Expiration date cannot be earlier than today.'
+  );
 });
 
 test('current dose filtering excludes post-expiration records but retains expiration-day, historical, and legacy records', () => {
