@@ -1180,7 +1180,7 @@ button:disabled {
   border-radius: 999px;
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1206,18 +1206,19 @@ button:disabled {
   justify-content: space-between;
   gap: 12px;
   color: #1e2a4a;
-  font-size: 0.83rem;
+  font-size: 0.95rem;
 }
 
 .bar-chart-label {
   min-width: 0;
   overflow-wrap: anywhere;
   color: #475569;
+  font-size: 0.95rem;
 }
 
 .bar-chart-heading strong {
   flex: 0 0 auto;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1254,17 +1255,17 @@ button:disabled {
 .line-chart-axis-label {
   fill: #7a8494;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 20px;
 }
 
 .line-chart-percentage-label {
   fill: #526579;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .line-chart-date-label {
-  font-size: 11px;
+  font-size: 20px;
 }
 
 .donut-chart {
@@ -1286,14 +1287,14 @@ button:disabled {
 
 .donut-chart-total {
   fill: #1e2a4a;
-  font-size: 23px;
+  font-size: 28px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .donut-chart-caption {
   fill: #7a8494;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .donut-chart-legend {
@@ -1317,7 +1318,7 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   color: #475569;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
 }
 
 .donut-legend-name {
@@ -1335,7 +1336,7 @@ button:disabled {
 .donut-chart-legend li > strong {
   flex: 0 0 auto;
   color: #1e2a4a;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
 }
 

@@ -85,7 +85,7 @@ const SimpleTrendBarChart = ({ data, valueKey = 'adherence', labelKey = 'day', c
 
   const width = 640;
   const height = 300;
-  const padding = { top: 18, right: 20, bottom: 44, left: 42 };
+  const padding = { top: 18, right: 20, bottom: 60, left: 42 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const values = data.map((item) => Math.min(100, getChartValue(item, valueKey)));
