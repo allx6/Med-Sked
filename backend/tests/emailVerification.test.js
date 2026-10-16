@@ -417,7 +417,7 @@ test('registration sends an OTP but does not create an authenticated session', a
   const mocks = installRouteStore(null);
   try {
     const response = await invokeAuthRoute('/register', {
-      name: 'Test Person',
+      name: 'TestPerson',
       email: ' Person@example.com ',
       password: 'secure-pass',
       role: 'caregiver',
@@ -437,12 +437,111 @@ test('registration sends an OTP but does not create an authenticated session', a
   }
 });
 
+test('registration accepts valid usernames and keeps duplicate suffix generation unchanged', async () => {
+  const availableMocks = installRouteStore(null);
+  try {
+    const availableResponse = await invokeAuthRoute('/register', {
+      name: 'giovanni',
+      email: 'available@example.com',
+      password: 'secure-pass',
+      role: 'caregiver',
+      termsAccepted: true,
+    });
+    assert.equal(availableResponse.statusCode, 201);
+    assert.equal(availableMocks.store.get().username, 'giovanni');
+  } finally {
+    availableMocks.restore();
+  }
+
+  const duplicateMocks = installRouteStore({
+    _id: 'existing-user',
+    username: 'giovanni',
+    email: 'existing@example.com',
+  });
+  try {
+    const duplicateResponse = await invokeAuthRoute('/register', {
+      name: 'giovanni',
+      email: 'duplicate@example.com',
+      password: 'secure-pass',
+      role: 'caregiver',
+      termsAccepted: true,
+    });
+    assert.equal(duplicateResponse.statusCode, 201);
+    assert.equal(duplicateMocks.store.get().username, 'giovanni1');
+  } finally {
+    duplicateMocks.restore();
+  }
+
+  const longDuplicateMocks = installRouteStore({
+    _id: 'existing-user',
+    username: 'abcdefghij',
+    email: 'existing@example.com',
+  });
+  try {
+    const longDuplicateResponse = await invokeAuthRoute('/register', {
+      name: 'abcdefghij',
+      email: 'long-duplicate@example.com',
+      password: 'secure-pass',
+      role: 'caregiver',
+      termsAccepted: true,
+    });
+    assert.equal(longDuplicateResponse.statusCode, 201);
+    assert.equal(longDuplicateMocks.store.get().username, 'abcdefghij1');
+  } finally {
+    longDuplicateMocks.restore();
+  }
+});
+
+test('registration accepts 10-letter usernames and rejects invalid user input', async () => {
+  const validMocks = installRouteStore(null);
+  try {
+    const response = await invokeAuthRoute('/register', {
+      name: 'abcdefghij',
+      email: 'tenletters@example.com',
+      password: 'secure-pass',
+      role: 'caregiver',
+      termsAccepted: true,
+    });
+    assert.equal(response.statusCode, 201);
+    assert.equal(validMocks.store.get().username, 'abcdefghij');
+  } finally {
+    validMocks.restore();
+  }
+
+  for (const name of [
+    'abcdefghijk',
+    'giovanni1',
+    'john123',
+    'john doe',
+    'john_doe',
+    'john-doe',
+    'john@doe',
+  ]) {
+    const mocks = installRouteStore(null);
+    try {
+      const response = await invokeAuthRoute('/register', {
+        name,
+        email: 'person@example.com',
+        password: 'secure-pass',
+        role: 'caregiver',
+        termsAccepted: true,
+      });
+      assert.equal(response.statusCode, 400, name);
+      assert.match(response.body.message, /Username must contain only letters/);
+      assert.equal(mocks.store.get(), null);
+      assert.equal(mocks.sentCodes.length, 0);
+    } finally {
+      mocks.restore();
+    }
+  }
+});
+
 test('registration rejects missing or false terms acceptance without creating an account', async () => {
   for (const termsAccepted of [undefined, false]) {
     const mocks = installRouteStore(null);
     try {
       const response = await invokeAuthRoute('/register', {
-        name: 'Test Person',
+        name: 'TestPerson',
         email: 'person@example.com',
         password: 'secure-pass',
         role: 'caregiver',
@@ -477,7 +576,7 @@ test('registration accepts valid email addresses from different providers', asyn
     const mocks = installRouteStore(null);
     try {
       const response = await invokeAuthRoute('/register', {
-        name: 'Test Person',
+        name: 'TestPerson',
         email,
         password: 'secure-pass',
         role: 'caregiver',
@@ -499,7 +598,7 @@ test('registration rejects malformed and empty email addresses', async () => {
     const mocks = installRouteStore(null);
     try {
       const response = await invokeAuthRoute('/register', {
-        name: 'Test Person',
+        name: 'TestPerson',
         email,
         password: 'secure-pass',
         role: 'caregiver',
@@ -520,7 +619,7 @@ test('registration handles email delivery failure without exposing provider deta
   });
   try {
     const response = await invokeAuthRoute('/register', {
-      name: 'Test Person',
+      name: 'TestPerson',
       email: 'person@example.com',
       password: 'secure-pass',
       role: 'caregiver',

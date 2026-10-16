@@ -24,7 +24,7 @@ import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { getSafeUserErrorMessage } from '../utils/medicationValidation';
-import { isValidEmail } from '../utils/helpers';
+import { isValidEmail, isValidUsername } from '../utils/helpers';
 
 const medSkedLogo = require('../assets/medsked.png');
 
@@ -108,6 +108,16 @@ export default function RegisterScreen({
       Alert.alert(
         'Missing Name',
         'Please enter your name.'
+      );
+      return;
+    }
+
+    if (!isValidUsername(name)) {
+      nextErrors.name = 'Username must contain only letters and be no more than 10 characters.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Username',
+        'Username must contain only letters and be no more than 10 characters.'
       );
       return;
     }
@@ -346,6 +356,7 @@ export default function RegisterScreen({
               }}
               placeholder="Enter your Username"
               error={errors.name}
+              maxLength={10}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!loading}

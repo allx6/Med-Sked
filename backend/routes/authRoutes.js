@@ -119,7 +119,6 @@ router.post('/register', async (req, res) => {
       });
     }
 
-
     // =====================================================
     // VALID ROLE
     // =====================================================
@@ -143,6 +142,13 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({
         message:
           'Password must be at least 6 characters.',
+      });
+    }
+
+    if (typeof name !== 'string' || !/^[A-Za-z]{1,10}$/.test(name)) {
+      return res.status(400).json({
+        message:
+          'Username must contain only letters and be no more than 10 characters.',
       });
     }
 
