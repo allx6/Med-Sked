@@ -298,7 +298,10 @@ export default function AnalyticsPage() {
     const peak = Math.max(...trend.map((item) => item.adherence), 0);
     const bestTime = [...timeOfDayChart].sort((a, b) => b.adherence - a.adherence)[0];
     const weakestRegimen = [...regimenChart].sort((a, b) => a.adherence - b.adherence)[0];
-    const missed = doseChart.find((item) => item.status === 'Missed')?.count || 0;
+    const missed = doseChart.find((item) => {
+      const status = String(item?.status ?? item?.name ?? '').trim().toLowerCase();
+      return status === 'missed';
+    })?.count || 0;
 
     return { latest, peak, change: latest - first, bestTime, weakestRegimen, missed };
   }, [doseChart, regimenChart, timeOfDayChart, trendChart]);
