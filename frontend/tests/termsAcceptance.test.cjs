@@ -33,6 +33,15 @@ test('registration exposes the complete terms in a scrollable modal', () => {
   }
 });
 
+test('checking terms opens the document and closing is gated on reaching its bottom', () => {
+  const source = readFrontendFile('screens/RegisterScreen.js');
+
+  assert.match(source, /if \(nextAccepted\)\s*\{\s*openTerms\(\)/);
+  assert.match(source, /contentOffset\.y \+ layoutMeasurement\.height >= contentSize\.height - 24/);
+  assert.match(source, /onScroll=\{handleTermsScroll\}/);
+  assert.match(source, /disabled=\{!termsReadToBottom\}/);
+});
+
 test('registration API sends terms acceptance to the backend', () => {
   const source = readFrontendFile('services/api.js');
 

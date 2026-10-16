@@ -219,10 +219,10 @@ const styles = StyleSheet.create({
   },
   dropdownButton: {
     position: 'absolute',
-    top: 17,
+    top: 18,
     right: 0,
-    width: 46,
-    height: 40,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 22,
@@ -238,8 +238,12 @@ const styles = StyleSheet.create({
   suggestionList: {
     borderWidth: 1,
     borderColor: colors.inputBorder,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     backgroundColor: colors.white,
+    shadowColor: '#17313A',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 30,
   },
   suggestion: {
