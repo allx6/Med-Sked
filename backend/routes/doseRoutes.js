@@ -386,6 +386,8 @@ router.put(
         return res.status(400).json({ message: 'Invalid patient ID' });
       }
 
+      await detectMissedDoses(new Date(), doseOwnerId);
+
       const existingDose = await DoseRecord.findOne({
         _id: req.params.id,
         userId: doseOwnerId,
