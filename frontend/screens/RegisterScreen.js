@@ -24,7 +24,7 @@ import TextField from '../components/TextField';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { getSafeUserErrorMessage } from '../utils/medicationValidation';
-import { isValidEmail } from '../utils/helpers';
+import { isValidEmail, isValidUsername } from '../utils/helpers';
 
 const medSkedLogo = require('../assets/medsked.png');
 
@@ -50,6 +50,7 @@ export default function RegisterScreen({
   const [role, setRole] = useState('patient');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsVisible, setTermsVisible] = useState(false);
+  const [termsReadToBottom, setTermsReadToBottom] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -80,6 +81,18 @@ export default function RegisterScreen({
     ],
   };
 
+  const openTerms = () => {
+    setTermsReadToBottom(false);
+    setTermsVisible(true);
+  };
+
+  const handleTermsScroll = ({ nativeEvent }) => {
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 24) {
+      setTermsReadToBottom(true);
+    }
+  };
+
 
   // =====================================================
   // REGISTER
@@ -95,6 +108,16 @@ export default function RegisterScreen({
       Alert.alert(
         'Missing Name',
         'Please enter your name.'
+      );
+      return;
+    }
+
+    if (!isValidUsername(name)) {
+      nextErrors.name = 'Username must contain only letters and be no more than 10 characters.';
+      setErrors(nextErrors);
+      Alert.alert(
+        'Invalid Username',
+        'Username must contain only letters and be no more than 10 characters.'
       );
       return;
     }
@@ -333,6 +356,7 @@ export default function RegisterScreen({
               }}
               placeholder="Enter your Username"
               error={errors.name}
+              maxLength={10}
               autoCapitalize="words"
               autoCorrect={false}
               editable={!loading}
@@ -483,31 +507,37 @@ export default function RegisterScreen({
             />
 
             <View style={styles.termsGroup}>
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: termsAccepted }}
-                onPress={() => {
-                  setTermsAccepted((accepted) => !accepted);
-                  setErrors((current) => ({ ...current, termsAccepted: '' }));
-                }}
-                disabled={loading}
-                style={styles.termsCheckboxRow}
-              >
-                <MaterialCommunityIcons
-                  name={termsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={22}
-                  color={termsAccepted ? '#0B4F59' : '#6B7280'}
-                />
-                <Text style={styles.termsCheckboxText}>I agree to the MedSked</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => setTermsVisible(true)}
-                disabled={loading}
-                style={styles.termsLinkButton}
-              >
-                <Text style={styles.termsLink}>Terms &amp; Conditions</Text>
-              </Pressable>
+              <View style={styles.termsAgreementRow}>
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: termsAccepted }}
+                  onPress={() => {
+                    const nextAccepted = !termsAccepted;
+                    setTermsAccepted(nextAccepted);
+                    setErrors((current) => ({ ...current, termsAccepted: '' }));
+                    if (nextAccepted) {
+                      openTerms();
+                    }
+                  }}
+                  disabled={loading}
+                  style={styles.termsCheckboxRow}
+                >
+                  <MaterialCommunityIcons
+                    name={termsAccepted ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={22}
+                    color={termsAccepted ? '#0B4F59' : '#6B7280'}
+                  />
+                  <Text style={styles.termsCheckboxText}>I agree to the MedSked</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={openTerms}
+                  disabled={loading}
+                  style={styles.termsLinkButton}
+                >
+                  <Text style={styles.termsLink}>Terms &amp; Conditions</Text>
+                </Pressable>
+              </View>
               {errors.termsAccepted ? (
                 <Text style={styles.termsError}>{errors.termsAccepted}</Text>
               ) : null}
@@ -573,7 +603,11 @@ export default function RegisterScreen({
         visible={termsVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setTermsVisible(false)}
+        onRequestClose={() => {
+          if (termsReadToBottom) {
+            setTermsVisible(false);
+          }
+        }}
       >
         <View style={styles.termsModal}>
           <View style={styles.termsModalHeader}>
@@ -581,7 +615,10 @@ export default function RegisterScreen({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close Terms & Conditions"
+              accessibilityState={{ disabled: !termsReadToBottom }}
+              disabled={!termsReadToBottom}
               onPress={() => setTermsVisible(false)}
+              style={!termsReadToBottom && styles.termsCloseDisabled}
               hitSlop={10}
             >
               <MaterialCommunityIcons name="close" size={26} color="#1E2A4A" />
@@ -591,6 +628,8 @@ export default function RegisterScreen({
             style={styles.termsScroll}
             contentContainerStyle={styles.termsScrollContent}
             showsVerticalScrollIndicator
+            onScroll={handleTermsScroll}
+            scrollEventThrottle={16}
           >
             <Text style={styles.termsDocument}>
               {`MedSked Terms & Conditions
@@ -708,8 +747,13 @@ If you do not agree to these Terms & Conditions, you should not create or use a 
           </ScrollView>
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ disabled: !termsReadToBottom }}
+            disabled={!termsReadToBottom}
             onPress={() => setTermsVisible(false)}
-            style={styles.termsCloseButton}
+            style={[
+              styles.termsCloseButton,
+              !termsReadToBottom && styles.termsCloseButtonDisabled,
+            ]}
           >
             <Text style={styles.termsCloseButtonText}>Close</Text>
           </Pressable>
@@ -920,10 +964,17 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
 
+  termsAgreementRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+
   termsCheckboxRow: {
     minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
 
   termsCheckboxText: {
@@ -933,9 +984,9 @@ const styles = StyleSheet.create({
   },
 
   termsLinkButton: {
-    alignSelf: 'flex-start',
-    marginLeft: 30,
-    marginTop: -2,
+    marginLeft: 6,
+    minHeight: 36,
+    justifyContent: 'center',
   },
 
   termsLink: {
@@ -997,6 +1048,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 6,
     backgroundColor: '#0B4F59',
+  },
+
+  termsCloseButtonDisabled: {
+    opacity: 0.45,
+  },
+
+  termsCloseDisabled: {
+    opacity: 0.4,
   },
 
   termsCloseButtonText: {

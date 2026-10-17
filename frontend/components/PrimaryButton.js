@@ -1,6 +1,12 @@
-import React from 'react';
-import { Pressable, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { colors, radius } from '../theme';
+import React, { useRef } from 'react';
+import {
+  Pressable,
+  Text,
+  ActivityIndicator,
+  Animated,
+  StyleSheet,
+} from 'react-native';
+import { colors, radius, shadow } from '../theme';
 
 export default function PrimaryButton({
   label,
@@ -9,15 +15,34 @@ export default function PrimaryButton({
   loading,
   style,
 }) {
+  const pressProgress = useRef(new Animated.Value(1)).current;
+  const buttonStyle = StyleSheet.flatten(style) || {};
+
+  const animatePress = (toValue) => {
+    Animated.spring(pressProgress, {
+      toValue,
+      speed: 32,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={() => animatePress(0.97)}
+      onPressOut={() => animatePress(1)}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      style={[
         styles.button,
-        pressed && styles.pressed,
         (disabled || loading) && styles.disabled,
         style,
+        {
+          transform: [
+            ...(buttonStyle.transform || []),
+            { scale: pressProgress },
+          ],
+        },
       ]}
     >
       {loading ? (
@@ -25,9 +50,11 @@ export default function PrimaryButton({
       ) : (
         <Text style={styles.label}>{label}</Text>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const styles = StyleSheet.create({
   button: {
@@ -36,9 +63,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.md,
     backgroundColor: colors.primary,
+    ...shadow.card,
   },
-  pressed: { opacity: 0.8 },
-  disabled: { opacity: 0.55 },
+  disabled: { opacity: 0.55, elevation: 0, shadowOpacity: 0 },
   label: {
     fontSize: 16,
     fontWeight: '800',

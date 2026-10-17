@@ -261,12 +261,9 @@ const validateMedicationFields = (payload) => {
     return 'Dosage amount cannot exceed 6 digits.';
   }
 
-  const frequencyMatch = frequency.match(/^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i);
-  if (!frequencyMatch || !Number.isFinite(Number(frequencyMatch[1])) || Number(frequencyMatch[1]) < 1) {
-    return 'Frequency must be at least 1 hour or day.';
-  }
-  if (exceedsMedicationNumericDigitLimit(frequencyMatch[1])) {
-    return 'Frequency interval cannot exceed 6 digits.';
+  const frequencyMatch = frequency.match(/^Every\s+([1-9][0-9]?)\s+(hours|days)$/i);
+  if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
+    return 'Frequency must be a whole number from 1 to 99 hours or days.';
   }
 
   for (const [field, label] of [

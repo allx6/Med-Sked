@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { Snackbar } from 'react-native-paper';
 
 import { getCaregiverRequestsForPatient } from '../services/api';
 import { colors, radius, spacing, shadow } from '../theme';
@@ -11,11 +12,12 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
   const patientId = user?.patientId || 'Not assigned';
   const [pendingRequestCount, setPendingRequestCount] = useState(null);
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
+  const [showCopiedMessage, setShowCopiedMessage] = useState(false);
 
   const handleCopyPatientId = async () => {
     try {
       await Clipboard.setStringAsync(patientId);
-      Alert.alert('Copied', 'Patient ID copied to clipboard.');
+      setShowCopiedMessage(true);
     } catch (error) {
       Alert.alert('Copy failed', 'Unable to copy the Patient ID. Please try again.');
     }
@@ -200,6 +202,13 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
         }}
         onCancel={() => setShowLogoutConfirmation(false)}
       />
+      <Snackbar
+        visible={showCopiedMessage}
+        onDismiss={() => setShowCopiedMessage(false)}
+        duration={2500}
+      >
+        Patient ID copied to clipboard.
+      </Snackbar>
     </View>
   );
 }

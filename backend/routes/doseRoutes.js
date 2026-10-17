@@ -7,7 +7,10 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
-const { createMedicationNotifications } = require('../services/notificationService');
+const {
+  createMedicationNotifications,
+  notifyLowRefill,
+} = require('../services/notificationService');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 const { detectMissedDoses } = require('../services/missedDoseService');
 
@@ -551,41 +554,19 @@ router.put(
         }
       }
 
-      if (
-        updatedMedication &&
-        updatedMedication.quantityOnHand <= updatedMedication.refillThreshold &&
-        !updatedMedication.lowRefillNotified
-      ) {
-        const notificationClaim = await Medication.updateOne(
-          {
-            _id: updatedMedication._id,
-            userId: updatedMedication.userId,
-            lowRefillNotified: { $ne: true },
-          },
-          { $set: { lowRefillNotified: true } }
-        );
-
-        if (notificationClaim.modifiedCount === 1) {
-          const patientNotification = await createMedicationNotifications({
-            patientId: updatedMedication.userId,
-            type: 'low_refill',
-            patientMessage: `${updatedMedication.name} is low on refill stock.`,
-            caregiverMessage: (patientName) => `${patientName}'s ${updatedMedication.name} is low on refill stock.`,
-            relatedEntityType: 'Medication',
-            relatedEntityId: updatedMedication._id,
-            dedupeKey: `low_refill:${updatedMedication._id}:${dose._id}`,
+      if (updatedMedication) {
+        try {
+          await notifyLowRefill({
+            medication: updatedMedication,
+            triggerId: dose._id,
           });
-
-          if (!patientNotification) {
-            await Medication.updateOne(
-              {
-                _id: updatedMedication._id,
-                userId: updatedMedication.userId,
-                lowRefillNotified: true,
-              },
-              { $set: { lowRefillNotified: false } }
-            );
-          }
+        } catch (error) {
+          console.error('Low-refill notification failed:', {
+            patientId: String(updatedMedication.userId),
+            medicationId: String(updatedMedication._id),
+            operation: 'notify-after-dose-taken',
+            errorName: error?.name || 'UnknownError',
+          });
         }
       }
 

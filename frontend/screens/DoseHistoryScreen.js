@@ -9,11 +9,11 @@ import {
   View,
   Image,
   Text,
-  FlatList,
   Pressable,
   StyleSheet,
   ActivityIndicator,
   Alert,
+  RefreshControl,
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
@@ -36,6 +36,14 @@ import {
   getAvailableDoseDates,
   normalizeDoseDate,
 } from '../utils/doseHistory';
+
+const DOSE_STATUS_OPTIONS = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'taken', label: 'Taken' },
+  { key: 'skipped', label: 'Skipped' },
+  { key: 'missed', label: 'Missed' },
+];
 
 export default function DoseHistoryScreen({
   token,
@@ -64,6 +72,8 @@ export default function DoseHistoryScreen({
   const [selectedDate, setSelectedDate] =
     useState(() => formatDateForComparison(new Date()));
   const [dateDropdownVisible, setDateDropdownVisible] = useState(false);
+  const [medicationDropdownVisible, setMedicationDropdownVisible] = useState(false);
+  const [statusDropdownVisible, setStatusDropdownVisible] = useState(false);
 
   // =====================================================
   // LOAD DOSE RECORDS
@@ -641,6 +651,16 @@ export default function DoseHistoryScreen({
     <View style={[styles.container, compactLayout && styles.compactContainer]}>
       <View style={styles.decorCircle} pointerEvents="none" />
 
+      <ScrollView
+        style={styles.screenScroll}
+        contentContainerStyle={styles.screenScrollContent}
+        refreshControl={(
+          <RefreshControl
+            refreshing={loading && doses.length > 0}
+            onRefresh={loadDoses}
+          />
+        )}
+      >
       {/* HEADER */}
 
       <View style={styles.brandHeader}>
@@ -697,8 +717,15 @@ export default function DoseHistoryScreen({
 
           <View style={styles.filterRow}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose dose history date"
+              accessibilityState={{ expanded: dateDropdownVisible }}
               style={styles.dateDropdownButton}
-              onPress={() => setDateDropdownVisible((current) => !current)}
+              onPress={() => {
+                setDateDropdownVisible((current) => !current);
+                setMedicationDropdownVisible(false);
+                setStatusDropdownVisible(false);
+              }}
             >
               <Text style={styles.dateDropdownText}>
                 {getDateLabel(selectedDate)}
@@ -773,48 +800,67 @@ export default function DoseHistoryScreen({
           </Text>
 
           <View style={styles.filterRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterScroll}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose medication"
+              accessibilityState={{ expanded: medicationDropdownVisible }}
+              style={styles.dateDropdownButton}
+              onPress={() => {
+                setMedicationDropdownVisible((current) => !current);
+                setDateDropdownVisible(false);
+                setStatusDropdownVisible(false);
+              }}
             >
-              <Pressable
-                style={[
-                  styles.filterChip,
-                  selectedMedication === 'all' && styles.activeFilterChip,
-                ]}
-                onPress={() => setSelectedMedication('all')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    selectedMedication === 'all' && styles.activeFilterChipText,
-                  ]}
-                >
-                  All Medications
-                </Text>
-              </Pressable>
+              <Text style={styles.dateDropdownText}>
+                {selectedMedication === 'all'
+                  ? 'All Medications'
+                  : medications.find((medication) => medication.id === selectedMedication)?.name || 'All Medications'}
+              </Text>
+              <MaterialCommunityIcons
+                name={medicationDropdownVisible ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#D7EDF3"
+              />
+            </Pressable>
 
-              {medications.map((medication) => (
-                <Pressable
-                  key={medication.id}
-                  style={[
-                    styles.filterChip,
-                    selectedMedication === medication.id && styles.activeFilterChip,
-                  ]}
-                  onPress={() => setSelectedMedication(medication.id)}
+            {medicationDropdownVisible ? (
+              <View style={styles.dateDropdownList}>
+                <ScrollView
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator
+                  style={styles.dateDropdownScroll}
+                  contentContainerStyle={styles.dateDropdownScrollContent}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedMedication === medication.id && styles.activeFilterChipText,
-                    ]}
-                  >
-                    {medication.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+                  {[
+                    { id: 'all', name: 'All Medications' },
+                    ...medications,
+                  ].map((medication) => (
+                    <Pressable
+                      key={medication.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: selectedMedication === medication.id }}
+                      style={[
+                        styles.dateDropdownItem,
+                        selectedMedication === medication.id && styles.dateDropdownItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedMedication(medication.id);
+                        setMedicationDropdownVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dateDropdownItemText,
+                          selectedMedication === medication.id && styles.dateDropdownItemTextActive,
+                        ]}
+                      >
+                        {medication.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
           </View>
 
           {/* STATUS FILTER */}
@@ -829,37 +875,62 @@ export default function DoseHistoryScreen({
           </Text>
 
           <View style={styles.filterRow}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterScroll}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose dose status"
+              accessibilityState={{ expanded: statusDropdownVisible }}
+              style={styles.dateDropdownButton}
+              onPress={() => {
+                setStatusDropdownVisible((current) => !current);
+                setDateDropdownVisible(false);
+                setMedicationDropdownVisible(false);
+              }}
             >
-              {[
-                { key: 'all', label: 'All' },
-                { key: 'pending', label: 'Pending' },
-                { key: 'taken', label: 'Taken' },
-                { key: 'skipped', label: 'Skipped' },
-                { key: 'missed', label: 'Missed' },
-              ].map((status) => (
-                <Pressable
-                  key={status.key}
-                  style={[
-                    styles.filterChip,
-                    selectedStatus === status.key && styles.activeFilterChip,
-                  ]}
-                  onPress={() => setSelectedStatus(status.key)}
+              <Text style={styles.dateDropdownText}>
+                {DOSE_STATUS_OPTIONS.find((status) => status.key === selectedStatus)?.label || 'All'}
+              </Text>
+              <MaterialCommunityIcons
+                name={statusDropdownVisible ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#D7EDF3"
+              />
+            </Pressable>
+
+            {statusDropdownVisible ? (
+              <View style={styles.dateDropdownList}>
+                <ScrollView
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator
+                  style={styles.dateDropdownScroll}
+                  contentContainerStyle={styles.dateDropdownScrollContent}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedStatus === status.key && styles.activeFilterChipText,
-                    ]}
-                  >
-                    {status.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+                  {DOSE_STATUS_OPTIONS.map((status) => (
+                    <Pressable
+                      key={status.key}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: selectedStatus === status.key }}
+                      style={[
+                        styles.dateDropdownItem,
+                        selectedStatus === status.key && styles.dateDropdownItemActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedStatus(status.key);
+                        setStatusDropdownVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dateDropdownItemText,
+                          selectedStatus === status.key && styles.dateDropdownItemTextActive,
+                        ]}
+                      >
+                        {status.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
           </View>
 
           <Text
@@ -893,29 +964,23 @@ export default function DoseHistoryScreen({
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={groupedDoses}
-          keyExtractor={(item) => item.date}
-          renderItem={renderDateGroup}
-          style={styles.flatList}
-          contentContainerStyle={
-            groupedDoses.length === 0
-              ? styles.emptyList
-              : styles.list
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
+        groupedDoses.length === 0 ? (
+          <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>No matching doses</Text>
 
               <Text style={styles.emptyText}>
                 Try changing your medication or status filters.
               </Text>
+          </View>
+        ) : (
+          groupedDoses.map((item) => (
+            <View key={item.date}>
+              {renderDateGroup({ item })}
             </View>
-          }
-          onRefresh={loadDoses}
-          refreshing={loading}
-        />
+          ))
+        )
       )}
+      </ScrollView>
 
       <ConfirmationDialog
         visible={showActionDialog}
@@ -1143,6 +1208,16 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
 
+  screenScroll: {
+    flex: 1,
+    width: '100%',
+  },
+
+  screenScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 30,
+  },
+
   // =================================================
   // HEADER
   // =================================================
@@ -1292,7 +1367,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#D7EDF3',
-    maxHeight: 260,
+    maxHeight: 90,
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOpacity: 0.1,
@@ -1302,7 +1377,7 @@ const styles = StyleSheet.create({
   },
 
   dateDropdownScroll: {
-    maxHeight: 240,
+    maxHeight: 88,
   },
 
   dateDropdownScrollContent: {
@@ -1342,40 +1417,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  filterScroll: {
-    gap: 6,
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingRight: 8,
-    maxWidth: '100%',
-    minWidth: 0,
-    paddingBottom: 1,
-  },
-
-  filterChip: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D7EDF3',
-    borderRadius: 20,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-
-  activeFilterChip: {
-    backgroundColor: '#0B4F59',
-    borderColor: '#0B4F59',
-  },
-
-  filterChipText: {
-    color: '#4B5563',
-    fontSize: 9,
-    fontWeight: '600',
-  },
-
-  activeFilterChipText: {
-    color: '#FFFFFF',
-  },
-
   resultCount: {
     marginTop: 5,
     fontSize: 8,
@@ -1398,28 +1439,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#A7CDD0',
     fontSize: 14,
-  },
-
-  // =================================================
-  // LIST
-  // =================================================
-
-  flatList: {
-    flex: 1,
-    width: '100%',
-  },
-
-  list: {
-    paddingBottom: 30,
-    width: '100%',
-    alignSelf: 'center',
-    flexGrow: 1,
-  },
-
-  emptyList: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingBottom: 100,
   },
 
   // =================================================
