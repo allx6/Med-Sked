@@ -1270,6 +1270,27 @@ export const getAdherenceAnalytics = async (
   return handleResponse(response);
 };
 
+export const getCaregiverOverviewAnalytics = async (
+  token,
+  options = {}
+) => {
+  const params = new URLSearchParams();
+
+  if (options.startDate) params.set('startDate', options.startDate);
+  if (options.endDate) params.set('endDate', options.endDate);
+
+  const query = params.toString();
+  const response = await fetch(
+    `${API_URL}/api/analytics/adherence/caregiver-overview${query ? `?${query}` : ''}`,
+    {
+      method: 'GET',
+      headers: authHeaders(token),
+    }
+  );
+
+  return handleResponse(response);
+};
+
 
 // =====================================================
 // EXPORT API URL

@@ -124,6 +124,8 @@ export default function App() {
 
   const [analyticsPatientId, setAnalyticsPatientId] =
     useState(null);
+  const [analyticsReturnScreen, setAnalyticsReturnScreen] =
+    useState(null);
 
   // =====================================================
   // LOGIN
@@ -328,11 +330,13 @@ export default function App() {
     setScreen('notifications');
   }
 
-  function handleAnalytics(patientId = null) {
+  function handleAnalytics(patientId = null, options = {}) {
     setAnalyticsPatientId(patientId);
+    setAnalyticsReturnScreen(options.returnScreen || (
+      user?.role === 'caregiver' ? 'patientMonitoring' : 'profile'
+    ));
     setScreen('analytics');
   }
-
 
   function handleSelectPatient(patient) {
     setSelectedPatient(patient);
@@ -917,7 +921,7 @@ export default function App() {
           <AnalyticsScreen
             token={token}
             patientId={analyticsPatientId}
-            onBack={user.role === 'caregiver' ? () => setScreen('patientMonitoring') : () => setScreen('profile')}
+            onBack={() => setScreen(analyticsReturnScreen || (user.role === 'caregiver' ? 'patientMonitoring' : 'profile'))}
           />
         )}
 
