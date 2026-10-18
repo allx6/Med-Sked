@@ -31,7 +31,6 @@ import {
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
 import { isMedicationLowStock } from '../utils/medicationStock';
-import { getDoseActionErrorMessage } from '../utils/doseErrors';
 import {
   filterDoseHistory,
   getAvailableDoseDates,
@@ -184,8 +183,13 @@ export default function PatientMonitoringScreen({
         };
       });
 
-    } catch (err) {
-      Alert.alert('Dose update failed', getDoseActionErrorMessage(err));
+    } catch {
+      Alert.alert(
+        'Unable to update dose',
+        action === 'take'
+          ? 'Unable to mark this dose as taken. Please try again.'
+          : 'Unable to skip this dose. Please try again.'
+      );
     } finally {
       setActionId(null);
     }
@@ -872,7 +876,9 @@ export default function PatientMonitoringScreen({
         message={confirmation?.message || ''}
         confirmLabel={confirmation?.type === 'dose' ? confirmation.action === 'take' ? 'Take dose' : 'Skip dose' : 'Delete'}
         cancelLabel="Cancel"
-        danger={confirmation?.type !== 'dose'}
+        danger={confirmation?.type === 'dose'
+          ? confirmation.action === 'skip'
+          : confirmation?.type !== undefined}
         onConfirm={confirmAction}
         onCancel={() => setConfirmation(null)}
       />

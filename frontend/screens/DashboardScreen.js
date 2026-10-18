@@ -30,7 +30,6 @@ import {
   filterDoseRecordsByMedicationExpiration,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
-import { getDoseActionErrorMessage } from '../utils/doseErrors';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import TimeOfDayPieChart from '../components/TimeOfDayPieChart';
 
@@ -94,10 +93,7 @@ export default function DashboardScreen({
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
 
-  const [
-    pendingSkipDoseId,
-    setPendingSkipDoseId,
-  ] = useState(null);
+  const [pendingDoseAction, setPendingDoseAction] = useState(null);
 
 
   // =====================================================
@@ -328,65 +324,33 @@ export default function DashboardScreen({
   // TAKE DOSE
   // =====================================================
 
-  const handleTakeDose =
-    async (doseId) => {
-
-      try {
-
-        const updatedDose =
-          await takeDose(
-            token,
-            doseId
-          );
-
-        setDoses(
-          previous =>
-            previous.map(
-              dose =>
-                dose._id === doseId
-                  ? updatedDose
-                  : dose
-            )
-        );
-        await loadDashboardAnalytics();
-
-      } catch (err) {
-
-        Alert.alert(
-          'Error',
-          getDoseActionErrorMessage(err)
-        );
-
-      }
-
-    };
-
-
-  // =====================================================
-  // SKIP DOSE
-  // =====================================================
-
-  const handleSkipDose = (doseId) => {
-    setPendingSkipDoseId(doseId);
+  const requestDoseAction = (doseId, action) => {
+    setPendingDoseAction({ doseId, action });
   };
 
-  const confirmSkipDose = async () => {
-    const doseId = pendingSkipDoseId;
-    setPendingSkipDoseId(null);
+  const confirmDoseAction = async () => {
+    const current = pendingDoseAction;
+    setPendingDoseAction(null);
 
-    if (!doseId) {
+    if (!current?.doseId || !['take', 'skip'].includes(current.action)) {
       return;
     }
 
     try {
-      const updatedDose = await skipDose(token, doseId);
+      const actionRequest = current.action === 'take' ? takeDose : skipDose;
+      const updatedDose = await actionRequest(token, current.doseId);
 
       setDoses((previous) => previous.map((dose) => (
-        dose._id === doseId ? updatedDose : dose
+        dose._id === current.doseId ? updatedDose : dose
       )));
       await loadDashboardAnalytics();
-    } catch (err) {
-      Alert.alert('Error', getDoseActionErrorMessage(err));
+    } catch {
+      Alert.alert(
+        'Unable to update dose',
+        current.action === 'take'
+          ? 'Unable to mark this dose as taken. Please try again.'
+          : 'Unable to skip this dose. Please try again.'
+      );
     }
   };
 
@@ -590,9 +554,7 @@ export default function DashboardScreen({
               <Pressable
 
                 onPress={() =>
-                  handleTakeDose(
-                    dose._id
-                  )
+                  requestDoseAction(dose._id, 'take')
                 }
 
                 style={({ pressed }) => [
@@ -620,9 +582,7 @@ export default function DashboardScreen({
               <Pressable
 
                 onPress={() =>
-                  handleSkipDose(
-                    dose._id
-                  )
+                  requestDoseAction(dose._id, 'skip')
                 }
 
                 style={({ pressed }) => [
@@ -1572,14 +1532,16 @@ export default function DashboardScreen({
       </ScrollView>
 
       <ConfirmationDialog
-        visible={Boolean(pendingSkipDoseId)}
-        title="Skip Dose"
-        message="Are you sure you want to skip this dose?"
-        confirmLabel="Skip"
+        visible={Boolean(pendingDoseAction)}
+        title={pendingDoseAction?.action === 'take' ? 'Mark dose as taken?' : 'Skip this dose?'}
+        message={pendingDoseAction?.action === 'take'
+          ? 'Confirm that this dose was taken.'
+          : 'Are you sure you want to skip this dose?'}
+        confirmLabel={pendingDoseAction?.action === 'take' ? 'Mark as Taken' : 'Skip'}
         cancelLabel="Cancel"
-        danger
-        onConfirm={confirmSkipDose}
-        onCancel={() => setPendingSkipDoseId(null)}
+        danger={pendingDoseAction?.action === 'skip'}
+        onConfirm={confirmDoseAction}
+        onCancel={() => setPendingDoseAction(null)}
       />
 
     </View>

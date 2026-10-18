@@ -485,6 +485,87 @@ button:disabled {
   margin-top: 18px;
 }
 
+.adherence-trend-panel {
+  min-width: 0;
+  padding: 22px 24px 18px;
+  border: 1px solid rgba(177, 218, 220, 0.14);
+  border-radius: var(--radius-panel);
+  background: linear-gradient(155deg, #0e6673 0%, #0a4455 100%);
+  box-shadow: var(--shadow-card);
+}
+
+.adherence-trend-heading {
+  margin-bottom: 8px;
+}
+
+.adherence-trend-heading h3 {
+  margin: 2px 0 0;
+  color: var(--color-text);
+  font-size: 1.25rem;
+}
+
+.adherence-trend-description {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.adherence-trend-chart-wrap {
+  min-width: 0;
+}
+
+.adherence-trend-chart {
+  display: block;
+  width: 100%;
+  height: clamp(250px, 28vw, 320px);
+  overflow: visible;
+}
+
+.adherence-trend-gridline {
+  stroke: rgba(217, 239, 240, 0.2);
+  stroke-dasharray: 4 7;
+  stroke-width: 1;
+}
+
+.adherence-trend-axis-label {
+  fill: #d9eaeb;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.adherence-trend-date-label {
+  font-size: 16px;
+}
+
+.adherence-trend-line {
+  fill: none;
+  stroke: #7fe1d7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.adherence-trend-point {
+  fill: #b8fff2;
+  stroke: #0b5962;
+  stroke-width: 3;
+  cursor: help;
+}
+
+.adherence-trend-no-data {
+  fill: #0a4455;
+  stroke: #b6d4d7;
+  stroke-width: 2;
+  stroke-dasharray: 2 2;
+  cursor: help;
+}
+
+.adherence-trend-note {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
 .dashboard-stat-grid > .dashboard-stat-card:nth-child(n) {
   --metric-accent: #dff9f6;
   --metric-tint: rgba(17, 111, 122, 0.18);
@@ -1878,6 +1959,9 @@ pre {
 @media (max-width: 520px) {
   .attention-grid,
   .analytics-summary { grid-template-columns: 1fr; }
+
+  .adherence-trend-panel { padding: 18px 14px 14px; }
+  .adherence-trend-chart { height: 250px; }
 
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-card { padding: 14px; }
