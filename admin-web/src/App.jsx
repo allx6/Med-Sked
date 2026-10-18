@@ -6,6 +6,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import UsersPage from './pages/UsersPage';
 import RelationshipsPage from './pages/RelationshipsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
+import AdminRequestsPage from './pages/AdminRequestsPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminLayout from './components/AdminLayout';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
@@ -67,6 +68,16 @@ function App() {
           <ProtectedAdminRoute>
             <AdminLayout>
               <AuditLogsPage />
+            </AdminLayout>
+          </ProtectedAdminRoute>
+        }
+      />
+      <Route
+        path="/admin-requests"
+        element={
+          <ProtectedAdminRoute>
+            <AdminLayout>
+              <AdminRequestsPage />
             </AdminLayout>
           </ProtectedAdminRoute>
         }

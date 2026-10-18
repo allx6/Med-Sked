@@ -43,7 +43,7 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
           <Text style={styles.eyebrow}>MEDICATION MANAGEMENT, SIMPLIFIED</Text>
           <Text style={styles.title}>
             Your medications, <Text style={styles.highlight}>organized</Text>
-            {'\n'}— and never missed again.
+            {'\n'}and never missed again.
           </Text>
           <Text style={styles.description}>
             MedSked keeps every dose, refill, and reminder in one calm,
@@ -68,7 +68,6 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
           </View>
         </View>
 
-        <View style={styles.bottomRule} />
       </ScrollView>
     </View>
   );
@@ -96,5 +95,4 @@ const styles = StyleSheet.create({
   decorRight: { position: 'absolute', pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', top: 314, right: -44 },
   decorLeft: { position: 'absolute', pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', bottom: -54, left: -76 },
   pressed: { opacity: 0.78 },
-  bottomRule: { height: 1, backgroundColor: '#3A858D' },
 });
