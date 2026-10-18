@@ -14,6 +14,7 @@ const patientRoutes = require('./routes/patientRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const adminPrivilegedActionRoutes = require('./routes/adminPrivilegedActionRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const { validateEncryptionKey } = require('./services/encryptionService');
 
@@ -86,6 +87,11 @@ app.use(
 app.use(
   '/api/admin',
   adminRoutes
+);
+
+app.use(
+  '/api/admin/privileged-action-requests',
+  adminPrivilegedActionRoutes
 );
 
 app.use(

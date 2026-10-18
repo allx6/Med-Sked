@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { getRelationship, listRelationships, revokeRelationship } from '../services/api';
+import {
+  createPrivilegedActionRequest,
+  getRelationship,
+  listRelationships,
+} from '../services/api';
 
 const getStoredAuth = () => {
   try {
@@ -80,6 +84,10 @@ export default function RelationshipsPage() {
   const [detailsError, setDetailsError] = useState('');
   const [error, setError] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [revokeRequest, setRevokeRequest] = useState(null);
+  const [revokeReason, setRevokeReason] = useState('');
+  const [requestingRevoke, setRequestingRevoke] = useState(false);
+  const [revokeError, setRevokeError] = useState('');
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -163,36 +171,37 @@ export default function RelationshipsPage() {
     setDetailsError('');
   };
 
-  const handleRevoke = async (relationship) => {
-    const confirmed = window.confirm('Revoke this caregiver relationship?');
+  const handleRevoke = (relationship) => {
+    setRevokeRequest(relationship);
+    setRevokeReason('');
+    setRevokeError('');
+  };
 
-    if (!confirmed) {
-      return;
-    }
-
+  const submitRevokeRequest = async (event) => {
+    event.preventDefault();
+    if (!revokeRequest) return;
     const auth = getStoredAuth();
 
     if (!auth?.token) {
-      setError('Authentication is required.');
+      setRevokeError('Authentication is required.');
       return;
     }
 
     try {
-      setError('');
-      setStatusMessage('');
-      await revokeRelationship(auth.token, relationship._id);
-      setStatusMessage('Relationship revoked successfully.');
-      setSelectedRelationship(null);
-      const refreshed = await listRelationships(auth.token, {
-        page,
-        limit: 20,
-        search: searchTerm,
-        status: statusFilter,
+      setRequestingRevoke(true);
+      setRevokeError('');
+      await createPrivilegedActionRequest(auth.token, {
+        actionType: 'CAREGIVER_RELATIONSHIP_REVOKE',
+        targetId: revokeRequest._id,
+        reason: revokeReason.trim(),
       });
-      setRelationships(refreshed?.data || []);
-      setPagination(refreshed?.pagination || pagination);
+      setStatusMessage('Approval request submitted. Another administrator must review it.');
+      setRevokeRequest(null);
+      setRevokeReason('');
     } catch (err) {
-      setError(err.message || 'Unable to revoke relationship.');
+      setRevokeError(err.message || 'Unable to submit the approval request.');
+    } finally {
+      setRequestingRevoke(false);
     }
   };
 
@@ -276,7 +285,7 @@ export default function RelationshipsPage() {
                           className="relationship-action-button relationship-revoke-button small"
                           onClick={() => handleRevoke(relationship)}
                         >
-                          Revoke
+                          Request revoke
                         </button>
                       ) : null}
                     </td>
@@ -347,6 +356,60 @@ export default function RelationshipsPage() {
             ) : (
               <div className="empty-state">Relationship details are unavailable.</div>
             )}
+          </section>
+        </div>
+      ) : null}
+
+      {revokeRequest ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !requestingRevoke) setRevokeRequest(null);
+        }}>
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="relationship-revoke-request-title">
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">Administrator approval</p>
+                <h3 id="relationship-revoke-request-title">Request relationship revocation</h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                aria-label="Close request form"
+                disabled={requestingRevoke}
+                onClick={() => setRevokeRequest(null)}
+              >
+                ×
+              </button>
+            </div>
+            <form className="user-form" onSubmit={submitRevokeRequest}>
+              <p>
+                {displayUser(revokeRequest.caregiver)} → {displayUser(revokeRequest.patient)}
+                {' '}will remain active unless a different administrator approves.
+              </p>
+              <label>
+                Reason for this request
+                <textarea
+                  required
+                  maxLength={500}
+                  rows={4}
+                  value={revokeReason}
+                  onChange={(event) => setRevokeReason(event.target.value)}
+                />
+              </label>
+              {revokeError ? <div className="error-state" role="alert">{revokeError}</div> : null}
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={requestingRevoke}
+                  onClick={() => setRevokeRequest(null)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="primary-button" disabled={requestingRevoke || !revokeReason.trim()}>
+                  {requestingRevoke ? 'Submitting…' : 'Submit for approval'}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       ) : null}

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import { createAdminUser, deleteUser, listUsers, updateUserRole } from '../services/api';
+import {
+  createAdminUser,
+  createPrivilegedActionRequest,
+  listUsers,
+} from '../services/api';
 
 const getStoredAuth = () => {
   try {
@@ -38,6 +42,8 @@ const getRoleLabel = (role) => {
 };
 
 export default function UsersPage() {
+  const currentAdmin = getStoredAuth()?.user;
+  const currentAdminId = currentAdmin?.id || currentAdmin?._id;
   const [users, setUsers] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [searchInput, setSearchInput] = useState('');
@@ -52,6 +58,10 @@ export default function UsersPage() {
   const [createError, setCreateError] = useState('');
   const [createEmailError, setCreateEmailError] = useState('');
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'patient' });
+  const [actionRequest, setActionRequest] = useState(null);
+  const [actionReason, setActionReason] = useState('');
+  const [requestingAction, setRequestingAction] = useState(false);
+  const [actionRequestError, setActionRequestError] = useState('');
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -95,77 +105,56 @@ export default function UsersPage() {
     loadUsers();
   }, [page, searchTerm, roleFilter]);
 
-  const updateRole = async (user, nextRole) => {
+  const updateRole = (user, nextRole) => {
     if (!nextRole || nextRole === user.role) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Change this user's role from ${getRoleLabel(user.role).toLowerCase()} to ${getRoleLabel(nextRole).toLowerCase()}?`
-    );
+    setActionRequest({ actionType: 'USER_ROLE_CHANGE', user, requestedRole: nextRole });
+    setActionReason('');
+    setActionRequestError('');
+  };
 
-    if (!confirmed) {
-      return;
-    }
+  const removeUser = (user) => {
+    setActionRequest({ actionType: 'USER_DELETE', user });
+    setActionReason('');
+    setActionRequestError('');
+  };
 
+  const submitActionRequest = async (event) => {
+    event.preventDefault();
+    if (!actionRequest) return;
     const auth = getStoredAuth();
 
     if (!auth?.token) {
-      setError('Authentication is required.');
+      setActionRequestError('Authentication is required.');
       return;
     }
 
     try {
-      setStatusMessage('');
-      setError('');
-      await updateUserRole(auth.token, user._id, { role: nextRole });
-      setStatusMessage(`Role updated for ${user.username || user.email || 'user'}.`);
-      setPage((currentPage) => currentPage);
-      const refreshed = await listUsers(auth.token, {
-        page,
-        limit: 20,
-        search: searchTerm,
-        role: roleFilter,
+      setRequestingAction(true);
+      setActionRequestError('');
+      await createPrivilegedActionRequest(auth.token, {
+        actionType: actionRequest.actionType,
+        targetId: actionRequest.user._id,
+        ...(actionRequest.requestedRole ? { requestedRole: actionRequest.requestedRole } : {}),
+        reason: actionReason.trim(),
       });
-      setUsers(refreshed?.users || []);
-      setPagination(refreshed?.pagination || pagination);
+      setStatusMessage('Approval request submitted. Another administrator must review it.');
+      setActionRequest(null);
+      setActionReason('');
     } catch (err) {
-      setError(err.message || 'Unable to update role.');
+      setActionRequestError(err.message || 'Unable to submit the approval request.');
+    } finally {
+      setRequestingAction(false);
     }
   };
 
-  const removeUser = async (user) => {
-    const confirmed = window.confirm(
-      `Delete ${user.username || user.email || 'this user'}? This action cannot be undone.`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    const auth = getStoredAuth();
-
-    if (!auth?.token) {
-      setError('Authentication is required.');
-      return;
-    }
-
-    try {
-      setStatusMessage('');
-      setError('');
-      await deleteUser(auth.token, user._id);
-      setStatusMessage(`${user.username || user.email || 'User'} deleted successfully.`);
-      const refreshed = await listUsers(auth.token, {
-        page,
-        limit: 20,
-        search: searchTerm,
-        role: roleFilter,
-      });
-      setUsers(refreshed?.users || []);
-      setPagination(refreshed?.pagination || pagination);
-    } catch (err) {
-      setError(err.message || 'Unable to delete user.');
-    }
+  const closeActionRequest = () => {
+    if (requestingAction) return;
+    setActionRequest(null);
+    setActionReason('');
+    setActionRequestError('');
   };
 
   const createUser = async (event) => {
@@ -188,13 +177,14 @@ export default function UsersPage() {
       setCreating(true);
       setCreateError('');
       setCreateEmailError('');
-      await createAdminUser(auth.token, {
+      const result = await createAdminUser(auth.token, {
         name: newUser.name.trim(),
         email,
         password: newUser.password,
         role: newUser.role,
       });
-      setStatusMessage(`${getRoleLabel(newUser.role)} account created successfully.`);
+      setStatusMessage(result.message
+        || "Account created successfully. A verification email has been sent to the user's email address. The user must verify their email before they can log in.");
       setNewUser({ name: '', email: '', password: '', role: 'patient' });
       setCreateEmailError('');
       setCreateOpen(false);
@@ -260,7 +250,6 @@ export default function UsersPage() {
             <option value="">All roles</option>
             <option value="patient">Patient</option>
             <option value="caregiver">Caregiver</option>
-            <option value="admin">Admin</option>
           </select>
         </div>
 
@@ -305,9 +294,11 @@ export default function UsersPage() {
                       <button
                         type="button"
                         className="secondary-button compact-button"
+                        disabled={String(user._id) === String(currentAdminId)}
+                        title={String(user._id) === String(currentAdminId) ? 'You cannot request deletion of your own account.' : undefined}
                         onClick={() => removeUser(user)}
                       >
-                        Delete
+                        Request deletion
                       </button>
                     </td>
                   </tr>
@@ -420,6 +411,49 @@ export default function UsersPage() {
                 </button>
                 <button type="submit" className="primary-button" disabled={creating}>
                   {creating ? 'Creating…' : 'Create account'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {actionRequest ? (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeActionRequest();
+        }}>
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="privileged-user-request-title">
+            <div className="modal-heading">
+              <div>
+                <p className="eyebrow">Administrator approval</p>
+                <h3 id="privileged-user-request-title">
+                  {actionRequest.actionType === 'USER_DELETE' ? 'Request user deletion' : 'Request role change'}
+                </h3>
+              </div>
+              <button type="button" className="modal-close" aria-label="Close request form" onClick={closeActionRequest}>×</button>
+            </div>
+            <form className="user-form" onSubmit={submitActionRequest}>
+              <p>
+                {actionRequest.user.username || actionRequest.user.email}
+                {actionRequest.requestedRole
+                  ? `: ${getRoleLabel(actionRequest.user.role)} → ${getRoleLabel(actionRequest.requestedRole)}`
+                  : ' will only be deleted after a different administrator approves.'}
+              </p>
+              <label>
+                Reason for this request
+                <textarea
+                  required
+                  maxLength={500}
+                  rows={4}
+                  value={actionReason}
+                  onChange={(event) => setActionReason(event.target.value)}
+                />
+              </label>
+              {actionRequestError ? <div className="error-state" role="alert">{actionRequestError}</div> : null}
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" disabled={requestingAction} onClick={closeActionRequest}>Cancel</button>
+                <button type="submit" className="primary-button" disabled={requestingAction || !actionReason.trim()}>
+                  {requestingAction ? 'Submitting…' : 'Submit for approval'}
                 </button>
               </div>
             </form>

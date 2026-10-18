@@ -1,0 +1,262 @@
+{
+  "info": {
+    "name": "MedSked Admin Privileged Action Approvals",
+    "description": "Two-admin approval workflow checks. Supply two distinct administrator tokens and test-only target IDs. The user deletion and relationship revocation requests execute immediately after reviewer approval, so use disposable records.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "requesterToken", "value": "" },
+    { "key": "reviewerToken", "value": "" },
+    { "key": "targetUserId", "value": "" },
+    { "key": "roleChangeRequestId", "value": "" },
+    { "key": "deleteTargetUserId", "value": "" },
+    { "key": "deleteRequestId", "value": "" },
+    { "key": "relationshipId", "value": "" },
+    { "key": "relationshipRequestId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Create role-change request",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{requesterToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionType\": \"USER_ROLE_CHANGE\",\n  \"targetId\": \"{{targetUserId}}\",\n  \"requestedRole\": \"caregiver\",\n  \"reason\": \"Postman approval workflow verification\"\n}"
+        },
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('request is created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('roleChangeRequestId', body.request._id);",
+              "pm.test('request starts pending', () => pm.expect(body.request.status).to.eql('PENDING'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Requester cannot approve own request",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{requesterToken}}" }],
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests/{{roleChangeRequestId}}/approve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('self-approval is denied', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Different admin approves and executes role change",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{reviewerToken}}" }],
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests/{{roleChangeRequestId}}/approve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('review executes action', () => pm.response.to.have.status(200));",
+              "pm.test('request is executed', () => pm.expect(pm.response.json().request.status).to.eql('EXECUTED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Executed request cannot be approved twice",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{reviewerToken}}" }],
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests/{{roleChangeRequestId}}/approve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('duplicate execution is rejected', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy direct role route is blocked",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{reviewerToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{ \"role\": \"admin\" }" },
+        "url": "{{baseUrl}}/api/admin/users/{{targetUserId}}/role"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('direct role mutation is blocked', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy direct delete route is blocked",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{reviewerToken}}" }],
+        "url": "{{baseUrl}}/api/admin/users/{{deleteTargetUserId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('direct user deletion is blocked', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Legacy direct relationship revocation route is blocked",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{reviewerToken}}" }],
+        "url": "{{baseUrl}}/api/admin/relationships/{{relationshipId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('direct relationship revocation is blocked', () => pm.response.to.have.status(409));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create user-deletion request for disposable target",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{requesterToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionType\": \"USER_DELETE\",\n  \"targetId\": \"{{deleteTargetUserId}}\",\n  \"reason\": \"Postman verification using a disposable test user\"\n}"
+        },
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('deletion request is created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('deleteRequestId', pm.response.json().request._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Approve and execute disposable user deletion",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{reviewerToken}}" }],
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests/{{deleteRequestId}}/approve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('approved deletion executes', () => pm.response.to.have.status(200));",
+              "pm.test('deletion request is executed', () => pm.expect(pm.response.json().request.status).to.eql('EXECUTED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create relationship-revocation request",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{requesterToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"actionType\": \"CAREGIVER_RELATIONSHIP_REVOKE\",\n  \"targetId\": \"{{relationshipId}}\",\n  \"reason\": \"Postman approval workflow verification\"\n}"
+        },
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('relationship request is created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('relationshipRequestId', pm.response.json().request._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Approve and execute relationship revocation",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{reviewerToken}}" }],
+        "url": "{{baseUrl}}/api/admin/privileged-action-requests/{{relationshipRequestId}}/approve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('approved relationship revocation executes', () => pm.response.to.have.status(200));",
+              "pm.test('relationship request is executed', () => pm.expect(pm.response.json().request.status).to.eql('EXECUTED'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

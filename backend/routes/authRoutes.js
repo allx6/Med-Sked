@@ -415,7 +415,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    if (user.emailVerified === false) {
+    if (user.emailVerified !== true) {
       return res.status(403).json({
         code: 'EMAIL_VERIFICATION_REQUIRED',
         message: 'Please verify your email before logging in.',

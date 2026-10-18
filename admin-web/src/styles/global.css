@@ -1143,7 +1143,8 @@ button:disabled {
   font-weight: 700;
 }
 
-.user-form input {
+.user-form input,
+.user-form textarea {
   width: 100%;
   min-height: 52px;
   padding: 12px 14px;
@@ -1154,7 +1155,13 @@ button:disabled {
   font: inherit;
 }
 
+.user-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
 .user-form input:focus,
+.user-form textarea:focus,
 .user-form .select-input:focus {
   outline: 3px solid rgba(47, 102, 144, 0.18);
   border-color: var(--color-primary);
@@ -1856,6 +1863,10 @@ button:disabled {
   color: var(--color-text);
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.detail-grid .detail-full {
+  grid-column: 1 / -1;
 }
 
 .placeholder {

@@ -664,6 +664,29 @@ test('unverified login is blocked after password validation and returns no token
   }
 });
 
+test('accounts without an explicit verified state cannot obtain a login token', async () => {
+  const password = await bcrypt.hash('secure-pass', 4);
+  const mocks = installRouteStore({
+    _id: 'user-1',
+    username: 'testperson',
+    email: 'person@example.com',
+    password,
+    role: 'caregiver',
+    emailVerified: undefined,
+  });
+  try {
+    const response = await invokeAuthRoute('/login', {
+      email: 'person@example.com',
+      password: 'secure-pass',
+    });
+    assert.equal(response.statusCode, 403);
+    assert.equal(response.body.code, 'EMAIL_VERIFICATION_REQUIRED');
+    assert.equal(response.body.token, undefined);
+  } finally {
+    mocks.restore();
+  }
+});
+
 test('verified login preserves the existing token response and claims', async () => {
   const originalSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = 'email-verification-test-secret';
