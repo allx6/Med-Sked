@@ -43,7 +43,7 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
           <Text style={styles.eyebrow}>MEDICATION MANAGEMENT, SIMPLIFIED</Text>
           <Text style={styles.title}>
             Your medications, <Text style={styles.highlight}>organized</Text>
-            {'\n'}— and never missed again.
+            {'\n'}and never missed again.
           </Text>
           <Text style={styles.description}>
             MedSked keeps every dose, refill, and reminder in one calm,
