@@ -68,7 +68,6 @@ export default function LandingScreen({ onSignIn, onGetStarted, onHowItWorks }) 
           </View>
         </View>
 
-        <View style={styles.bottomRule} />
       </ScrollView>
     </View>
   );
@@ -96,5 +95,4 @@ const styles = StyleSheet.create({
   decorRight: { position: 'absolute', pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', top: 314, right: -44 },
   decorLeft: { position: 'absolute', pointerEvents: 'none', width: 148, height: 148, borderRadius: 74, backgroundColor: '#3D929B', bottom: -54, left: -76 },
   pressed: { opacity: 0.78 },
-  bottomRule: { height: 1, backgroundColor: '#3A858D' },
 });
