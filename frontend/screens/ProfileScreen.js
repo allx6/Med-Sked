@@ -9,14 +9,21 @@ import { colors, radius, spacing, shadow } from '../theme';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function ProfileScreen({ user, token, unreadNotificationCount = 0, onOpenNotifications, onOpenAnalytics, onLogout, onOpenCaregiverRequests, onOpenPatientConnections }) {
-  const patientId = user?.patientId || 'Not assigned';
+  const patientIdValue = user?.patientId?.trim();
+  const patientId = patientIdValue || 'Not assigned';
+  const canCopyPatientId = Boolean(patientIdValue);
   const [pendingRequestCount, setPendingRequestCount] = useState(null);
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false);
   const [showCopiedMessage, setShowCopiedMessage] = useState(false);
 
   const handleCopyPatientId = async () => {
+    if (!canCopyPatientId) {
+      Alert.alert('No Patient ID', 'This account does not have a patient ID yet.');
+      return;
+    }
+
     try {
-      await Clipboard.setStringAsync(patientId);
+      await Clipboard.setStringAsync(patientIdValue);
       setShowCopiedMessage(true);
     } catch (error) {
       Alert.alert('Copy failed', 'Unable to copy the Patient ID. Please try again.');
@@ -97,20 +104,25 @@ export default function ProfileScreen({ user, token, unreadNotificationCount = 0
             {user?.role !== 'caregiver' ? (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Patient ID</Text>
-                <View style={styles.patientIdValueRow}>
-                  {user?.patientId ? (
-                    <Pressable
-                      onPress={handleCopyPatientId}
-                      style={({ pressed }) => [styles.copyButton, pressed && styles.buttonPressed]}
-                      accessibilityRole="button"
-                      accessibilityLabel="Copy patient ID"
-                      hitSlop={8}
-                    >
+                <Pressable
+                  onPress={handleCopyPatientId}
+                  disabled={!canCopyPatientId}
+                  style={({ pressed }) => [
+                    styles.patientIdValueRow,
+                    !canCopyPatientId && styles.patientIdDisabled,
+                    pressed && canCopyPatientId && styles.buttonPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={canCopyPatientId ? 'Copy patient ID' : 'Patient ID not available'}
+                  hitSlop={8}
+                >
+                  {canCopyPatientId ? (
+                    <View style={styles.copyButton}>
                       <MaterialCommunityIcons name="content-copy" size={17} color={colors.primary} />
-                    </Pressable>
+                    </View>
                   ) : null}
                   <Text style={styles.infoValue}>{patientId}</Text>
-                </View>
+                </Pressable>
               </View>
             ) : null}
 
@@ -252,11 +264,25 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   infoLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '700' },
-  infoValue: { fontSize: 13, color: colors.text, fontWeight: '700', maxWidth: '60%', textAlign: 'right' },
-  patientIdValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  infoValue: { fontSize: 13, color: colors.text, fontWeight: '700', maxWidth: '60%', textAlign: 'right', flexShrink: 1 },
+  patientIdValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    maxWidth: '62%',
+    flexShrink: 1,
+  },
+  patientIdDisabled: {
+    opacity: 0.6,
+  },
   copyButton: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.cardTintBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },

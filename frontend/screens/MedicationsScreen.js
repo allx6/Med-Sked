@@ -791,21 +791,18 @@ export default function MedicationsScreen({
 
         {/* ADD BUTTON */}
 
-        <Pressable
-          onPress={
-            onAddMedication
-          }
-          hitSlop={6}
-          style={({ pressed }) => [
-            styles.headerAddButton,
-            pressed &&
-              styles.buttonPressed,
-          ]}
-        >
-
-          <Text style={styles.headerAddText}>+ Add</Text>
-
-        </Pressable>
+        {medications.length > 0 ? (
+          <Pressable
+            onPress={onAddMedication}
+            hitSlop={6}
+            style={({ pressed }) => [
+              styles.headerAddButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.headerAddText}>+ Add</Text>
+          </Pressable>
+        ) : null}
 
       </View>
 
@@ -1252,8 +1249,9 @@ const styles = StyleSheet.create({
 
   summaryLabel: {
     marginTop: 1,
-    fontSize: 8,
-    color: '#7A8494',
+    fontSize: 11,
+    lineHeight: 15,
+    color: '#526579',
   },
 
 
@@ -1686,57 +1684,66 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingBottom: 120,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
 
   emptyContainer: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     alignItems: 'center',
-    paddingHorizontal: 15,
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+    borderWidth: 1,
+    borderColor: '#B5D4DC',
+    borderRadius: 20,
+    backgroundColor: '#D7EDF3',
   },
 
   emptyIconContainer: {
-    width: 78,
-    height: 78,
+    width: 88,
+    height: 88,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
-    borderRadius: 25,
-    backgroundColor:
-      '#EAF3F9',
+    marginBottom: 18,
+    borderRadius: 28,
+    backgroundColor: '#C5E3EA',
   },
 
   emptyIcon: {
-    fontSize: 36,
+    fontSize: 42,
   },
 
   emptyTitle: {
-    fontSize: 19,
+    fontSize: 22,
+    lineHeight: 28,
+    textAlign: 'center',
     fontWeight: '900',
     color: '#1E2A4A',
   },
 
   emptyText: {
-    maxWidth: 300,
-    marginTop: 7,
-    fontSize: 12,
-    lineHeight: 19,
+    maxWidth: 360,
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
-    color: '#6B7280',
+    color: '#526579',
   },
 
   emptyButton: {
-    minHeight: 48,
-    marginTop: 18,
-    paddingHorizontal: 20,
+    minHeight: 54,
+    marginTop: 22,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor:
-      '#0B4F59',
+    borderRadius: 14,
+    backgroundColor: '#0B4F59',
   },
 
   emptyButtonText: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '800',
     color: '#FFFFFF',
   },

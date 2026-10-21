@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -80,7 +81,24 @@ export default function AIAssistantScreen({
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -147,7 +165,7 @@ export default function AIAssistantScreen({
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 84 : 0}
+      keyboardVerticalOffset={0}
     >
       <View style={styles.header}>
         {onBack ? (
@@ -185,6 +203,7 @@ export default function AIAssistantScreen({
         ref={scrollRef}
         style={styles.chatArea}
         contentContainerStyle={styles.chatContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {messages.map((message) => (
@@ -224,7 +243,7 @@ export default function AIAssistantScreen({
         ) : null}
       </ScrollView>
 
-      {suggestions.length > 0 ? (
+      {!keyboardVisible && suggestions.length > 0 ? (
         <View style={styles.suggestionsWrap}>
           {suggestions.map((suggestion) => (
             <Pressable
@@ -243,7 +262,16 @@ export default function AIAssistantScreen({
         </View>
       ) : null}
 
-      <View style={[styles.inputRow, { paddingBottom: spacing.lg + insets.bottom }]}>
+      <View
+        style={[
+          styles.inputRow,
+          {
+            paddingBottom: keyboardVisible
+              ? spacing.sm
+              : spacing.lg + insets.bottom,
+          },
+        ]}
+      >
         <TextInput
           value={input}
           onChangeText={setInput}
