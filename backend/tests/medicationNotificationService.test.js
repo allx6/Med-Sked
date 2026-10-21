@@ -1,11 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
 
 process.env.ENCRYPTION_KEY = Buffer.alloc(32, 'N').toString('base64');
 
 const Notification = require('../models/Notification');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const Medication = require('../models/Medication');
+const MedicationSchedule = require('../models/MedicationSchedule');
 const User = require('../models/User');
 const { decrypt } = require('../services/encryptionService');
 const {
@@ -157,8 +159,10 @@ test('updating a medication into a low-stock state invokes the low-refill notifi
   ));
   const handler = putRoute.route.stack.at(-1).handle;
   const originals = {
+    startSession: mongoose.startSession,
     findOne: Medication.findOne,
     findOneAndUpdate: Medication.findOneAndUpdate,
+    scheduleFindOne: MedicationSchedule.findOne,
   };
   const response = {
     statusCode: 200,
@@ -173,13 +177,33 @@ test('updating a medication into a low-stock state invokes the low-refill notifi
     },
   };
   lowRefillNotificationCalls.length = 0;
-  Medication.findOne = async () => null;
+  let medicationLookupCount = 0;
+  Medication.findOne = async () => {
+    medicationLookupCount += 1;
+    return medicationLookupCount === 1
+      ? {
+        _id: '507f1f77bcf86cd799439019',
+        userId: PATIENT_ID,
+        name: 'Medication',
+        dosage: '100 mg',
+        frequency: 'Every 8 hours',
+        expirationDate: '2099-12-31',
+      }
+      : null;
+  };
   Medication.findOneAndUpdate = async (_filter, update) => ({
     ...update,
     _id: '507f1f77bcf86cd799439019',
     userId: PATIENT_ID,
     name: update.name,
     updatedAt: new Date(),
+  });
+  MedicationSchedule.findOne = () => ({
+    session: async () => null,
+  });
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
   });
 
   try {
@@ -196,8 +220,10 @@ test('updating a medication into a low-stock state invokes the low-refill notifi
       },
     }, response);
   } finally {
+    mongoose.startSession = originals.startSession;
     Medication.findOne = originals.findOne;
     Medication.findOneAndUpdate = originals.findOneAndUpdate;
+    MedicationSchedule.findOne = originals.scheduleFindOne;
   }
 
   assert.equal(response.statusCode, 200);
@@ -358,9 +384,13 @@ test('low stock notifies the patient and active caregivers once and encrypts eve
       _id: '507f1f77bcf86cd799439017',
       userId: PATIENT_ID,
       name: 'Medication',
-      quantityOnHand: 2,
+      quantityOnHand: 10,
       refillThreshold: 2,
       lowRefillNotified: false,
+      stockBatches: [
+        { remainingQuantity: 8, expirationDate: '2020-01-01' },
+        { remainingQuantity: 2, expirationDate: '2099-12-31' },
+      ],
     };
 
     await notifyLowRefill({ medication, triggerId: 'low-stock-trigger' });

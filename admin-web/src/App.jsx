@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import LoginPage from './pages/LoginPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
-import AnalyticsPage from './pages/AnalyticsPage';
 import UsersPage from './pages/UsersPage';
 import RelationshipsPage from './pages/RelationshipsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
@@ -32,16 +31,8 @@ function App() {
         }
       />
 
-      <Route
-        path="/analytics"
-        element={
-          <ProtectedAdminRoute>
-            <AdminLayout>
-              <AnalyticsPage />
-            </AdminLayout>
-          </ProtectedAdminRoute>
-        }
-      />
+      <Route path="/analytics" element={<Navigate to="/dashboard" replace />} />
+
       <Route
         path="/users"
         element={

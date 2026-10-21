@@ -30,7 +30,11 @@ import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
-import { isMedicationLowStock } from '../utils/medicationStock';
+import {
+  getNextBatchExpirationDate,
+  getUsableMedicationQuantity,
+  isMedicationLowStock,
+} from '../utils/medicationStock';
 import {
   filterDoseHistory,
   getAvailableDoseDates,
@@ -470,6 +474,8 @@ export default function PatientMonitoringScreen({
               const expirationState = getMedicationExpirationState(medication?.expirationDate);
               const isExpired = expirationState.expired;
               const isLowStock = isMedicationLowStock(medication);
+              const usableQuantity = getUsableMedicationQuantity(medication);
+              const nextBatchExpirationDate = getNextBatchExpirationDate(medication);
 
               return (
                 <View key={medication._id || medication.id} style={styles.doseCardContainer}>
@@ -481,6 +487,14 @@ export default function PatientMonitoringScreen({
                         <Text style={[styles.doseMeta, styles.expiredMeta]}>Expired • {expirationState.expirationDate}</Text>
                       ) : expirationState.expirationDate ? (
                         <Text style={[styles.doseMeta, styles.expirationMeta]}>Expires: {expirationState.expirationDate}</Text>
+                      ) : null}
+                      <Text style={styles.doseMeta}>
+                        Usable stock: {usableQuantity}
+                      </Text>
+                      {nextBatchExpirationDate ? (
+                        <Text style={[styles.doseMeta, styles.expirationMeta]}>
+                          Next batch expires: {nextBatchExpirationDate}
+                        </Text>
                       ) : null}
                       <Text style={styles.doseMeta}>
                         Refill: <Text style={isLowStock ? styles.lowStockMeta : styles.inStockMeta}>{isLowStock ? 'Low Stock' : 'In Stock'}</Text>

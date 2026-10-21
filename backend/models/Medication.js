@@ -68,6 +68,58 @@ const medicationSchema = new mongoose.Schema(
       default: 0,
     },
 
+    stockBatches: {
+      type: [{
+        quantityAdded: {
+          type: Number,
+          min: 0,
+          required: true,
+        },
+        remainingQuantity: {
+          type: Number,
+          min: 0,
+          required: true,
+        },
+        expirationDate: {
+          type: String,
+          default: null,
+          validate: {
+            validator(value) {
+              if (value === null || value === undefined || value === '') {
+                return true;
+              }
+
+              if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                return false;
+              }
+
+              const [year, month, day] = value.split('-').map(Number);
+              const parsedDate = new Date(year, month - 1, day);
+              return parsedDate.getFullYear() === year
+                && parsedDate.getMonth() === month - 1
+                && parsedDate.getDate() === day;
+            },
+            message: 'Batch expiration date must be a valid YYYY-MM-DD date.',
+          },
+        },
+        receivedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        receivedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null,
+        },
+        source: {
+          type: String,
+          enum: ['initial', 'refill', 'legacy', 'manual-adjustment'],
+          default: 'refill',
+        },
+      }],
+      default: [],
+    },
+
     lowRefillNotified: {
       type: Boolean,
       default: false,

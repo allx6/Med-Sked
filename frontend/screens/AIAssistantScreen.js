@@ -168,6 +168,19 @@ export default function AIAssistantScreen({
         <View style={styles.headerSpacer} />
       </View>
 
+      <View style={styles.safetyNotice} accessibilityRole="summary">
+        <MaterialCommunityIcons
+          name="information-outline"
+          size={18}
+          color={colors.primary}
+        />
+        <Text style={styles.safetyNoticeText}>
+          MedSked AI provides general information, not medical advice. Confirm
+          treatment decisions with a licensed clinician; seek urgent care for
+          emergencies.
+        </Text>
+      </View>
+
       <ScrollView
         ref={scrollRef}
         style={styles.chatArea}
@@ -282,6 +295,24 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  safetyNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  safetyNoticeText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   chatArea: {
     flex: 1,

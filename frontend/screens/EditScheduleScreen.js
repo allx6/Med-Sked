@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import TimeSelector from '../components/TimeSelector';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import {
   format12HourTime,
   parse24HourTime,
@@ -28,6 +29,7 @@ import {
   updateSchedule,
 } from '../services/api';
 import {
+  getScheduleFieldError,
   getScheduleSubmissionErrorMessage,
   parseLocalDate,
   validateScheduleFields,
@@ -111,6 +113,8 @@ export default function EditScheduleScreen({
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [fieldError, setFieldError] = useState(null);
+  const [reviewVisible, setReviewVisible] = useState(false);
 
   const weekDays = [
     'Monday',
@@ -328,21 +332,23 @@ export default function EditScheduleScreen({
   // UPDATE SCHEDULE
   // =====================================================
 
-  const handleUpdate = async () => {
-    setFormError('');
+  const buildEditableFields = () => ({
+    time: timeSelection
+      ? to24HourTime(
+        timeSelection.hour,
+        timeSelection.minute,
+        timeSelection.period
+      )
+      : '',
+    days,
+    endDate: endDate ? formatDate(endDate) : null,
+    enabled,
+  });
 
-    const editableFields = {
-      time: timeSelection
-        ? to24HourTime(
-          timeSelection.hour,
-          timeSelection.minute,
-          timeSelection.period
-        )
-        : '',
-      days,
-      endDate: endDate ? formatDate(endDate) : null,
-      enabled,
-    };
+  const handleUpdate = () => {
+    setFormError('');
+    setFieldError(null);
+    const editableFields = buildEditableFields();
 
     const scheduleError = validateScheduleFields({
       medicationId,
@@ -357,9 +363,16 @@ export default function EditScheduleScreen({
     });
     if (scheduleError) {
       setFormError(scheduleError);
+      setFieldError(getScheduleFieldError(scheduleError));
       return;
     }
 
+    setReviewVisible(true);
+  };
+
+  const confirmUpdateSchedule = async () => {
+    const editableFields = buildEditableFields();
+    setReviewVisible(false);
     setSaving(true);
 
     try {
@@ -412,7 +425,9 @@ export default function EditScheduleScreen({
         error
       );
 
-      setFormError(getScheduleSubmissionErrorMessage(error));
+      const message = getScheduleSubmissionErrorMessage(error);
+      setFormError(message);
+      setFieldError(getScheduleFieldError(message));
     } finally {
       setSaving(false);
     }
@@ -479,7 +494,21 @@ export default function EditScheduleScreen({
               </Text>
             ) : null}
           </View>
+          {fieldError === 'medication' ? (
+            <Text style={styles.errorText} accessibilityRole="alert">
+              Medication information is unavailable. Reopen the schedule and try again.
+            </Text>
+          ) : null}
 
+        </View>
+
+        <View style={styles.frequencyInfo}>
+          <Text style={styles.frequencyInfoTitle}>
+            Medication frequency: {selectedMedication?.frequency || 'Not specified'}
+          </Text>
+          <Text style={styles.frequencyInfoText}>
+            The selected time anchors the schedule. Hour-based intervals repeat from that time and can continue past midnight. Review the generated doses after saving.
+          </Text>
         </View>
 
         {/* =================================================
@@ -497,6 +526,11 @@ export default function EditScheduleScreen({
           onChange={setTimeSelection}
           disabled={saving}
         />
+        {fieldError === 'time' ? (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            Select a valid scheduled time.
+          </Text>
+        ) : null}
 
         <Text style={styles.selectedTimeText}>
           {format12HourTime(
@@ -524,6 +558,11 @@ export default function EditScheduleScreen({
           selectTextOnFocus={false}
           pointerEvents="none"
         />
+        {fieldError === 'dose' ? (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            A scheduled dose is required.
+          </Text>
+        ) : null}
 
         {/* =================================================
             DAYS
@@ -569,6 +608,11 @@ export default function EditScheduleScreen({
             ))}
           </ScrollView>
         </View>
+        {fieldError === 'days' ? (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            Select at least one day.
+          </Text>
+        ) : null}
 
         {/* =================================================
             START DATE
@@ -585,6 +629,11 @@ export default function EditScheduleScreen({
           selectTextOnFocus={false}
           pointerEvents="none"
         />
+        {fieldError === 'startDate' ? (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            The schedule start date is invalid. Reopen the schedule and try again.
+          </Text>
+        ) : null}
 
         {/* =================================================
             END DATE
@@ -702,6 +751,11 @@ export default function EditScheduleScreen({
             </>
           )}
         </View>
+        {fieldError === 'endDate' ? (
+          <Text style={styles.errorText} accessibilityRole="alert">
+            Choose a valid end date within the medication's expiration date.
+          </Text>
+        ) : null}
 
         {/* =================================================
             STATUS
@@ -785,7 +839,23 @@ export default function EditScheduleScreen({
         </Pressable>
 
       </ScrollView>
-
+      <ConfirmationDialog
+        visible={reviewVisible}
+        title="Review schedule changes"
+        message={[
+          `Medication: ${selectedMedication?.name || 'Medication'}`,
+          `Product strength: ${selectedMedication?.dosage || 'Not specified'}`,
+          `Scheduled dose: ${dose || 'Not specified'}`,
+          `Time: ${format12HourTime(timeSelection.hour, timeSelection.minute, timeSelection.period)}`,
+          `Days: ${days.join(', ')}`,
+          `Date range: ${formatDate(startDate)} to ${endDate ? formatDate(endDate) : 'No end date'}`,
+          `Reminders: ${enabled ? 'Enabled' : 'Disabled'}`,
+        ].join('\n')}
+        confirmLabel="Save changes"
+        cancelLabel="Back to edit"
+        onConfirm={confirmUpdateSchedule}
+        onCancel={() => setReviewVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -917,6 +987,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     marginTop: 3,
+  },
+  frequencyInfo: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#EAF5F6',
+  },
+  frequencyInfoTitle: {
+    color: '#0B4F59',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  frequencyInfoText: {
+    marginTop: 4,
+    color: '#375B63',
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   selectedOptionText: {

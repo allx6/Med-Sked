@@ -13,6 +13,123 @@ const isAfterExpiration = (scheduledDate, expirationDate) => {
   return scheduledDate > expirationDate;
 };
 
+const buildEffectiveMedicationExpirationExpression = (medicationPath = '$medication') => ({
+  $let: {
+    vars: {
+      remainingBatches: {
+        $filter: {
+          input: { $ifNull: [`${medicationPath}.stockBatches`, []] },
+          as: 'batch',
+          cond: { $gt: ['$$batch.remainingQuantity', 0] },
+        },
+      },
+    },
+    in: {
+      $cond: [
+        { $eq: [{ $size: '$$remainingBatches' }, 0] },
+        `${medicationPath}.expirationDate`,
+        {
+          $cond: [
+            {
+              $anyElementTrue: [
+                {
+                  $map: {
+                    input: '$$remainingBatches',
+                    as: 'batch',
+                    in: {
+                      $or: [
+                        { $eq: [{ $ifNull: ['$$batch.expirationDate', null] }, null] },
+                        { $eq: ['$$batch.expirationDate', ''] },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+            null,
+            {
+              $reduce: {
+                input: '$$remainingBatches',
+                initialValue: null,
+                in: {
+                  $cond: [
+                    {
+                      $or: [
+                        { $eq: ['$$value', null] },
+                        { $gt: ['$$this.expirationDate', '$$value'] },
+                      ],
+                    },
+                    '$$this.expirationDate',
+                    '$$value',
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+});
+
+const buildEligibleDosePipeline = ({
+  medicationCollection,
+  userIds,
+  startDate,
+  endDate,
+  today,
+}) => [
+  {
+    $match: {
+      ...(userIds ? { userId: { $in: userIds } } : {}),
+      scheduledDate: {
+        ...(startDate ? { $gte: startDate } : {}),
+        ...(endDate ? { $lte: endDate } : {}),
+      },
+      $expr: {
+        $lte: ['$scheduledDate', today],
+      },
+    },
+  },
+  {
+    $lookup: {
+      from: medicationCollection,
+      localField: 'medicationId',
+      foreignField: '_id',
+      as: 'medication',
+    },
+  },
+  {
+    $unwind: {
+      path: '$medication',
+      preserveNullAndEmptyArrays: true,
+    },
+  },
+  {
+    $addFields: {
+      effectiveMedicationExpiration: buildEffectiveMedicationExpirationExpression(),
+    },
+  },
+  {
+    $match: {
+      $or: [
+        { effectiveMedicationExpiration: null },
+        { effectiveMedicationExpiration: '' },
+        {
+          $expr: {
+            $lte: ['$scheduledDate', '$effectiveMedicationExpiration'],
+          },
+        },
+      ],
+    },
+  },
+  {
+    $set: {
+      'medication.expirationDate': '$effectiveMedicationExpiration',
+    },
+  },
+];
+
 const calculateCanonicalAdherence = (doses = [], options = {}) => {
   const nowDate = options.now instanceof Date
     ? new Date(options.now.getTime())
@@ -61,5 +178,7 @@ const calculateCanonicalAdherence = (doses = [], options = {}) => {
 };
 
 module.exports = {
+  buildEligibleDosePipeline,
+  buildEffectiveMedicationExpirationExpression,
   calculateCanonicalAdherence,
 };

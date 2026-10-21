@@ -115,6 +115,10 @@ const doseRecordSchema =
         type: Boolean,
         default: false,
       },
+      stockBatchId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+      },
     },
 
     {

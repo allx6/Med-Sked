@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
@@ -14,9 +15,22 @@ const {
 } = require('../utils/validation');
 const { isMedicationExpired } = require('../utils/medicationExpiration');
 const {
+  generateTodayDoses,
+  reconcilePendingDosesForSchedule,
+} = require('../services/doseGenerator');
+const {
   createMedicationNotifications,
   notifyLowRefill,
 } = require('../services/notificationService');
+const {
+  addMedicationStockBatch,
+  reconcileMedicationStockBatches,
+} = require('../services/medicationInventoryService');
+const {
+  getMedicationExpirationDate,
+  getUsableMedicationQuantity,
+  validateBatchExpirationDate,
+} = require('../utils/medicationInventory');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -111,7 +125,7 @@ const validateMedicationIdParam = (value) => {
   return value;
 };
 
-const validateMedicationPayload = (payload) => {
+const validateMedicationPayload = (payload, options) => {
   if (containsMongoOperatorPayload(payload)) {
     const error = new Error('Invalid medication payload');
     error.statusCode = 400;
@@ -127,7 +141,7 @@ const validateMedicationPayload = (payload) => {
     throw error;
   }
 
-  const validationError = validateMedicationFields(filtered);
+  const validationError = validateMedicationFields(filtered, options);
   if (validationError) {
     const error = new Error(validationError);
     error.statusCode = 400;
@@ -366,6 +380,17 @@ const createMedicationForOwner = async (req, res) => {
 
         refillThreshold: normalizedThreshold ?? 0,
 
+        stockBatches: normalizedQuantity > 0
+          ? [{
+            quantityAdded: normalizedQuantity,
+            remainingQuantity: normalizedQuantity,
+            expirationDate: normalizedExpirationDate,
+            receivedAt: new Date(),
+            receivedBy: req.user.userId,
+            source: 'initial',
+          }]
+          : [],
+
         normalizedMedicationKey,
 
       });
@@ -423,7 +448,33 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
 
   try {
     validateMedicationIdParam(req.params.id);
-    const payload = validateMedicationPayload(req.body);
+    const ownerId = getOwnerId(req);
+
+    if (!ownerId) {
+      return res.status(400).json({ message: 'Patient ID is required' });
+    }
+
+    if (!isValidObjectId(ownerId)) {
+      return res.status(400).json({ message: 'Invalid patient ID' });
+    }
+
+    const currentMedication = await Medication.findOne({
+      _id: req.params.id,
+      userId: ownerId,
+    });
+
+    if (!currentMedication) {
+      return res.status(404).json({ message: 'Medication not found' });
+    }
+
+    const currentFrequencyIsLegacy = !/^Every\s+[1-9][0-9]?\s+(hours|days)$/i.test(
+      String(currentMedication.frequency || '').trim()
+    );
+    const preserveLegacyFrequency = currentFrequencyIsLegacy
+      && req.body?.frequency === currentMedication.frequency;
+    const payload = validateMedicationPayload(req.body, {
+      allowLegacyFrequency: preserveLegacyFrequency,
+    });
     const {
       name,
       dosage,
@@ -455,16 +506,6 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
 
     }
 
-    const ownerId = getOwnerId(req);
-
-    if (!ownerId) {
-      return res.status(400).json({ message: 'Patient ID is required' });
-    }
-
-    if (!isValidObjectId(ownerId)) {
-      return res.status(400).json({ message: 'Invalid patient ID' });
-    }
-
     const normalizedQuantity = parseNonNegativeNumber(quantityOnHand, 'Quantity on hand');
     const normalizedThreshold = parseNonNegativeNumber(refillThreshold, 'Refill threshold');
     const normalizedMedicationKey = buildNormalizedMedicationKey(name, dosage);
@@ -491,7 +532,20 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
     if (normalizedQuantity !== undefined) {
       update.quantityOnHand = normalizedQuantity;
 
-      if (normalizedQuantity > (normalizedThreshold ?? 0)) {
+      if (Array.isArray(currentMedication.stockBatches)
+        && currentMedication.stockBatches.length > 0) {
+        update.stockBatches = reconcileMedicationStockBatches({
+          batches: currentMedication.stockBatches,
+          targetQuantity: normalizedQuantity,
+          expirationDate: expirationDate || currentMedication.expirationDate,
+          receivedBy: req.user.userId,
+        });
+      }
+
+      if (getUsableMedicationQuantity({
+        quantityOnHand: normalizedQuantity,
+        stockBatches: update.stockBatches || currentMedication.stockBatches,
+      }) > Number(normalizedThreshold ?? currentMedication.refillThreshold ?? 0)) {
         update.lowRefillNotified = false;
       }
     }
@@ -499,7 +553,10 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
     if (normalizedThreshold !== undefined) {
       update.refillThreshold = normalizedThreshold;
 
-      if ((normalizedQuantity ?? 0) > normalizedThreshold) {
+      if (getUsableMedicationQuantity({
+        quantityOnHand: normalizedQuantity ?? currentMedication.quantityOnHand,
+        stockBatches: update.stockBatches || currentMedication.stockBatches,
+      }) > normalizedThreshold) {
         update.lowRefillNotified = false;
       }
     }
@@ -509,25 +566,64 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
         ? null
         : expirationDate.trim();
     }
+    if (Array.isArray(currentMedication.stockBatches)
+      && currentMedication.stockBatches.length > 0) {
+      update.expirationDate = getMedicationExpirationDate({
+        expirationDate: update.expirationDate ?? currentMedication.expirationDate,
+        stockBatches: update.stockBatches || currentMedication.stockBatches,
+      });
+    }
 
-    const medication =
-      await Medication.findOneAndUpdate(
+    const frequencyChanged = currentMedication.frequency !== update.frequency;
+    let medication;
+    let scheduleId = null;
+    const session = await mongoose.startSession();
 
-        {
-          _id:
-            req.params.id,
+    try {
+      await session.withTransaction(async () => {
+        medication = await Medication.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            userId: ownerId,
+          },
+          update,
+          {
+            session,
+            returnDocument: 'after',
+            runValidators: true,
+          }
+        );
 
-          userId: ownerId,
-        },
-
-        update,
-
-        {
-        returnDocument: 'after',
-        runValidators: true,
+        if (!medication) {
+          return;
         }
 
-      );
+        const schedule = await MedicationSchedule.findOne({
+          userId: ownerId,
+          medicationId: req.params.id,
+        }).session(session);
+
+        if (!schedule) {
+          return;
+        }
+
+        scheduleId = schedule._id;
+        if (schedule.dose !== update.dosage) {
+          schedule.dose = update.dosage;
+          await schedule.save({ session });
+        }
+
+        if (frequencyChanged) {
+          await reconcilePendingDosesForSchedule({
+            userId: ownerId,
+            scheduleId,
+            session,
+          });
+        }
+      });
+    } finally {
+      await session.endSession();
+    }
 
 
     if (!medication) {
@@ -539,6 +635,10 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
 
       });
 
+    }
+
+    if (frequencyChanged && scheduleId) {
+      await generateTodayDoses(ownerId);
     }
 
     try {
@@ -591,6 +691,13 @@ router.post('/:id/refill', authMiddleware, authorizeMedicationMutation, async (r
     }
 
     const refillAmount = parsePositiveRefillAmount(req.body?.refillAmount);
+    const hasBatchExpirationDate = Object.prototype.hasOwnProperty.call(
+      req.body || {},
+      'expirationDate'
+    );
+    const batchExpirationDate = hasBatchExpirationDate
+      ? validateBatchExpirationDate(req.body.expirationDate)
+      : undefined;
     const ownerId = getOwnerId(req);
 
     if (!ownerId) {
@@ -610,32 +717,19 @@ router.post('/:id/refill', authMiddleware, authorizeMedicationMutation, async (r
       return res.status(404).json({ message: 'Medication not found' });
     }
 
-    if (isMedicationExpired(currentMedication.expirationDate)) {
+    if (!hasBatchExpirationDate && isMedicationExpired(currentMedication.expirationDate)) {
       return res.status(400).json({ message: 'Cannot refill an expired medication.' });
     }
 
-    const nextQuantity = Number(currentMedication.quantityOnHand ?? 0) + refillAmount;
-    const nextLowRefillNotified = nextQuantity > Number(currentMedication.refillThreshold ?? 0)
-      ? false
-      : Boolean(currentMedication.lowRefillNotified);
-
-    const updatedMedication = await Medication.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        userId: ownerId,
-        expirationDate: currentMedication.expirationDate ?? null,
-      },
-      {
-        $inc: {
-          quantityOnHand: refillAmount,
-        },
-        $set: {
-          lowRefillNotified: nextLowRefillNotified,
-          updatedAt: new Date(),
-        },
-      },
-      { returnDocument: 'after', timestamps: false }
-    );
+    const updatedMedication = await addMedicationStockBatch({
+      medicationId: req.params.id,
+      userId: ownerId,
+      quantity: refillAmount,
+      expirationDate: hasBatchExpirationDate
+        ? batchExpirationDate
+        : currentMedication.expirationDate,
+      receivedBy: req.user.userId,
+    });
 
     if (!updatedMedication) {
       return res.status(409).json({

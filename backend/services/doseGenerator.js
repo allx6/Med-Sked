@@ -2,6 +2,7 @@ const DoseRecord = require('../models/DoseRecord');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const Medication = require('../models/Medication');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
+const { getMedicationExpirationDate } = require('../utils/medicationInventory');
 
 const logDoseTiming = (label, startTime) => {
   const elapsed = performance.now() - startTime;
@@ -430,6 +431,7 @@ const reconcilePendingDosesForSchedule = async ({
   userId,
   scheduleId,
   fromDate = new Date(),
+  session,
 }) => {
   const fromDateString = formatDate(fromDate);
 
@@ -440,7 +442,7 @@ const reconcilePendingDosesForSchedule = async ({
     scheduledDate: {
       $gte: fromDateString,
     },
-  });
+  }, session ? { session } : {});
 
   return result.deletedCount || 0;
 };
@@ -697,7 +699,10 @@ const generateDosesForDate = async (
       const doseData of dosesToCreate
     ) {
 
-      if (isDoseDateAfterExpiration(doseData.scheduledDate, medication.expirationDate)) {
+      if (isDoseDateAfterExpiration(
+        doseData.scheduledDate,
+        getMedicationExpirationDate(medication)
+      )) {
         continue;
       }
 

@@ -18,6 +18,11 @@ const {
   generateTodayDoses,
   parseTime,
 } = require('../services/doseGenerator');
+const {
+  consumeMedicationStockBatch,
+  restoreMedicationStockBatch,
+} = require('../services/medicationInventoryService');
+const { getMedicationExpirationDate } = require('../utils/medicationInventory');
 
 const router = express.Router();
 
@@ -51,19 +56,6 @@ const populateDose = (doseId) => DoseRecord.findById(doseId)
     'scheduleId',
     'time dose days startDate endDate enabled'
   );
-
-const restoreStockReservation = async (medicationId, userId) => {
-  const restoredMedication = await Medication.findOneAndUpdate(
-    { _id: medicationId, userId },
-    { $inc: { quantityOnHand: 1 } },
-    { returnDocument: 'after', runValidators: true }
-  );
-
-  if (!restoredMedication) {
-    throw new Error('Unable to restore reserved medication stock.');
-  }
-};
-
 
 // =====================================================
 // GENERATE TODAY'S DOSES
@@ -252,7 +244,10 @@ router.post(
         });
       }
 
-      if (isDoseDateAfterExpiration(scheduledDate, medication.expirationDate)) {
+      if (isDoseDateAfterExpiration(
+        scheduledDate,
+        getMedicationExpirationDate(medication)
+      )) {
         return res.status(400).json({
           message: `Cannot create a dose scheduled for ${scheduledDate} because the medication expired on ${medication.expirationDate}.`,
         });
@@ -414,7 +409,10 @@ router.put(
         userId: doseOwnerId,
       });
 
-      if (isDoseDateAfterExpiration(existingDose.scheduledDate, medication?.expirationDate)) {
+      if (isDoseDateAfterExpiration(
+        existingDose.scheduledDate,
+        getMedicationExpirationDate(medication)
+      )) {
         return res.status(400).json({
           message: 'Cannot update a dose scheduled after the medication expiration date.',
         });
@@ -455,24 +453,17 @@ router.put(
         return res.json(await populateDose(existingDose._id));
       }
 
-      const updatedMedication = await Medication.findOneAndUpdate(
-        {
-          _id: existingDose.medicationId,
-          userId: doseOwnerId,
-          quantityOnHand: { $gt: 0 },
-        },
-        { $inc: { quantityOnHand: -1 } },
-        {
-          returnDocument: 'after',
-          runValidators: true,
-        }
+      const stockReservation = await consumeMedicationStockBatch(
+        existingDose.medicationId,
+        doseOwnerId
       );
 
-      if (!updatedMedication) {
+      if (!stockReservation) {
         return res.status(409).json({
-          message: 'Cannot take this dose because there is no medication stock remaining.',
+          message: 'Cannot take this dose because there is no unexpired medication stock remaining.',
         });
       }
+      const { medication: updatedMedication, batchId: stockBatchId } = stockReservation;
 
       let dose;
       try {
@@ -488,6 +479,7 @@ router.put(
               status: 'taken',
               takenAt: new Date(),
               refillDeducted: true,
+              stockBatchId,
             },
           },
           {
@@ -507,15 +499,30 @@ router.put(
         }
 
         if (currentDose?.status === 'taken') {
+          if (String(currentDose.stockBatchId || '') !== String(stockBatchId)) {
+            await restoreMedicationStockBatch(
+              existingDose.medicationId,
+              doseOwnerId,
+              stockBatchId
+            );
+          }
           return res.json(await populateDose(existingDose._id));
         }
 
-        await restoreStockReservation(existingDose.medicationId, doseOwnerId);
+        await restoreMedicationStockBatch(
+          existingDose.medicationId,
+          doseOwnerId,
+          stockBatchId
+        );
         throw error;
       }
 
       if (!dose) {
-        await restoreStockReservation(existingDose.medicationId, doseOwnerId);
+        await restoreMedicationStockBatch(
+          existingDose.medicationId,
+          doseOwnerId,
+          stockBatchId
+        );
 
         const latestDose = await DoseRecord.findOne({
           _id: req.params.id,
@@ -634,7 +641,10 @@ router.put(
         userId: doseOwnerId,
       });
 
-      if (isDoseDateAfterExpiration(existingDose.scheduledDate, medication?.expirationDate)) {
+      if (isDoseDateAfterExpiration(
+        existingDose.scheduledDate,
+        getMedicationExpirationDate(medication)
+      )) {
         return res.status(400).json({
           message: 'Cannot update a dose scheduled after the medication expiration date.',
         });

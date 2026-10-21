@@ -92,6 +92,23 @@ test('medication fields accept valid values', () => {
   assert.equal(buildNormalizedMedicationKey('Metformin', '500 mg'), 'metformin|500mg');
 });
 
+test('legacy frequencies can only be preserved by an explicitly authorized update path', () => {
+  const legacyMedication = {
+    name: 'Medicine',
+    dosage: '10 mg',
+    frequency: 'Twice daily',
+    expirationDate: '2099-12-31',
+  };
+
+  assert.equal(
+    validateMedicationFields(legacyMedication),
+    'Frequency must be a whole number from 1 to 99 hours or days.'
+  );
+  assert.equal(validateMedicationFields(legacyMedication, {
+    allowLegacyFrequency: true,
+  }), null);
+});
+
 test('medication validation rejects an expiration date before today', () => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);

@@ -73,7 +73,7 @@ export const validateMedicationFields = ({
   expirationDate,
   quantityOnHand,
   refillThreshold,
-}) => {
+}, { allowLegacyFrequency = false } = {}) => {
   const expirationError = validateMedicationExpirationDate(expirationDate);
   if (expirationError) {
     return expirationError;
@@ -120,12 +120,52 @@ export const validateMedicationFields = ({
     return 'Dosage amount must be greater than 0.';
   }
 
-  const frequencyMatch = String(frequency || '').trim().match(frequencyPattern);
-  if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
-    return 'Frequency must be a whole number from 1 to 99 hours or days.';
+  if (!allowLegacyFrequency) {
+    const frequencyMatch = String(frequency || '').trim().match(frequencyPattern);
+    if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
+      return 'Frequency must be a whole number from 1 to 99 hours or days.';
+    }
   }
 
   return '';
+};
+
+export const getMedicationFieldErrors = (fields, options = {}) => {
+  const errors = {};
+  const normalizedName = String(fields.name || '').trim();
+  const dosageValue = String(fields.dosage || '').trim();
+  const dosageMatch = dosageValue.match(dosagePattern);
+  const frequencyValue = String(fields.frequency || '').trim();
+
+  const expirationError = validateMedicationExpirationDate(fields.expirationDate);
+  if (expirationError) errors.expirationDate = expirationError;
+
+  if (normalizedName.length < 2) {
+    errors.name = 'Medication name must contain at least 2 characters.';
+  } else if (normalizedName.length > 100 || /[\u0000-\u001F\u007F]/.test(normalizedName)) {
+    errors.name = 'Medication name must be 100 characters or fewer and cannot contain control characters.';
+  }
+
+  if (!dosageMatch || Number(dosageMatch[1]) <= 0) {
+    errors.dosage = 'Dosage amount must be a valid number greater than 0.';
+  } else if ((dosageMatch[1].match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
+    errors.dosage = 'Dosage amount cannot exceed 6 digits.';
+  }
+
+  if (!options.allowLegacyFrequency) {
+    const frequencyMatch = frequencyValue.match(frequencyPattern);
+    if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
+      errors.frequency = 'Frequency must be a whole number from 1 to 99 hours or days.';
+    }
+  }
+
+  const quantityError = validateMedicationCount(fields.quantityOnHand, 'Quantity on hand');
+  if (quantityError) errors.quantityOnHand = quantityError;
+
+  const thresholdError = validateMedicationCount(fields.refillThreshold, 'Refill threshold');
+  if (thresholdError) errors.refillThreshold = thresholdError;
+
+  return errors;
 };
 
 export const getMedicationExpirationState = (value) => {
@@ -179,7 +219,15 @@ export const validateRefillAmount = (value) => {
   const rawValue = String(value).trim();
   const isNumericString = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(rawValue);
 
-  if (!isNumericString || (rawValue.match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
+  if (!isNumericString) {
+    if (Number.isFinite(Number(rawValue)) && Number(rawValue) <= 0) {
+      return 'Refill amount must be greater than 0.';
+    }
+
+    return 'Refill amount must be a number greater than 0.';
+  }
+
+  if ((rawValue.match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
     return 'Refill amount cannot exceed 6 digits.';
   }
 
@@ -189,6 +237,25 @@ export const validateRefillAmount = (value) => {
 
   if (Number(rawValue) <= 0) {
     return 'Refill amount must be greater than 0.';
+  }
+
+  return '';
+};
+
+export const validateBatchExpirationDate = (value) => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return 'Batch expiration date is required.';
+  }
+
+  if (!datePattern.test(trimmed) || !parseLocalDate(trimmed)) {
+    return 'Batch expiration date must be a valid YYYY-MM-DD date.';
+  }
+
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  if (trimmed < todayString) {
+    return 'Batch expiration date cannot be earlier than today.';
   }
 
   return '';

@@ -55,16 +55,19 @@ test('adherence analytics applies expiration filters to records and active compl
 
   assert.ok(dosePipeline.some((stage) => stage.$lookup?.from === 'medications'));
   assert.ok(dosePipeline.some((stage) => (
+    stage.$addFields?.effectiveMedicationExpiration?.$let?.vars?.remainingBatches?.$filter
+  )));
+  assert.ok(dosePipeline.some((stage) => (
     stage.$match?.$or?.some((condition) => (
       condition.$expr?.$lte?.[0] === '$scheduledDate'
-      && condition.$expr?.$lte?.[1] === '$medication.expirationDate'
+      && condition.$expr?.$lte?.[1] === '$effectiveMedicationExpiration'
     ))
   )));
 
   assert.ok(schedulePipeline.some((stage) => stage.$lookup?.from === 'medications'));
   assert.ok(schedulePipeline.some((stage) => (
     stage.$match?.$or?.some((condition) => (
-      condition.$expr?.$gte?.[0] === '$medication.expirationDate'
+      condition.$expr?.$gte?.[0] === '$effectiveMedicationExpiration'
     ))
   )));
 });

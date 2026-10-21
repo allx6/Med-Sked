@@ -28,6 +28,10 @@ import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
+import {
+  getUsableMedicationQuantity,
+  isMedicationLowStock,
+} from '../utils/medicationStock';
 
 
 // =====================================================
@@ -184,11 +188,11 @@ export default function MedicationsScreen({
     (medication) => !getMedicationExpirationState(medication?.expirationDate).expired
   ).length;
   const unitsInStock = medications.reduce((total, medication) => {
-    const quantity = Number(medication.quantityOnHand ?? 0);
+    const quantity = getUsableMedicationQuantity(medication);
     return total + (Number.isFinite(quantity) ? quantity : 0);
   }, 0);
   const refillCount = medications.filter(
-    (medication) => Number(medication.quantityOnHand ?? 0) <= Number(medication.refillThreshold ?? 0)
+    isMedicationLowStock
   ).length;
 
   const handleDeleteMedication = (medication) => {
@@ -493,7 +497,7 @@ export default function MedicationsScreen({
             <Text
               style={styles.detailValue}
             >
-              {Number(item.quantityOnHand ?? 0)} units on hand
+              {getUsableMedicationQuantity(item)} usable units on hand
             </Text>
             <Text style={styles.stockDetail}>
               Threshold {Number(item.refillThreshold ?? 0)}
@@ -506,14 +510,14 @@ export default function MedicationsScreen({
             <Text
               style={[
                 styles.detailValue,
-                Number(item.quantityOnHand ?? 0) <= Number(item.refillThreshold ?? 0)
+                isMedicationLowStock(item)
                   ? styles.lowStock
                   : styles.stockOkay,
               ]}
             >
-              {Number(item.quantityOnHand ?? 0) <= 0
+              {getUsableMedicationQuantity(item) <= 0
                 ? 'Out of stock'
-                : Number(item.quantityOnHand ?? 0) <= Number(item.refillThreshold ?? 0)
+                : isMedicationLowStock(item)
                   ? 'Low stock'
                   : 'In stock'}
             </Text>

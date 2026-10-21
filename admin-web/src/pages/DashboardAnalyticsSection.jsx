@@ -14,11 +14,14 @@ const getStoredAuth = () => {
 };
 
 const toPercent = (value) => {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
   return Number(value.toFixed(2));
 };
 
-const formatPercent = (value) => `${toPercent(value)}%`;
+const formatPercent = (value) => {
+  const percentage = toPercent(value);
+  return percentage === null ? 'No data' : `${percentage}%`;
+};
 const formatNumber = (value) => Number(value || 0).toLocaleString();
 
 const DashboardCard = ({ title, meta, children }) => (
@@ -194,19 +197,22 @@ const SimpleDonutChart = ({ data, colorScale = CHART_COLORS, valueKey = 'value',
   );
 };
 
-export default function AnalyticsPage() {
+export default function DashboardAnalyticsSection({ refreshKey }) {
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let active = true;
     const auth = getStoredAuth();
 
     if (!auth?.token) {
       setError('Authentication is required.');
       setLoading(false);
-      return;
+      return () => {
+        active = false;
+      };
     }
 
     const loadAnalytics = async () => {
@@ -214,16 +220,19 @@ export default function AnalyticsPage() {
         setLoading(true);
         setError('');
         const result = await getAdminAnalytics(auth.token, days);
-        setData(result);
+        if (active) setData(result);
       } catch (err) {
-        setError(err.message || 'Unable to load analytics.');
+        if (active) setError(err.message || 'Unable to load analytics.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     loadAnalytics();
-  }, [days]);
+    return () => {
+      active = false;
+    };
+  }, [days, refreshKey]);
 
   const doseChart = useMemo(() => {
     if (!data?.doseOutcomes?.data) return [];
@@ -235,7 +244,9 @@ export default function AnalyticsPage() {
 
   const trendChart = useMemo(() => {
     if (!data?.adherenceTrend?.data) return [];
-    return data.adherenceTrend.data.map((item) => ({
+    return data.adherenceTrend.data.filter((item) => (
+      Number(item.taken) + Number(item.skipped) + Number(item.missed) > 0
+    )).map((item) => ({
       ...item,
       day: item.date || item.day || 'Unknown',
       adherence: toPercent(item.adherenceRate),
@@ -244,7 +255,9 @@ export default function AnalyticsPage() {
 
   const timeOfDayChart = useMemo(() => {
     if (!data?.timeOfDay?.data) return [];
-    return data.timeOfDay.data.map((item) => ({
+    return data.timeOfDay.data.filter((item) => (
+      Number(item.taken) + Number(item.skipped) + Number(item.missed) > 0
+    )).map((item) => ({
       ...item,
       name: item.timeOfDay ? item.timeOfDay.charAt(0).toUpperCase() + item.timeOfDay.slice(1) : 'Unknown',
       adherence: toPercent(item.adherenceRate),
@@ -253,7 +266,9 @@ export default function AnalyticsPage() {
 
   const regimenChart = useMemo(() => {
     if (!data?.regimenComplexity?.data) return [];
-    return data.regimenComplexity.data.map((item) => ({
+    return data.regimenComplexity.data.filter((item) => (
+      Number(item.taken) + Number(item.skipped) + Number(item.missed) > 0
+    )).map((item) => ({
       ...item,
       name: item.group ? item.group.charAt(0).toUpperCase() + item.group.slice(1) : 'Unknown',
       adherence: toPercent(item.adherenceRate),
@@ -293,9 +308,12 @@ export default function AnalyticsPage() {
 
   const analyticsSummary = useMemo(() => {
     const trend = trendChart.filter((item) => Number.isFinite(item.adherence));
-    const latest = trend[trend.length - 1]?.adherence ?? 0;
+    const latest = trend[trend.length - 1]?.adherence ?? null;
     const first = trend[0]?.adherence ?? latest;
-    const peak = Math.max(...trend.map((item) => item.adherence), 0);
+    const peak = trend.length
+      ? Math.max(...trend.map((item) => item.adherence))
+      : null;
+    const change = latest === null || first === null ? null : latest - first;
     const bestTime = [...timeOfDayChart].sort((a, b) => b.adherence - a.adherence)[0];
     const weakestRegimen = [...regimenChart].sort((a, b) => a.adherence - b.adherence)[0];
     const missed = doseChart.find((item) => {
@@ -303,44 +321,16 @@ export default function AnalyticsPage() {
       return status === 'missed';
     })?.count || 0;
 
-    return { latest, peak, change: latest - first, bestTime, weakestRegimen, missed };
+    return { latest, peak, change, bestTime, weakestRegimen, missed };
   }, [doseChart, regimenChart, timeOfDayChart, trendChart]);
 
-  if (loading) {
-    return (
-      <div className="page-stack analytics-page">
-        <div className="panel page-header">
-          <div>
-            <p className="eyebrow">Overview</p>
-            <h2 className="analytics-page-title">Analytics</h2>
-          </div>
-        </div>
-        <LoadingState label="Loading analytics..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page-stack analytics-page">
-        <div className="panel page-header">
-          <div>
-            <p className="eyebrow">Overview</p>
-            <h2 className="analytics-page-title">Analytics</h2>
-          </div>
-        </div>
-        <ErrorState message={error} />
-      </div>
-    );
-  }
-
   return (
-    <div className="page-stack analytics-page">
+    <section className="page-stack analytics-page dashboard-analytics" aria-labelledby="dashboard-analytics-heading">
       <div className="panel page-header">
         <div>
           <p className="eyebrow">Decision support</p>
-          <h2 className="analytics-page-title">Analytics</h2>
-          <p className="page-intro">Explore adherence and medication activity over the selected period.</p>
+          <h2 className="analytics-page-title" id="dashboard-analytics-heading">Analytics</h2>
+          <p className="page-intro">Explore adherence and medication activity. Dose data uses the selected period; distribution, notifications, and refills show current totals.</p>
         </div>
         <div className="segmented-control">
           {[7, 30, 90].map((option) => (
@@ -356,13 +346,21 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {loading ? <LoadingState label="Loading analytics..." /> : null}
+      {!loading && error ? <ErrorState message={error} /> : null}
+      {!loading && !error ? (
+        <>
       <div className="analytics-summary" aria-label="Analytics summary">
         <div className="summary-highlight">
-          <span>Latest adherence</span>
+          <span>Latest recorded adherence</span>
           <strong>{formatPercent(analyticsSummary.latest)}</strong>
-          <small className={analyticsSummary.change >= 0 ? 'trend-positive' : 'trend-negative'}>
-            {analyticsSummary.change >= 0 ? '↑' : '↓'} {Math.abs(toPercent(analyticsSummary.change))}% vs period start
-          </small>
+          {analyticsSummary.change === null ? (
+            <small>No eligible completed doses in this period</small>
+          ) : (
+            <small className={analyticsSummary.change >= 0 ? 'trend-positive' : 'trend-negative'}>
+              {analyticsSummary.change >= 0 ? '↑' : '↓'} {Math.abs(toPercent(analyticsSummary.change))}% vs period start
+            </small>
+          )}
         </div>
         <div className="summary-highlight">
           <span>Missed doses</span>
@@ -387,7 +385,12 @@ export default function AnalyticsPage() {
         </DashboardCard>
 
         <DashboardCard title="Adherence Trend" meta={trendChart.length ? `Peak ${formatPercent(analyticsSummary.peak)}` : null}>
-          {trendChart.length > 0 ? <SimpleTrendBarChart data={trendChart} color="#2F6690" /> : <EmptyState message="No adherence data available." />}
+          {trendChart.length > 0 ? (
+            <>
+              <SimpleTrendBarChart data={trendChart} color="#2F6690" />
+              <p className="chart-period-note">Dates without eligible completed doses are omitted.</p>
+            </>
+          ) : <EmptyState message="No adherence data available." />}
         </DashboardCard>
 
         <DashboardCard title="Time of Day">
@@ -398,18 +401,20 @@ export default function AnalyticsPage() {
           {regimenChart.length > 0 ? <SimpleBarChart data={regimenChart} color="#E76F51" valueKey="adherence" /> : <EmptyState message="No regimen complexity data available." />}
         </DashboardCard>
 
-        <DashboardCard title="User Distribution">
+        <DashboardCard title="User Distribution" meta="All-time">
           {userRoleChart.length > 0 ? <SimpleDonutChart data={userRoleChart} valueKey="count" /> : <EmptyState message="No user distribution data available." />}
         </DashboardCard>
 
-        <DashboardCard title="Notifications by Type">
+        <DashboardCard title="Notifications by Type" meta="All-time">
           {notificationsChart.length > 0 ? <SimpleBarChart data={notificationsChart} color="#8BC34A" valueKey="count" /> : <EmptyState message="No notification data available." />}
         </DashboardCard>
 
-        <DashboardCard title="Refill Analytics">
+        <DashboardCard title="Refill Analytics" meta="Current stock">
           {refillsChart.some((item) => item.value > 0) ? <SimpleDonutChart data={refillsChart} valueKey="value" /> : <EmptyState message="No refill data available." />}
         </DashboardCard>
       </div>
-    </div>
+        </>
+      ) : null}
+    </section>
   );
 }

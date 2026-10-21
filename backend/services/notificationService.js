@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const Medication = require('../models/Medication');
+const { getUsableMedicationQuantity } = require('../utils/medicationInventory');
 const User = require('../models/User');
 
 const logMedicationNotificationFailure = ({
@@ -188,7 +189,7 @@ const createMedicationNotifications = async ({
 };
 
 const notifyLowRefill = async ({ medication, triggerId }) => {
-  const quantityOnHand = Number(medication?.quantityOnHand ?? 0);
+  const quantityOnHand = Number(getUsableMedicationQuantity(medication));
   const refillThreshold = Number(medication?.refillThreshold ?? 0);
 
   if (
