@@ -1728,34 +1728,43 @@ button:disabled {
 }
 
 .relationship-action-button {
-  border: 0;
-  border-radius: 4px;
-  padding: 6px 4px;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #ffffff;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: color 150ms ease, background-color 150ms ease;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
 }
 
 .relationship-details-button {
-  color: var(--color-primary);
+  border-color: #0b5962;
+  background: #116f7a;
+  color: #ffffff;
 }
 
 .relationship-details-button:hover {
-  background: rgba(47, 102, 144, 0.1);
+  background: #0b5962;
+  border-color: #08464e;
 }
 
 .relationship-revoke-button {
-  color: #b91c1c;
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #ffffff;
 }
 
 .relationship-revoke-button:hover {
-  background: rgba(185, 28, 28, 0.08);
+  background: #991b1b;
+  border-color: #7f1d1d;
 }
 
 .relationship-action-button:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid rgba(255, 255, 255, 0.9);
   outline-offset: 2px;
 }
 
@@ -1784,6 +1793,13 @@ button:disabled {
 .small {
   padding: 8px 10px;
   font-size: 0.82rem;
+}
+
+.relationship-action-button.small {
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 1rem;
 }
 
 .detail-grid {
