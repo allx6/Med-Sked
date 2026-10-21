@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import {
   View,
@@ -7,14 +7,16 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  FlatList,
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { Portal } from 'react-native-paper';
 
 import { refillMedication, updateMedication } from '../services/api';
 
+import MedicineNameInput from '../components/MedicineNameInput';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
@@ -22,6 +24,7 @@ import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
   isValidMedicationNumericInput,
+  isValidMedicationFrequencyInput,
   validateMedicationFields,
   validateRefillAmount,
 } from '../utils/medicationValidation';
@@ -49,6 +52,7 @@ export default function EditMedicationScreen({
   onCancel,
 }) {
 
+  const medicineNameInputRef = useRef(null);
   const [name, setName] =
     useState(medication.name || '');
 
@@ -78,6 +82,24 @@ export default function EditMedicationScreen({
   const [refilling, setRefilling] = useState(false);
   const [refillError, setRefillError] = useState('');
   const [refillSuccess, setRefillSuccess] = useState('');
+
+  const openExpirationDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: parseDateOnly(expirationDate) || todayStart,
+        mode: 'date',
+        minimumDate: todayStart,
+        onValueChange: (_event, date) => {
+          if (date) {
+            setExpirationDate(formatDateOnly(date));
+          }
+        },
+      });
+      return;
+    }
+
+    setShowExpirationDatePicker((isVisible) => !isVisible);
+  };
 
 
   // =====================================================
@@ -205,23 +227,31 @@ export default function EditMedicationScreen({
 
   return (
 
-    <KeyboardAvoidingView
-      style={styles.wrapper}
+    <Portal.Host>
+      <KeyboardAvoidingView
+        style={styles.wrapper}
 
-      behavior={
-        Platform.OS === 'ios'
-          ? 'padding'
-          : 'height'
-      }
-    >
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : 'height'
+        }
+      >
 
-      <ScrollView
+      <FlatList
+        data={[]}
+        renderItem={() => null}
         contentContainerStyle={
           styles.scroll
         }
         keyboardShouldPersistTaps="handled"
-      >
-
+        onScroll={
+          Platform.OS === 'web'
+            ? () => medicineNameInputRef.current?.closeDropdown()
+            : undefined
+        }
+        onScrollBeginDrag={() => medicineNameInputRef.current?.closeDropdown()}
+        ListHeaderComponent={(
         <View style={styles.card}>
 
           {/* TITLE */}
@@ -237,9 +267,10 @@ export default function EditMedicationScreen({
 
           {/* MEDICATION NAME */}
 
-          <TextField
+          <MedicineNameInput
+            ref={medicineNameInputRef}
             label="Medication name"
-            placeholder="e.g. Paracetamol"
+            placeholder="Enter Medication name"
             value={name}
             onChangeText={(value) => {
               if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
@@ -306,12 +337,11 @@ export default function EditMedicationScreen({
                 placeholder="e.g. 8"
                 value={frequencyAmount}
                 onChangeText={(value) => {
-                  if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
+                  if (isValidMedicationFrequencyInput(value)) {
                     setFrequencyAmount(value);
                   }
                 }}
                 keyboardType="number-pad"
-                maxLength={7}
                 editable={!loading}
               />
               <Text style={styles.unitLabel}>Frequency unit</Text>
@@ -399,8 +429,8 @@ export default function EditMedicationScreen({
             <>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Choose expiration date"
-                onPress={() => setShowExpirationDatePicker(true)}
+                accessibilityLabel={showExpirationDatePicker ? 'Close expiration date picker' : 'Choose expiration date'}
+                onPress={openExpirationDatePicker}
                 disabled={loading}
                 style={styles.expirationDateButton}
               >
@@ -418,9 +448,8 @@ export default function EditMedicationScreen({
                   value={parseDateOnly(expirationDate) || todayStart}
                   mode="date"
                   minimumDate={todayStart}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onValueChange={(date) => {
-                    setShowExpirationDatePicker(false);
+                  display="spinner"
+                  onValueChange={(_event, date) => {
                     if (date) {
                       setExpirationDate(formatDateOnly(date));
                     }
@@ -464,10 +493,11 @@ export default function EditMedicationScreen({
           />
 
         </View>
-
-      </ScrollView>
+        )}
+      />
 
     </KeyboardAvoidingView>
+    </Portal.Host>
 
   );
 

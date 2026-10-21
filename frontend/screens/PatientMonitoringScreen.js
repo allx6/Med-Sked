@@ -30,12 +30,20 @@ import {
   getMedicationExpirationState,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
-import { getDoseActionErrorMessage } from '../utils/doseErrors';
+import { isMedicationLowStock } from '../utils/medicationStock';
 import {
   filterDoseHistory,
   getAvailableDoseDates,
   normalizeDoseDate,
 } from '../utils/doseHistory';
+
+const DOSE_STATUS_OPTIONS = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'taken', label: 'Taken' },
+  { key: 'skipped', label: 'Skipped' },
+  { key: 'missed', label: 'Missed' },
+];
 
 export default function PatientMonitoringScreen({
   token,
@@ -60,6 +68,7 @@ export default function PatientMonitoringScreen({
   const [selectedDoseStatus, setSelectedDoseStatus] = useState('all');
   const [dateDropdownVisible, setDateDropdownVisible] = useState(false);
   const [medicationDropdownVisible, setMedicationDropdownVisible] = useState(false);
+  const [statusDropdownVisible, setStatusDropdownVisible] = useState(false);
 
   const loadOverview = useCallback(async (isRefresh = false) => {
     if (!patient?._id) return;
@@ -174,8 +183,13 @@ export default function PatientMonitoringScreen({
         };
       });
 
-    } catch (err) {
-      Alert.alert('Dose update failed', getDoseActionErrorMessage(err));
+    } catch {
+      Alert.alert(
+        'Unable to update dose',
+        action === 'take'
+          ? 'Unable to mark this dose as taken. Please try again.'
+          : 'Unable to skip this dose. Please try again.'
+      );
     } finally {
       setActionId(null);
     }
@@ -455,6 +469,7 @@ export default function PatientMonitoringScreen({
             medications.map((medication) => {
               const expirationState = getMedicationExpirationState(medication?.expirationDate);
               const isExpired = expirationState.expired;
+              const isLowStock = isMedicationLowStock(medication);
 
               return (
                 <View key={medication._id || medication.id} style={styles.doseCardContainer}>
@@ -465,10 +480,10 @@ export default function PatientMonitoringScreen({
                       {isExpired ? (
                         <Text style={[styles.doseMeta, styles.expiredMeta]}>Expired • {expirationState.expirationDate}</Text>
                       ) : expirationState.expirationDate ? (
-                        <Text style={styles.doseMeta}>Expires: {expirationState.expirationDate}</Text>
+                        <Text style={[styles.doseMeta, styles.expirationMeta]}>Expires: {expirationState.expirationDate}</Text>
                       ) : null}
                       <Text style={styles.doseMeta}>
-                        Refill: {Number(medication.quantityOnHand ?? 0) <= 0 ? 'Out of stock' : Number(medication.quantityOnHand ?? 0) <= Number(medication.refillThreshold ?? 0) ? 'Low stock' : 'In stock'} ({Number(medication.quantityOnHand ?? 0)} on hand, threshold {Number(medication.refillThreshold ?? 0)})
+                        Refill: <Text style={isLowStock ? styles.lowStockMeta : styles.inStockMeta}>{isLowStock ? 'Low Stock' : 'In Stock'}</Text>
                       </Text>
                     </View>
                     {canSupportAdherence ? (
@@ -516,6 +531,7 @@ export default function PatientMonitoringScreen({
                 onPress={() => {
                   setDateDropdownVisible((visible) => !visible);
                   setMedicationDropdownVisible(false);
+                  setStatusDropdownVisible(false);
                 }}
                 style={styles.filterDropdownButton}
               >
@@ -573,6 +589,7 @@ export default function PatientMonitoringScreen({
                 onPress={() => {
                   setMedicationDropdownVisible((visible) => !visible);
                   setDateDropdownVisible(false);
+                  setStatusDropdownVisible(false);
                 }}
                 style={styles.filterDropdownButton}
               >
@@ -634,33 +651,58 @@ export default function PatientMonitoringScreen({
               ) : null}
 
               <Text style={styles.filterLabel}>Status</Text>
-              <View style={styles.statusFilterOptions}>
-                {[
-                  { key: 'all', label: 'All' },
-                  { key: 'pending', label: 'Pending' },
-                  { key: 'taken', label: 'Taken' },
-                  { key: 'skipped', label: 'Skipped' },
-                  { key: 'missed', label: 'Missed' },
-                ].map((status) => (
-                  <Pressable
-                    key={status.key}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: selectedDoseStatus === status.key }}
-                    onPress={() => setSelectedDoseStatus(status.key)}
-                    style={[
-                      styles.statusFilterChip,
-                      selectedDoseStatus === status.key && styles.statusFilterChipActive,
-                    ]}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose dose status"
+                accessibilityState={{ expanded: statusDropdownVisible }}
+                onPress={() => {
+                  setStatusDropdownVisible((visible) => !visible);
+                  setDateDropdownVisible(false);
+                  setMedicationDropdownVisible(false);
+                }}
+                style={styles.filterDropdownButton}
+              >
+                <Text style={styles.filterDropdownText}>
+                  {DOSE_STATUS_OPTIONS.find((status) => status.key === selectedDoseStatus)?.label || 'All'}
+                </Text>
+                <MaterialCommunityIcons
+                  name={statusDropdownVisible ? 'chevron-up' : 'chevron-down'}
+                  size={18}
+                  color={colors.primary}
+                />
+              </Pressable>
+              {statusDropdownVisible ? (
+                <View style={[styles.filterDropdownList, styles.statusDropdownList]}>
+                  <ScrollView
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                    style={[styles.filterDropdownScroll, styles.statusDropdownScroll]}
                   >
-                    <Text style={[
-                      styles.statusFilterChipText,
-                      selectedDoseStatus === status.key && styles.statusFilterChipTextActive,
-                    ]}>
-                      {status.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+                    {DOSE_STATUS_OPTIONS.map((status) => (
+                      <Pressable
+                        key={status.key}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: selectedDoseStatus === status.key }}
+                        onPress={() => {
+                          setSelectedDoseStatus(status.key);
+                          setStatusDropdownVisible(false);
+                        }}
+                        style={[
+                          styles.filterDropdownOption,
+                          selectedDoseStatus === status.key && styles.filterDropdownOptionActive,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterDropdownOptionText,
+                          selectedDoseStatus === status.key && styles.filterDropdownOptionTextActive,
+                        ]}>
+                          {status.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
               <Text style={styles.filterResultCount}>
                 Showing {filteredDoseHistory.length} {filteredDoseHistory.length === 1 ? 'dose' : 'doses'}
               </Text>
@@ -834,7 +876,9 @@ export default function PatientMonitoringScreen({
         message={confirmation?.message || ''}
         confirmLabel={confirmation?.type === 'dose' ? confirmation.action === 'take' ? 'Take dose' : 'Skip dose' : 'Delete'}
         cancelLabel="Cancel"
-        danger={confirmation?.type !== 'dose'}
+        danger={confirmation?.type === 'dose'
+          ? confirmation.action === 'skip'
+          : confirmation?.type !== undefined}
         onConfirm={confirmAction}
         onCancel={() => setConfirmation(null)}
       />
@@ -933,7 +977,10 @@ const styles = StyleSheet.create({
   doseInfo: { flex: 1, minWidth: 0 },
   doseName: { fontSize: 15, fontWeight: '700', color: colors.text },
   doseMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  expirationMeta: { color: colors.primary, fontWeight: '600' },
   expiredMeta: { color: colors.dangerText, fontWeight: '700' },
+  lowStockMeta: { color: colors.dangerText, fontWeight: '700' },
+  inStockMeta: { color: colors.success, fontWeight: '700' },
   doseDate: { fontSize: 14, color: colors.textSecondary, marginTop: 3 },
   resourceActions: { marginLeft: spacing.sm, gap: 5 },
   scheduleResourceActions: { width: 72, marginLeft: spacing.md, gap: 8 },
@@ -979,15 +1026,12 @@ const styles = StyleSheet.create({
   filterDropdownText: { flex: 1, color: colors.text, fontSize: 14, marginRight: spacing.sm },
   filterDropdownList: { marginTop: 5, marginBottom: 3, maxHeight: 180, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.inputBorder, borderRadius: radius.sm, overflow: 'hidden' },
   filterDropdownScroll: { maxHeight: 178 },
+  statusDropdownList: { maxHeight: 84 },
+  statusDropdownScroll: { maxHeight: 82 },
   filterDropdownOption: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   filterDropdownOptionActive: { backgroundColor: colors.primarySoft },
   filterDropdownOptionText: { color: colors.text, fontSize: 13 },
   filterDropdownOptionTextActive: { color: colors.primary, fontWeight: '800' },
-  statusFilterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  statusFilterChip: { minHeight: 34, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 11, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.inputBorder, backgroundColor: colors.white },
-  statusFilterChipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
-  statusFilterChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
-  statusFilterChipTextActive: { color: colors.white },
   filterResultCount: { color: colors.textSecondary, fontSize: 12, marginTop: spacing.md },
   emptyDescription: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 6 },
   emptyState: {

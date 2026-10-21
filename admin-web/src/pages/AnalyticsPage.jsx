@@ -85,7 +85,7 @@ const SimpleTrendBarChart = ({ data, valueKey = 'adherence', labelKey = 'day', c
 
   const width = 640;
   const height = 300;
-  const padding = { top: 18, right: 20, bottom: 44, left: 42 };
+  const padding = { top: 18, right: 20, bottom: 60, left: 42 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
   const values = data.map((item) => Math.min(100, getChartValue(item, valueKey)));
@@ -298,7 +298,10 @@ export default function AnalyticsPage() {
     const peak = Math.max(...trend.map((item) => item.adherence), 0);
     const bestTime = [...timeOfDayChart].sort((a, b) => b.adherence - a.adherence)[0];
     const weakestRegimen = [...regimenChart].sort((a, b) => a.adherence - b.adherence)[0];
-    const missed = doseChart.find((item) => item.status === 'Missed')?.count || 0;
+    const missed = doseChart.find((item) => {
+      const status = String(item?.status ?? item?.name ?? '').trim().toLowerCase();
+      return status === 'missed';
+    })?.count || 0;
 
     return { latest, peak, change: latest - first, bestTime, weakestRegimen, missed };
   }, [doseChart, regimenChart, timeOfDayChart, trendChart]);

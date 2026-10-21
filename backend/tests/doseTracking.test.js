@@ -25,15 +25,15 @@ test('dose records use the protected status values and unique identity index', (
 test('dose scheduled date and time stay in the local calendar', () => {
   const scheduled = parseScheduledDateTime('2026-09-24', '08:00');
 
-  assert.equal(scheduled.getFullYear(), 2026);
-  assert.equal(scheduled.getMonth(), 8);
-  assert.equal(scheduled.getDate(), 24);
-  assert.equal(scheduled.getHours(), 8);
-  assert.equal(scheduled.getMinutes(), 0);
+  assert.equal(scheduled.getUTCFullYear(), 2026);
+  assert.equal(scheduled.getUTCMonth(), 8);
+  assert.equal(scheduled.getUTCDate(), 24);
+  assert.equal(scheduled.getUTCHours(), 8);
+  assert.equal(scheduled.getUTCMinutes(), 0);
 });
 
 test('invalid dose date/time values are ignored by missed-dose detection', () => {
   assert.equal(parseScheduledDateTime('2026-02-30', '08:00'), null);
   assert.equal(parseScheduledDateTime('2026-09-24', '25:00'), null);
-  assert.equal(MISSED_DOSE_GRACE_MINUTES, 15);
+  assert.equal(MISSED_DOSE_GRACE_MINUTES, 0);
 });

@@ -16,6 +16,12 @@ const handleResponse = async (response, options = {}) => {
   if (!response.ok) {
     const message = data.message || data.error || `Request failed with status ${response.status}`;
 
+    if (data.verificationRequired === true) {
+      throw new Error(
+        `The account was created but still requires email verification. ${message}`
+      );
+    }
+
     if (response.status === 401 && !options.isLogin) {
       throw new Error('Your session has expired. Please log in again.');
     }
@@ -127,17 +133,6 @@ export const updateUser = async (token, userId, payload) => {
   return handleResponse(response);
 };
 
-export const deleteUser = async (token, userId) => {
-  const response = await fetch(`${API_URL}/api/admin/users/${userId}`, {
-    method: 'DELETE',
-    headers: {
-      ...getAuthHeaders(token),
-    },
-  });
-
-  return handleResponse(response);
-};
-
 export const listUsers = async (token, options = {}) => {
   const params = new URLSearchParams();
 
@@ -148,19 +143,6 @@ export const listUsers = async (token, options = {}) => {
 
   const queryString = params.toString();
   return fetchWithToken(`/api/admin/users${queryString ? `?${queryString}` : ''}`, token);
-};
-
-export const updateUserRole = async (token, userId, payload) => {
-  const response = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(token),
-    },
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(response);
 };
 
 export const listRelationships = async (token, options = {}) => {
@@ -177,17 +159,6 @@ export const listRelationships = async (token, options = {}) => {
 
 export const getRelationship = async (token, relationshipId) => fetchWithToken(`/api/admin/relationships/${relationshipId}`, token);
 
-export const revokeRelationship = async (token, relationshipId) => {
-  const response = await fetch(`${API_URL}/api/admin/relationships/${relationshipId}`, {
-    method: 'DELETE',
-    headers: {
-      ...getAuthHeaders(token),
-    },
-  });
-
-  return handleResponse(response);
-};
-
 export const listAuditLogs = async (token, options = {}) => {
   const params = new URLSearchParams();
 
@@ -202,6 +173,47 @@ export const listAuditLogs = async (token, options = {}) => {
   const queryString = params.toString();
   return fetchWithToken(`/api/admin/audit-logs${queryString ? `?${queryString}` : ''}`, token);
 };
+
+const postAdminJson = async (path, token, payload) => {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse(response);
+};
+
+export const listPrivilegedActionRequests = async (token, options = {}) => {
+  const params = new URLSearchParams();
+  if (options.status) params.set('status', options.status);
+  if (options.page) params.set('page', String(options.page));
+  if (options.limit) params.set('limit', String(options.limit));
+  const queryString = params.toString();
+  return fetchWithToken(
+    `/api/admin/privileged-action-requests${queryString ? `?${queryString}` : ''}`,
+    token
+  );
+};
+
+export const getPrivilegedActionRequest = async (token, requestId) => (
+  fetchWithToken(`/api/admin/privileged-action-requests/${requestId}`, token)
+);
+
+export const createPrivilegedActionRequest = async (token, payload) => (
+  postAdminJson('/api/admin/privileged-action-requests', token, payload)
+);
+
+export const approvePrivilegedActionRequest = async (token, requestId) => (
+  postAdminJson(`/api/admin/privileged-action-requests/${requestId}/approve`, token, {})
+);
+
+export const rejectPrivilegedActionRequest = async (token, requestId, reason) => (
+  postAdminJson(`/api/admin/privileged-action-requests/${requestId}/reject`, token, { reason })
+);
 
 export const getAdminAnalytics = async (token, days = 30) => {
   const [doseOutcomes, adherenceTrend, timeOfDay, regimenComplexity, userRoles, notifications, refills] = await Promise.all([

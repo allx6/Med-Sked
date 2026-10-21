@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import {
   View,
@@ -8,20 +8,23 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  FlatList,
   useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { Portal } from 'react-native-paper';
 
 import { createMedication } from '../services/api';
 
+import MedicineNameInput from '../components/MedicineNameInput';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
 import {
   getSafeUserErrorMessage,
   isValidMedicationNumericInput,
+  isValidMedicationFrequencyInput,
   validateMedicationFields,
 } from '../utils/medicationValidation';
 
@@ -34,6 +37,7 @@ export default function AddMedicationScreen({
 }) {
   const { width } = useWindowDimensions();
   const wideLayout = width >= 640;
+  const medicineNameInputRef = useRef(null);
   const [name, setName] = useState('');
   const [dosageAmount, setDosageAmount] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -43,11 +47,30 @@ export default function AddMedicationScreen({
   const [refillThreshold, setRefillThreshold] = useState('0');
   const [expirationDate, setExpirationDate] = useState('');
   const [showExpirationDatePicker, setShowExpirationDatePicker] = useState(false);
+  const [expirationDateFocused, setExpirationDateFocused] = useState(false);
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const openExpirationDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: parseDateOnly(expirationDate) || todayStart,
+        mode: 'date',
+        minimumDate: todayStart,
+        onValueChange: (_event, date) => {
+          if (date) {
+            setExpirationDate(formatDateOnly(date));
+          }
+        },
+      });
+      return;
+    }
+
+    setShowExpirationDatePicker((isVisible) => !isVisible);
+  };
 
 
   async function handleSubmit() {
@@ -109,20 +132,28 @@ export default function AddMedicationScreen({
 
 
   return (
-    <KeyboardAvoidingView
-      style={styles.wrapper}
-      behavior={
-        Platform.OS === 'ios'
-          ? 'padding'
-          : 'height'
-      }
-    >
-
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+    <Portal.Host>
+      <KeyboardAvoidingView
+        style={styles.wrapper}
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : 'height'
+        }
       >
 
+      <FlatList
+        data={[]}
+        renderItem={() => null}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        onScroll={
+          Platform.OS === 'web'
+            ? () => medicineNameInputRef.current?.closeDropdown()
+            : undefined
+        }
+        onScrollBeginDrag={() => medicineNameInputRef.current?.closeDropdown()}
+        ListHeaderComponent={(
         <View style={styles.card}>
           <View style={styles.heading}>
             <Image
@@ -138,9 +169,10 @@ export default function AddMedicationScreen({
             </View>
           </View>
 
-          <TextField
+          <MedicineNameInput
+            ref={medicineNameInputRef}
             label="Medication name"
-            placeholder="e.g. Paracetamol"
+            placeholder="Enter Medication name"
             value={name}
             onChangeText={(value) => {
               if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
@@ -182,7 +214,11 @@ export default function AddMedicationScreen({
                     accessibilityState={{ selected: dosageUnit === unit }}
                     onPress={() => setDosageUnit(unit)}
                     disabled={loading}
-                    style={[styles.unitChip, dosageUnit === unit && styles.unitChipSelected]}
+                    style={({ pressed }) => [
+                      styles.unitChip,
+                      dosageUnit === unit && styles.unitChipSelected,
+                      pressed && styles.unitChipPressed,
+                    ]}
                   >
                     <Text style={[styles.unitChipText, dosageUnit === unit && styles.unitChipTextSelected]}>{unit}</Text>
                   </Pressable>
@@ -238,16 +274,26 @@ export default function AddMedicationScreen({
                   min={formatDateOnly(todayStart)}
                   onChange={(event) => setExpirationDate(event.target.value)}
                   disabled={loading}
-                  style={styles.webDateInput}
+                  onFocus={() => setExpirationDateFocused(true)}
+                  onBlur={() => setExpirationDateFocused(false)}
+                  style={{
+                    ...styles.webDateInput,
+                    ...(expirationDateFocused
+                      ? styles.webDateInputFocused
+                      : {}),
+                  }}
                 />
               ) : (
                 <>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Choose expiration date"
-                    onPress={() => setShowExpirationDatePicker(true)}
+                    accessibilityLabel={showExpirationDatePicker ? 'Close expiration date picker' : 'Choose expiration date'}
+                    onPress={openExpirationDatePicker}
                     disabled={loading}
-                    style={styles.expirationDateButton}
+                    style={({ pressed }) => [
+                      styles.expirationDateButton,
+                      pressed && styles.expirationDateButtonPressed,
+                    ]}
                   >
                     <Text style={expirationDate ? styles.expirationDateText : styles.expirationDatePlaceholder}>
                       {expirationDate || 'YYYY-MM-DD'}
@@ -263,9 +309,8 @@ export default function AddMedicationScreen({
                       value={parseDateOnly(expirationDate) || todayStart}
                       mode="date"
                       minimumDate={todayStart}
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      onValueChange={(date) => {
-                        setShowExpirationDatePicker(false);
+                      display="spinner"
+                      onValueChange={(_event, date) => {
                         if (date) {
                           setExpirationDate(formatDateOnly(date));
                         }
@@ -282,11 +327,10 @@ export default function AddMedicationScreen({
                 placeholder="e.g. 8"
                 value={frequencyAmount}
                 onChangeText={(value) => {
-                  if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
+                  if (isValidMedicationFrequencyInput(value)) {
                     setFrequencyAmount(value);
                   }
                 }}
-                maxLength={7}
                 keyboardType="number-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
@@ -301,7 +345,11 @@ export default function AddMedicationScreen({
                     accessibilityState={{ selected: frequencyUnit === unit }}
                     onPress={() => setFrequencyUnit(unit)}
                     disabled={loading}
-                    style={[styles.unitChip, frequencyUnit === unit && styles.unitChipSelected]}
+                    style={({ pressed }) => [
+                      styles.unitChip,
+                      frequencyUnit === unit && styles.unitChipSelected,
+                      pressed && styles.unitChipPressed,
+                    ]}
                   >
                     <Text style={[styles.unitChipText, frequencyUnit === unit && styles.unitChipTextSelected]}>{unit}</Text>
                   </Pressable>
@@ -334,10 +382,11 @@ export default function AddMedicationScreen({
           </View>
 
         </View>
-
-      </ScrollView>
+        )}
+      />
 
     </KeyboardAvoidingView>
+    </Portal.Host>
   );
 }
 
@@ -350,32 +399,33 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
-
     flexGrow: 1,
-
     justifyContent: 'center',
-
     width: '100%',
     maxWidth: 760,
     alignSelf: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 32,
-
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
 
   card: {
     width: '100%',
-    backgroundColor: '#D7EDF3',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#B5D4DC',
-    padding: 32,
+    borderColor: '#E1ECEF',
+    padding: 24,
+    shadowColor: '#17313A',
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
 
   heading: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 28,
   },
 
   logo: {
@@ -393,8 +443,8 @@ const styles = StyleSheet.create({
 
   fieldRow: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 4,
+    gap: 18,
+    marginBottom: 8,
   },
 
   frequencyFieldRow: {
@@ -412,84 +462,103 @@ const styles = StyleSheet.create({
   },
 
   fieldLabel: {
-    marginBottom: 5,
-    fontSize: 12,
+    marginBottom: 7,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#17313A',
+    color: '#35515A',
   },
 
   fieldInput: {
-    minHeight: 38,
-    paddingHorizontal: 11,
-    borderRadius: 8,
-    borderColor: '#8EBAC5',
-    backgroundColor: '#EAF5F7',
-    fontSize: 13,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    borderColor: '#BDD3D8',
+    backgroundColor: '#F8FBFC',
+  },
+
+  webDateInputFocused: {
+    borderColor: '#0B4F59',
+    boxShadow: '0 0 0 3px rgba(11, 79, 89, 0.12)',
+    outlineStyle: 'none',
   },
 
   expirationDateButton: {
-    minHeight: 40,
+    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingLeft: 15,
+    paddingRight: 15,
     borderWidth: 1,
-    borderRadius: 8,
-    borderColor: '#8EBAC5',
+    borderRadius: 13,
+    borderColor: '#BDD3D8',
+    backgroundColor: '#F8FBFC',
+  },
+
+  expirationDateButtonPressed: {
     backgroundColor: '#EAF5F7',
+    borderColor: '#0B4F59',
   },
 
   expirationDateText: {
     color: '#17313A',
-    fontSize: 13,
+    fontSize: 15,
   },
 
   expirationDatePlaceholder: {
     color: '#8A9CA3',
-    fontSize: 13,
+    fontSize: 15,
   },
 
   webDateInput: {
-    height: 40,
+    height: 52,
     width: '100%',
     display: 'block',
     boxSizing: 'border-box',
-    paddingHorizontal: 11,
-    borderRadius: 8,
+    paddingLeft: 15,
+    paddingRight: 15,
+    borderRadius: 13,
     borderWidth: 1,
     borderStyle: 'solid',
-    borderColor: '#8EBAC5',
-    backgroundColor: '#EAF5F7',
-    fontSize: 13,
+    borderColor: '#BDD3D8',
+    backgroundColor: '#F8FBFC',
+    fontSize: 15,
     color: '#17313A',
+    transition: 'border-color 180ms ease, box-shadow 180ms ease',
+    outlineStyle: 'none',
   },
 
   unitLabel: {
-    marginBottom: 5,
-    fontSize: 12,
+    marginBottom: 7,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#17313A',
+    color: '#35515A',
   },
 
   unitRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 14,
   },
 
   unitChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#B5D4DC',
-    backgroundColor: '#EAF5F7',
+    borderColor: '#D6E5E8',
+    backgroundColor: '#F5FAFB',
   },
 
   unitChipSelected: {
     borderColor: '#0B4F59',
-    backgroundColor: '#C5E3EA',
+    backgroundColor: '#DCEFF0',
+  },
+
+  unitChipPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.97 }],
   },
 
   unitChipText: {
@@ -503,34 +572,15 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 23,
+    fontSize: 25,
     fontWeight: '800',
     color: '#0B4F59',
   },
 
   subtitle: {
-    marginTop: 2,
-    fontSize: 11,
-    color: '#607981',
-  },
-
-  label: {
+    marginTop: 4,
     fontSize: 13,
-    color: '#374151',
-    marginBottom: 6,
-    marginTop: 12,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-
-    fontSize: 15,
-    backgroundColor: '#FFFFFF',
+    color: '#607981',
   },
 
   error: {
@@ -543,8 +593,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    marginTop: 14,
+    gap: 12,
+    marginTop: 20,
   },
 
   buttonRowStacked: {
@@ -554,15 +604,8 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: '#0B4F59',
-    borderRadius: 8,
     width: '50%',
     maxWidth: 180,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 0,
-    paddingVertical: 8,
   },
 
   buttonFullWidth: {
@@ -570,32 +613,9 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
 
-  disabledButton: {
-    opacity: 0.6,
-  },
-
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-
   cancelButton: {
     width: '50%',
     maxWidth: 180,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#0B4F59',
-    borderRadius: 8,
-    paddingVertical: 8,
-  },
-
-  cancelText: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '600',
   },
 
 });

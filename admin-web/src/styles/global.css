@@ -485,6 +485,87 @@ button:disabled {
   margin-top: 18px;
 }
 
+.adherence-trend-panel {
+  min-width: 0;
+  padding: 22px 24px 18px;
+  border: 1px solid rgba(177, 218, 220, 0.14);
+  border-radius: var(--radius-panel);
+  background: linear-gradient(155deg, #0e6673 0%, #0a4455 100%);
+  box-shadow: var(--shadow-card);
+}
+
+.adherence-trend-heading {
+  margin-bottom: 8px;
+}
+
+.adherence-trend-heading h3 {
+  margin: 2px 0 0;
+  color: var(--color-text);
+  font-size: 1.25rem;
+}
+
+.adherence-trend-description {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.adherence-trend-chart-wrap {
+  min-width: 0;
+}
+
+.adherence-trend-chart {
+  display: block;
+  width: 100%;
+  height: clamp(250px, 28vw, 320px);
+  overflow: visible;
+}
+
+.adherence-trend-gridline {
+  stroke: rgba(217, 239, 240, 0.2);
+  stroke-dasharray: 4 7;
+  stroke-width: 1;
+}
+
+.adherence-trend-axis-label {
+  fill: #d9eaeb;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.adherence-trend-date-label {
+  font-size: 16px;
+}
+
+.adherence-trend-line {
+  fill: none;
+  stroke: #7fe1d7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.adherence-trend-point {
+  fill: #b8fff2;
+  stroke: #0b5962;
+  stroke-width: 3;
+  cursor: help;
+}
+
+.adherence-trend-no-data {
+  fill: #0a4455;
+  stroke: #b6d4d7;
+  stroke-width: 2;
+  stroke-dasharray: 2 2;
+  cursor: help;
+}
+
+.adherence-trend-note {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
 .dashboard-stat-grid > .dashboard-stat-card:nth-child(n) {
   --metric-accent: #dff9f6;
   --metric-tint: rgba(17, 111, 122, 0.18);
@@ -1062,7 +1143,8 @@ button:disabled {
   font-weight: 700;
 }
 
-.user-form input {
+.user-form input,
+.user-form textarea {
   width: 100%;
   min-height: 52px;
   padding: 12px 14px;
@@ -1073,7 +1155,13 @@ button:disabled {
   font: inherit;
 }
 
+.user-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
 .user-form input:focus,
+.user-form textarea:focus,
 .user-form .select-input:focus {
   outline: 3px solid rgba(47, 102, 144, 0.18);
   border-color: var(--color-primary);
@@ -1180,7 +1268,7 @@ button:disabled {
   border-radius: 999px;
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1206,18 +1294,19 @@ button:disabled {
   justify-content: space-between;
   gap: 12px;
   color: #1e2a4a;
-  font-size: 0.83rem;
+  font-size: 0.95rem;
 }
 
 .bar-chart-label {
   min-width: 0;
   overflow-wrap: anywhere;
   color: #475569;
+  font-size: 0.95rem;
 }
 
 .bar-chart-heading strong {
   flex: 0 0 auto;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1254,17 +1343,17 @@ button:disabled {
 .line-chart-axis-label {
   fill: #7a8494;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 20px;
 }
 
 .line-chart-percentage-label {
   fill: #526579;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .line-chart-date-label {
-  font-size: 11px;
+  font-size: 20px;
 }
 
 .donut-chart {
@@ -1286,14 +1375,14 @@ button:disabled {
 
 .donut-chart-total {
   fill: #1e2a4a;
-  font-size: 23px;
+  font-size: 28px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .donut-chart-caption {
   fill: #7a8494;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .donut-chart-legend {
@@ -1317,7 +1406,7 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   color: #475569;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
 }
 
 .donut-legend-name {
@@ -1335,7 +1424,7 @@ button:disabled {
 .donut-chart-legend li > strong {
   flex: 0 0 auto;
   color: #1e2a4a;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1776,6 +1865,10 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.detail-grid .detail-full {
+  grid-column: 1 / -1;
+}
+
 .placeholder {
   padding: 20px;
   color: #475569;
@@ -1877,6 +1970,9 @@ pre {
 @media (max-width: 520px) {
   .attention-grid,
   .analytics-summary { grid-template-columns: 1fr; }
+
+  .adherence-trend-panel { padding: 18px 14px 14px; }
+  .adherence-trend-chart { height: 250px; }
 
   .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-card { padding: 14px; }

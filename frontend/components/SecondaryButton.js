@@ -1,5 +1,10 @@
-import React from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  Pressable,
+  Text,
+  Animated,
+  StyleSheet,
+} from 'react-native';
 import { colors, radius } from '../theme';
 
 export default function SecondaryButton({
@@ -9,24 +14,45 @@ export default function SecondaryButton({
   danger,
   style,
 }) {
+  const pressProgress = useRef(new Animated.Value(1)).current;
+  const buttonStyle = StyleSheet.flatten(style) || {};
+
+  const animatePress = (toValue) => {
+    Animated.spring(pressProgress, {
+      toValue,
+      speed: 32,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={() => animatePress(0.97)}
+      onPressOut={() => animatePress(1)}
       disabled={disabled}
-      style={({ pressed }) => [
+      style={[
         styles.button,
         danger && styles.danger,
-        pressed && styles.pressed,
         disabled && styles.disabled,
         style,
+        {
+          transform: [
+            ...(buttonStyle.transform || []),
+            { scale: pressProgress },
+          ],
+        },
       ]}
     >
       <Text style={[styles.label, danger && styles.dangerLabel]}>
         {label}
       </Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const styles = StyleSheet.create({
   button: {
@@ -37,13 +63,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#17313A',
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   danger: {
     borderColor: '#FECACA',
     backgroundColor: colors.dangerSoft,
   },
-  pressed: { opacity: 0.8 },
-  disabled: { opacity: 0.55 },
+  disabled: { opacity: 0.55, elevation: 0, shadowOpacity: 0 },
   label: {
     fontSize: 16,
     fontWeight: '800',

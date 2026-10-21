@@ -20,8 +20,21 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   getMyPatients,
   getCaregiverRequests,
+  getAdherenceAnalytics,
+  getCaregiverOverviewAnalytics,
 } from '../services/api';
+import TimeOfDayPieChart from '../components/TimeOfDayPieChart';
 import { colors } from '../theme';
+
+const formatAnalyticsDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const getDashboardAnalyticsRange = () => {
+  const end = new Date();
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6);
+  return {
+    startDate: formatAnalyticsDate(start),
+    endDate: formatAnalyticsDate(end),
+  };
+};
 
 export default function CaregiverDashboardScreen({
   username,
@@ -44,6 +57,9 @@ export default function CaregiverDashboardScreen({
     useState(false);
 
   const [error, setError] = useState('');
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState('');
 
   // =====================================================
   // LOAD PATIENTS
@@ -65,19 +81,48 @@ export default function CaregiverDashboardScreen({
           getCaregiverRequests(token),
         ]);
 
-        setPatients(
-          Array.isArray(patientData)
-            ? patientData
-            : Array.isArray(patientData?.patients)
-            ? patientData.patients
-            : []
-        );
+        const authorizedPatients = Array.isArray(patientData)
+          ? patientData
+          : Array.isArray(patientData?.patients)
+          ? patientData.patients
+          : [];
+        setPatients(authorizedPatients);
 
         setPendingRequests(
           Array.isArray(requestData)
             ? requestData.filter((request) => request?.status === 'pending' || !request?.status)
             : []
         );
+
+        setAnalyticsLoading(true);
+        setAnalyticsError('');
+        try {
+          let analyticsData = null;
+          const range = getDashboardAnalyticsRange();
+          if (authorizedPatients.length === 1) {
+            const patient = authorizedPatients[0]?.patient
+              || authorizedPatients[0]?.user
+              || authorizedPatients[0];
+            if (!patient?._id) {
+              throw new Error('Unable to identify the connected patient for analytics.');
+            }
+            analyticsData = await getAdherenceAnalytics(token, {
+              ...range,
+              patientId: patient._id,
+            });
+          } else if (authorizedPatients.length > 1) {
+            analyticsData = await getCaregiverOverviewAnalytics(token, range);
+          }
+          setAnalytics(analyticsData);
+        } catch (analyticsLoadError) {
+          console.error('Caregiver dashboard analytics error:', analyticsLoadError);
+          setAnalytics(null);
+          setAnalyticsError(
+            analyticsLoadError.message || 'Failed to load adherence analytics.'
+          );
+        } finally {
+          setAnalyticsLoading(false);
+        }
       } catch (err) {
         console.error(
           'Caregiver dashboard error:',
@@ -247,6 +292,33 @@ export default function CaregiverDashboardScreen({
 
           </View>
         ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Doses by Time of Day</Text>
+          <Text style={styles.sectionSubtitle}>
+            {patientCount === 1
+              ? "Your connected patient's last 7 days"
+              : patientCount > 1
+              ? `Combined last 7 days across ${patientCount} authorized patients`
+              : 'Analytics will appear when you have an active patient connection.'}
+          </Text>
+          {patientCount > 0 ? (
+            <View style={styles.analyticsChartCard}>
+              {analyticsLoading ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : analyticsError ? (
+                <View>
+                  <Text style={styles.analyticsErrorText}>{analyticsError}</Text>
+                  <Pressable onPress={() => loadPatients(true)}>
+                    <Text style={styles.analyticsRetryText}>Retry</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <TimeOfDayPieChart timeOfDay={analytics?.timeOfDay} size={180} />
+              )}
+            </View>
+          ) : null}
+        </View>
 
         {/* =================================================
             CONNECTION MANAGEMENT
@@ -689,6 +761,32 @@ const styles = StyleSheet.create({
 
   managementCardPressed: {
     opacity: 0.82,
+  },
+
+  analyticsChartCard: {
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 17,
+    backgroundColor: colors.cardTint,
+    borderWidth: 1,
+    borderColor: colors.cardTintBorder,
+    shadowColor: '#1E2A4A',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+
+  analyticsErrorText: {
+    color: colors.dangerText,
+    fontSize: 12,
+  },
+
+  analyticsRetryText: {
+    marginTop: 7,
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
   },
 
   managementContent: {

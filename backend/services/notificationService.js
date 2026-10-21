@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
+const Medication = require('../models/Medication');
 const User = require('../models/User');
 
 const logMedicationNotificationFailure = ({
@@ -186,7 +187,61 @@ const createMedicationNotifications = async ({
   return patientNotification;
 };
 
+const notifyLowRefill = async ({ medication, triggerId }) => {
+  const quantityOnHand = Number(medication?.quantityOnHand ?? 0);
+  const refillThreshold = Number(medication?.refillThreshold ?? 0);
+
+  if (
+    !medication?._id
+    || !medication.userId
+    || !triggerId
+    || !Number.isFinite(quantityOnHand)
+    || !Number.isFinite(refillThreshold)
+    || quantityOnHand > refillThreshold
+    || medication.lowRefillNotified
+  ) {
+    return null;
+  }
+
+  const notificationClaim = await Medication.updateOne(
+    {
+      _id: medication._id,
+      userId: medication.userId,
+      lowRefillNotified: { $ne: true },
+    },
+    { $set: { lowRefillNotified: true } }
+  );
+
+  if (notificationClaim.modifiedCount !== 1) {
+    return null;
+  }
+
+  const patientNotification = await createMedicationNotifications({
+    patientId: medication.userId,
+    type: 'low_refill',
+    patientMessage: `${medication.name} is low on refill stock.`,
+    caregiverMessage: (patientName) => `${patientName}'s ${medication.name} is low on refill stock.`,
+    relatedEntityType: 'Medication',
+    relatedEntityId: medication._id,
+    dedupeKey: `low_refill:${medication._id}:${triggerId}`,
+  });
+
+  if (!patientNotification) {
+    await Medication.updateOne(
+      {
+        _id: medication._id,
+        userId: medication.userId,
+        lowRefillNotified: true,
+      },
+      { $set: { lowRefillNotified: false } }
+    );
+  }
+
+  return patientNotification;
+};
+
 module.exports = {
   createNotification,
   createMedicationNotifications,
+  notifyLowRefill,
 };

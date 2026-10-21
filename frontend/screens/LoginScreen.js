@@ -464,15 +464,20 @@ const styles = StyleSheet.create({
   },
 
   authInput: {
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontSize: 14,
+    minHeight: 56,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.inputFill,
+    fontSize: 16,
   },
 
   authPasswordRow: {
-    minHeight: 44,
-    borderRadius: 7,
+    minHeight: 56,
+    borderRadius: 16,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.inputFill,
   },
 
   inputGroup: {

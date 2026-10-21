@@ -22,6 +22,7 @@ import {
   getMedications,
   generateTodayDoses,
   getDoseRecords,
+  getAdherenceAnalytics,
   takeDose,
   skipDose,
 } from '../services/api';
@@ -29,9 +30,19 @@ import {
   filterDoseRecordsByMedicationExpiration,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
-import { getDoseActionErrorMessage } from '../utils/doseErrors';
+import ConfirmationDialog from '../components/ConfirmationDialog';
+import TimeOfDayPieChart from '../components/TimeOfDayPieChart';
 
 const medSkedLogo = require('../assets/medsked.png');
+const formatAnalyticsDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const getDashboardAnalyticsRange = () => {
+  const end = new Date();
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6);
+  return {
+    startDate: formatAnalyticsDate(start),
+    endDate: formatAnalyticsDate(end),
+  };
+};
 
 
 export default function DashboardScreen({
@@ -78,10 +89,37 @@ export default function DashboardScreen({
     setError,
   ] = useState('');
 
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState('');
+
+  const [pendingDoseAction, setPendingDoseAction] = useState(null);
+
 
   // =====================================================
   // LOAD DASHBOARD
   // =====================================================
+
+  const loadDashboardAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsError('');
+
+    try {
+      const result = await getAdherenceAnalytics(token, getDashboardAnalyticsRange());
+      setAnalytics(result || null);
+    } catch (analyticsLoadError) {
+      console.error('Dashboard analytics loading error:', analyticsLoadError);
+      setAnalytics(null);
+      setAnalyticsError(
+        getSafeUserErrorMessage(
+          analyticsLoadError,
+          'Unable to load adherence analytics.'
+        )
+      );
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [token]);
 
   const loadDashboard =
     useCallback(
@@ -115,7 +153,10 @@ export default function DashboardScreen({
             console.log(`[Dashboard] Dose generation: ${((performance.now() - generateStart)).toFixed(0)} ms`);
 
             const dosesStart = performance.now();
-            const doseData = await getDoseRecords(token);
+            const [doseData] = await Promise.all([
+              getDoseRecords(token),
+              loadDashboardAnalytics(),
+            ]);
             console.log(`[Dashboard] Dose records: ${((performance.now() - dosesStart)).toFixed(0)} ms`);
             return doseData;
           })();
@@ -152,7 +193,7 @@ export default function DashboardScreen({
         }
 
       },
-      [token]
+      [loadDashboardAnalytics, token]
     );
 
 
@@ -283,104 +324,35 @@ export default function DashboardScreen({
   // TAKE DOSE
   // =====================================================
 
-  const handleTakeDose =
-    async (doseId) => {
+  const requestDoseAction = (doseId, action) => {
+    setPendingDoseAction({ doseId, action });
+  };
 
-      try {
+  const confirmDoseAction = async () => {
+    const current = pendingDoseAction;
+    setPendingDoseAction(null);
 
-        const updatedDose =
-          await takeDose(
-            token,
-            doseId
-          );
+    if (!current?.doseId || !['take', 'skip'].includes(current.action)) {
+      return;
+    }
 
-        setDoses(
-          previous =>
-            previous.map(
-              dose =>
-                dose._id === doseId
-                  ? updatedDose
-                  : dose
-            )
-        );
+    try {
+      const actionRequest = current.action === 'take' ? takeDose : skipDose;
+      const updatedDose = await actionRequest(token, current.doseId);
 
-      } catch (err) {
-
-        Alert.alert(
-          'Error',
-          getDoseActionErrorMessage(err)
-        );
-
-      }
-
-    };
-
-
-  // =====================================================
-  // SKIP DOSE
-  // =====================================================
-
-  const handleSkipDose =
-    async (doseId) => {
-
+      setDoses((previous) => previous.map((dose) => (
+        dose._id === current.doseId ? updatedDose : dose
+      )));
+      await loadDashboardAnalytics();
+    } catch {
       Alert.alert(
-
-        'Skip Dose',
-
-        'Are you sure you want to skip this dose?',
-
-        [
-
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-
-          {
-
-            text: 'Skip',
-
-            style: 'destructive',
-
-            onPress:
-              async () => {
-
-                try {
-
-                  const updatedDose =
-                    await skipDose(
-                      token,
-                      doseId
-                    );
-
-                  setDoses(
-                    previous =>
-                      previous.map(
-                        dose =>
-                          dose._id === doseId
-                            ? updatedDose
-                            : dose
-                      )
-                  );
-
-                } catch (err) {
-
-                  Alert.alert(
-                    'Error',
-                    getDoseActionErrorMessage(err)
-                  );
-
-                }
-
-              },
-
-          },
-
-        ]
-
+        'Unable to update dose',
+        current.action === 'take'
+          ? 'Unable to mark this dose as taken. Please try again.'
+          : 'Unable to skip this dose. Please try again.'
       );
-
-    };
+    }
+  };
 
 
   // =====================================================
@@ -449,7 +421,6 @@ export default function DashboardScreen({
       </View>
     </Pressable>
   );
-
 
   // =====================================================
   // DOSE CARD
@@ -583,9 +554,7 @@ export default function DashboardScreen({
               <Pressable
 
                 onPress={() =>
-                  handleTakeDose(
-                    dose._id
-                  )
+                  requestDoseAction(dose._id, 'take')
                 }
 
                 style={({ pressed }) => [
@@ -613,9 +582,7 @@ export default function DashboardScreen({
               <Pressable
 
                 onPress={() =>
-                  handleSkipDose(
-                    dose._id
-                  )
+                  requestDoseAction(dose._id, 'skip')
                 }
 
                 style={({ pressed }) => [
@@ -982,6 +949,29 @@ export default function DashboardScreen({
 
           </View>
 
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.analyticsSectionTitle}>Doses by Time of Day</Text>
+              <Text style={styles.analyticsSectionSubtitle}>Last 7 days · Based on finalized dose outcomes</Text>
+            </View>
+          </View>
+          <View style={[styles.adherenceCard, styles.analyticsChartCard]}>
+            {analyticsLoading ? (
+              <ActivityIndicator color="#0B4F59" />
+            ) : analyticsError ? (
+              <View>
+                <Text style={styles.analyticsErrorText}>{analyticsError}</Text>
+                <Pressable onPress={loadDashboardAnalytics}>
+                  <Text style={styles.analyticsRetryText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <TimeOfDayPieChart timeOfDay={analytics?.timeOfDay} size={180} />
+            )}
+          </View>
         </View>
 
 
@@ -1541,6 +1531,19 @@ export default function DashboardScreen({
 
       </ScrollView>
 
+      <ConfirmationDialog
+        visible={Boolean(pendingDoseAction)}
+        title={pendingDoseAction?.action === 'take' ? 'Mark dose as taken?' : 'Skip this dose?'}
+        message={pendingDoseAction?.action === 'take'
+          ? 'Confirm that this dose was taken.'
+          : 'Are you sure you want to skip this dose?'}
+        confirmLabel={pendingDoseAction?.action === 'take' ? 'Mark as Taken' : 'Skip'}
+        cancelLabel="Cancel"
+        danger={pendingDoseAction?.action === 'skip'}
+        onConfirm={confirmDoseAction}
+        onCancel={() => setPendingDoseAction(null)}
+      />
+
     </View>
 
   );
@@ -1894,6 +1897,33 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
 
+  analyticsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+
+  analyticsSectionSubtitle: {
+    marginTop: 3,
+    fontSize: 10,
+    color: '#A7CDD0',
+  },
+
+  analyticsChartCard: {
+    padding: 12,
+  },
+
+  analyticsErrorText: {
+    fontSize: 12,
+    color: '#991B1B',
+  },
+
+  analyticsRetryText: {
+    marginTop: 7,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0B4F59',
+  },
 
   // ===================================================
   // SECTIONS

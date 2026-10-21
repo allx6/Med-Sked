@@ -1,5 +1,5 @@
 const dosagePattern = /^([0-9]+(?:\.[0-9]+)?)\s*(mg|mcg|g|mL|tablet)$/i;
-const frequencyPattern = /^Every\s+([0-9]+(?:\.[0-9]+)?)\s+(hours|days)$/i;
+const frequencyPattern = /^Every\s+([1-9][0-9]?)\s+(hours|days)$/i;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_MEDICATION_NUMERIC_DIGITS = 6;
 const COUNT_INPUT_PATTERN = /^\d*$/;
@@ -12,6 +12,10 @@ export const isValidMedicationNumericInput = (value, { allowDecimal = false } = 
   return pattern.test(input)
     && (input.match(/[0-9]/g) || []).length <= MAX_MEDICATION_NUMERIC_DIGITS;
 };
+
+export const isValidMedicationFrequencyInput = (value) => (
+  value === '' || /^[1-9][0-9]?$/.test(String(value))
+);
 
 const validateMedicationCount = (value, label) => {
   if (value === undefined) {
@@ -117,11 +121,8 @@ export const validateMedicationFields = ({
   }
 
   const frequencyMatch = String(frequency || '').trim().match(frequencyPattern);
-  if (!frequencyMatch || Number(frequencyMatch[1]) < 1) {
-    return 'Frequency must be at least 1 hour or day.';
-  }
-  if ((frequencyMatch[1].match(/[0-9]/g) || []).length > MAX_MEDICATION_NUMERIC_DIGITS) {
-    return 'Frequency interval cannot exceed 6 digits.';
+  if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
+    return 'Frequency must be a whole number from 1 to 99 hours or days.';
   }
 
   return '';

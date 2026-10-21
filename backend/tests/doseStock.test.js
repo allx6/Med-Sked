@@ -22,6 +22,50 @@ require.cache[notificationServicePath] = {
       sentNotifications.push(notification);
       return notificationResult;
     },
+    notifyLowRefill: async ({ medication, triggerId }) => {
+      if (
+        !medication
+        || medication.quantityOnHand > medication.refillThreshold
+        || medication.lowRefillNotified
+      ) {
+        return null;
+      }
+
+      const claim = await Medication.updateOne(
+        {
+          _id: medication._id,
+          userId: medication.userId,
+          lowRefillNotified: { $ne: true },
+        },
+        { $set: { lowRefillNotified: true } }
+      );
+
+      if (claim.modifiedCount !== 1) return null;
+
+      const notification = {
+        patientId: medication.userId,
+        type: 'low_refill',
+        patientMessage: `${medication.name} is low on refill stock.`,
+        caregiverMessage: (patientName) => `${patientName}'s ${medication.name} is low on refill stock.`,
+        relatedEntityType: 'Medication',
+        relatedEntityId: medication._id,
+        dedupeKey: `low_refill:${medication._id}:${triggerId}`,
+      };
+      sentNotifications.push(notification);
+
+      if (!notificationResult) {
+        await Medication.updateOne(
+          {
+            _id: medication._id,
+            userId: medication.userId,
+            lowRefillNotified: true,
+          },
+          { $set: { lowRefillNotified: false } }
+        );
+      }
+
+      return notificationResult ? notification : null;
+    },
   },
 };
 delete require.cache[require.resolve('../routes/doseRoutes')];

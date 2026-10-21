@@ -5,6 +5,11 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const AuditLog = require('../models/AuditLog');
+const emailService = require('../services/emailService');
+const {
+  createEmailVerificationService,
+  EmailVerificationError,
+} = require('../services/emailVerificationService');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const { createAuditLog } = require('../services/auditLogService');
@@ -21,6 +26,10 @@ const {
 } = require('../services/adminAnalyticsService');
 
 const router = express.Router();
+const emailVerificationService = createEmailVerificationService({
+  User,
+  emailService,
+});
 
 const ALLOWED_ROLES = [
   'patient',
@@ -42,6 +51,11 @@ const AUDIT_ACTIONS = [
   'CAREGIVER_REQUEST_ACCEPTED',
   'CAREGIVER_REQUEST_DECLINED',
   'CAREGIVER_RELATIONSHIP_REVOKED',
+  'PRIVILEGED_ACTION_REQUESTED',
+  'PRIVILEGED_ACTION_APPROVED',
+  'PRIVILEGED_ACTION_REJECTED',
+  'PRIVILEGED_ACTION_EXECUTED',
+  'PRIVILEGED_ACTION_EXECUTION_FAILED',
 ];
 
 const escapeRegex = (value) => (
@@ -225,53 +239,9 @@ router.get('/relationships/:relationshipId', async (req, res) => {
 });
 
 router.delete('/relationships/:relationshipId', async (req, res) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.relationshipId)) {
-      return res.status(400).json({ message: 'Invalid relationship ID.' });
-    }
-
-    const relationship = await CaregiverRelationship.findById(
-      req.params.relationshipId
-    );
-
-    if (!relationship) {
-      return res.status(404).json({ message: 'Relationship not found.' });
-    }
-
-    if (relationship.status !== 'revoked') {
-      const previousStatus = relationship.status;
-      relationship.status = 'revoked';
-      await relationship.save();
-
-      await createAuditLog({
-        actorId: req.user.userId,
-        actorRole: req.user.role,
-        action: 'ADMIN_RELATIONSHIP_REVOKED',
-        targetType: 'CAREGIVER_RELATIONSHIP',
-        targetId: relationship._id,
-        details: {
-          caregiverId: relationship.caregiver,
-          patientId: relationship.patient,
-          previousStatus,
-          newStatus: relationship.status,
-        },
-      });
-    }
-
-    const safeRelationship = await safeRelationshipQuery(
-      CaregiverRelationship.findById(relationship._id)
-    ).lean();
-
-    return res.json({
-      message: relationship.status === 'revoked'
-        ? 'Relationship revoked.'
-        : 'Relationship updated.',
-      relationship: safeRelationship,
-    });
-  } catch (error) {
-    console.error('Admin relationship revoke error:', error.message);
-    return res.status(500).json({ message: 'Failed to revoke relationship.' });
-  }
+  return res.status(409).json({
+    message: 'Relationship revocation requires an approved privileged-action request.',
+  });
 });
 
 router.get('/audit-logs', async (req, res) => {
@@ -474,6 +444,12 @@ router.post('/users', async (req, res) => {
       return res.status(400).json({ message: 'Invalid role.' });
     }
 
+    if (role === 'admin') {
+      return res.status(409).json({
+        message: 'Admin accounts must be created as a standard account and promoted through an approved role-change request.',
+      });
+    }
+
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters.' });
     }
@@ -505,7 +481,7 @@ router.post('/users', async (req, res) => {
       email,
       password: hashedPassword,
       role,
-      emailVerified: true,
+      emailVerified: false,
     };
 
     if (role === 'patient') {
@@ -523,7 +499,6 @@ router.post('/users', async (req, res) => {
         return candidateId;
       })();
     }
-
     const user = await User.create(userData);
 
     await createAuditLog({
@@ -539,11 +514,25 @@ router.post('/users', async (req, res) => {
       },
     });
 
+    await emailVerificationService.sendInitialVerificationCode(email);
+
     return res.status(201).json({
-      message: 'User created successfully.',
+      message: "Account created successfully. A verification email has been sent to the user's email address. The user must verify their email before they can log in.",
+      verificationRequired: true,
+      email,
       user: sanitizeUserDocument(user.toObject()),
     });
   } catch (error) {
+    if (error instanceof EmailVerificationError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        verificationRequired: error.code === 'VERIFICATION_EMAIL_SEND_FAILED',
+        ...(error.code === 'VERIFICATION_EMAIL_SEND_FAILED'
+          ? { email: normalizeEmail(req.body?.email) }
+          : {}),
+      });
+    }
     console.error('Admin user create error:', error.message);
     return res.status(500).json({ message: 'Failed to create user.' });
   }
@@ -559,6 +548,12 @@ router.put('/users/:userId', async (req, res) => {
 
     if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
       return res.status(400).json({ message: 'Invalid user update payload.' });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'role')) {
+      return res.status(409).json({
+        message: 'Role changes require an approved privileged-action request.',
+      });
     }
 
     const blockedKeys = Object.keys(req.body).filter((key) =>
@@ -580,11 +575,11 @@ router.put('/users/:userId', async (req, res) => {
       return res.status(400).json({ message: 'Sensitive authentication fields cannot be modified.' });
     }
 
-    const allowedFields = ['username', 'email', 'patientId', 'role'];
+    const allowedFields = ['username', 'email', 'patientId'];
     const invalidFields = Object.keys(req.body).filter((key) => !allowedFields.includes(key));
 
     if (invalidFields.length > 0) {
-      return res.status(400).json({ message: 'Only username, email, patientId, and role may be updated.' });
+      return res.status(400).json({ message: 'Only username, email, and patientId may be updated.' });
     }
 
     const existingUser = await User.findById(userId).select('_id username email patientId role');
@@ -648,22 +643,6 @@ router.put('/users/:userId', async (req, res) => {
       updatePayload.patientId = patientId;
     }
 
-    if (Object.prototype.hasOwnProperty.call(req.body, 'role')) {
-      const role = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : '';
-      if (!ALLOWED_ROLES.includes(role)) {
-        return res.status(400).json({ message: 'Invalid role.' });
-      }
-
-      if (userId === req.user.userId && role !== 'admin') {
-        const adminCount = await User.countDocuments({ role: 'admin' });
-        if (adminCount <= 1) {
-          return res.status(400).json({ message: 'You cannot remove the last Admin account.' });
-        }
-      }
-
-      updatePayload.role = role;
-    }
-
     if (Object.keys(updatePayload).length === 0) {
       return res.status(400).json({ message: 'No valid user fields were provided.' });
     }
@@ -698,57 +677,9 @@ router.put('/users/:userId', async (req, res) => {
 });
 
 router.delete('/users/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID.' });
-    }
-
-    const targetUser = await User.findById(userId).select('_id username email role');
-
-    if (!targetUser) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
-
-    if (userId === req.user.userId) {
-      return res.status(400).json({ message: 'You cannot delete your own admin account.' });
-    }
-
-    if (targetUser.role === 'admin') {
-      const adminCount = await User.countDocuments({ role: 'admin' });
-      if (adminCount <= 1) {
-        return res.status(400).json({ message: 'You cannot delete the last Admin account.' });
-      }
-    }
-
-    const deletedUser = sanitizeUserDocument(targetUser.toObject());
-
-    await CaregiverRelationship.deleteMany({
-      $or: [
-        { caregiver: userId },
-        { patient: userId },
-      ],
-    });
-
-    await User.findByIdAndDelete(userId);
-
-    await createAuditLog({
-      actorId: req.user.userId,
-      actorRole: req.user.role,
-      action: 'ADMIN_USER_DELETED',
-      targetType: 'USER',
-      targetId: targetUser._id,
-      details: {
-        deletedUser,
-      },
-    });
-
-    return res.json({ message: 'User deleted successfully.', user: deletedUser });
-  } catch (error) {
-    console.error('Admin user delete error:', error.message);
-    return res.status(500).json({ message: 'Failed to delete user.' });
-  }
+  return res.status(409).json({
+    message: 'User deletion requires an approved privileged-action request.',
+  });
 });
 
 router.get('/users', async (req, res) => {
@@ -814,95 +745,9 @@ router.get('/users', async (req, res) => {
 });
 
 router.put('/users/:userId/role', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({
-        message: 'Invalid user ID.',
-      });
-    }
-
-    if (
-      !req.body ||
-      typeof req.body !== 'object' ||
-      Array.isArray(req.body) ||
-      Object.keys(req.body).length !== 1 ||
-      !Object.prototype.hasOwnProperty.call(req.body, 'role')
-    ) {
-      return res.status(400).json({
-        message: 'Only the role field may be modified.',
-      });
-    }
-
-    const { role } = req.body;
-
-    if (!ALLOWED_ROLES.includes(role)) {
-      return res.status(400).json({
-        message: 'Invalid role.',
-      });
-    }
-
-    if (
-      userId === req.user.userId &&
-      role !== 'admin'
-    ) {
-      const adminCount = await User.countDocuments({ role: 'admin' });
-
-      if (adminCount <= 1) {
-        return res.status(400).json({
-          message: 'You cannot remove the last Admin account.',
-        });
-      }
-    }
-
-    const existingUser = await User.findById(userId).select('role');
-
-    if (!existingUser) {
-      return res.status(404).json({
-        message: 'User not found.',
-      });
-    }
-
-    const previousRole = existingUser.role;
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $set: { role } },
-      {
-        returnDocument: 'after',
-        runValidators: true,
-      }
-    )
-      .select(SAFE_USER_FIELDS)
-      .lean();
-
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found.',
-      });
-    }
-
-    if (previousRole !== role) {
-      await createAuditLog({
-        actorId: req.user.userId,
-        actorRole: req.user.role,
-        action: 'ADMIN_ROLE_CHANGED',
-        targetType: 'USER',
-        targetId: user._id,
-        details: {
-          previousRole,
-          newRole: role,
-        },
-      });
-    }
-
-    return res.json({ user });
-  } catch (error) {
-    console.error('Admin role update error:', error.message);
-    return res.status(500).json({
-      message: 'Failed to update user role.',
-    });
-  }
+  return res.status(409).json({
+    message: 'Role changes require an approved privileged-action request.',
+  });
 });
 
 module.exports = router;

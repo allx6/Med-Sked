@@ -13,7 +13,10 @@ const {
   buildNormalizedMedicationKey,
 } = require('../utils/validation');
 const { isMedicationExpired } = require('../utils/medicationExpiration');
-const { createMedicationNotifications } = require('../services/notificationService');
+const {
+  createMedicationNotifications,
+  notifyLowRefill,
+} = require('../services/notificationService');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -387,6 +390,20 @@ const createMedicationForOwner = async (req, res) => {
       }
     }
 
+    try {
+      await notifyLowRefill({
+        medication,
+        triggerId: `created:${medication._id}`,
+      });
+    } catch (error) {
+      console.error('Low-refill notification failed:', {
+        patientId: String(ownerId),
+        medicationId: String(medication._id),
+        operation: 'notify-after-medication-create',
+        errorName: error?.name || 'UnknownError',
+      });
+    }
+
     return res.status(201).json(medication);
   } catch (error) {
     console.error('Create medication error:', error);
@@ -524,6 +541,19 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
 
     }
 
+    try {
+      await notifyLowRefill({
+        medication,
+        triggerId: medication.updatedAt?.getTime?.() || Date.now(),
+      });
+    } catch (error) {
+      console.error('Low-refill notification failed:', {
+        patientId: String(ownerId),
+        medicationId: String(medication._id),
+        operation: 'notify-after-medication-update',
+        errorName: error?.name || 'UnknownError',
+      });
+    }
 
     res.json(
       medication
@@ -610,6 +640,20 @@ router.post('/:id/refill', authMiddleware, authorizeMedicationMutation, async (r
     if (!updatedMedication) {
       return res.status(409).json({
         message: 'Medication changed while processing the refill. Please try again.',
+      });
+    }
+
+    try {
+      await notifyLowRefill({
+        medication: updatedMedication,
+        triggerId: updatedMedication.updatedAt?.getTime?.() || Date.now(),
+      });
+    } catch (error) {
+      console.error('Low-refill notification failed:', {
+        patientId: String(ownerId),
+        medicationId: String(updatedMedication._id),
+        operation: 'notify-after-medication-refill',
+        errorName: error?.name || 'UnknownError',
       });
     }
 

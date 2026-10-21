@@ -14,7 +14,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import TimeSelector from '../components/TimeSelector';
 import {
@@ -280,6 +280,20 @@ export default function AddScheduleScreen({
     }
 
     return nextDate;
+  };
+
+  const openStartDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: startDate,
+        mode: 'date',
+        minimumDate: todayStart,
+        onValueChange: handleStartDateChange,
+      });
+      return;
+    }
+
+    setShowStartDatePicker(true);
   };
 
   // =====================================================
@@ -743,67 +757,65 @@ export default function AddScheduleScreen({
         Start Date
       </Text>
 
-      {isWeb ? (
-        <input
-          type="date"
-          value={formatDate(startDate)}
-          min={formatDate(todayStart)}
-          onChange={(event) => {
-            const nextDate = parseWebDateValue(event.target.value);
+      <View style={styles.dateFieldCard}>
+        {isWeb ? (
+          <input
+            type="date"
+            value={formatDate(startDate)}
+            min={formatDate(todayStart)}
+            onChange={(event) => {
+              const nextDate = parseWebDateValue(event.target.value);
 
-            if (!nextDate || nextDate < todayStart) {
-              return;
-            }
+              if (!nextDate || nextDate < todayStart) {
+                return;
+              }
 
-            setStartDate(nextDate);
-          }}
-          disabled={saving}
-          style={styles.webDateInput}
-        />
-      ) : (
-        <>
-          <Pressable
-            style={styles.inputButton}
-            onPress={() =>
-              setShowStartDatePicker(true)
-            }
-          >
+              setStartDate(nextDate);
+            }}
+            disabled={saving}
+            style={styles.webDateInput}
+          />
+        ) : (
+          <>
+            <Pressable
+              style={styles.inputButton}
+              onPress={openStartDatePicker}
+            >
 
-            <Text style={styles.inputIcon}>
-              📅
-            </Text>
+              <Text style={styles.inputIcon}>
+                📅
+              </Text>
 
-            <Text style={styles.inputButtonText}>
-              {formatDate(startDate)}
-            </Text>
+              <Text style={styles.inputButtonText}>
+                {formatDate(startDate)}
+              </Text>
 
-          </Pressable>
+            </Pressable>
 
 
-          {showStartDatePicker && (
+            {showStartDatePicker && (
 
-            <View style={styles.pickerContainer}>
+              <View style={styles.pickerContainer}>
 
-              <DateTimePicker
-                value={startDate}
-                mode="date"
-                minimumDate={todayStart}
-                display={
-                  Platform.OS === 'ios'
-                    ? 'spinner'
-                    : 'default'
-                }
-                onValueChange={(selectedDate) =>
-                  handleStartDateChange(undefined, selectedDate)
-                }
-                onDismiss={() => setShowStartDatePicker(false)}
-              />
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  minimumDate={todayStart}
+                  display={
+                    Platform.OS === 'ios'
+                      ? 'spinner'
+                      : 'default'
+                  }
+                  onValueChange={handleStartDateChange}
+                  onDismiss={() => setShowStartDatePicker(false)}
+                />
 
-            </View>
+              </View>
 
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </View>
 
 
       {/* =================================================
@@ -812,14 +824,17 @@ export default function AddScheduleScreen({
 
       <Text style={styles.label}>End Date (required)</Text>
 
-      {selectedMedication?.expirationDate ? (
-        <Text style={styles.expirationHint}>
-          End date is required because this medication expires on {selectedMedication.expirationDate}.
-        </Text>
-      ) : null}
+      <View style={styles.dateFieldCard}>
+        {selectedMedication?.expirationDate ? (
+          <View style={styles.expirationDetails}>
+            <Text style={styles.expirationTitle}>Medication expiration</Text>
+            <Text style={styles.expirationHint}>
+              An end date is required. This medication expires on {selectedMedication.expirationDate}.
+            </Text>
+          </View>
+        ) : null}
 
-
-      {isWeb ? (
+        {isWeb ? (
           <input
             type="date"
             value={endDate ? formatDate(endDate) : ''}
@@ -915,6 +930,7 @@ export default function AddScheduleScreen({
 
           </>
         )}
+      </View>
 
 
       {/* =================================================
@@ -1059,10 +1075,26 @@ const styles = StyleSheet.create({
   },
 
   expirationHint: {
-    marginTop: 4,
-    color: '#D8F0F2',
+    marginTop: 3,
+    color: '#4B6B7C',
     fontSize: 12,
     lineHeight: 18,
+  },
+
+  dateFieldCard: {
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#EAF5F7',
+  },
+
+  expirationDetails: {
+    marginBottom: 12,
+  },
+
+  expirationTitle: {
+    color: '#0B4F59',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   label: {
@@ -1326,9 +1358,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     minHeight: 52,
     width: '100%',
-    backgroundColor: '#0B4F59',
-    borderRadius: 16,
-    borderWidth: 2,
+    backgroundColor: '#237F89',
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: '#D8F0F2',
     alignItems: 'center',
     justifyContent: 'center',

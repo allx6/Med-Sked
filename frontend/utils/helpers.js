@@ -92,6 +92,10 @@ export function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
 }
 
+export function isValidUsername(username) {
+  return typeof username === 'string' && /^[A-Za-z]{1,10}$/.test(username);
+}
+
 export function asArray(data) {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.patients)) return data.patients;

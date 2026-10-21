@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const DoseRecord = require('../models/DoseRecord');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const Medication = require('../models/Medication');
+const CaregiverRelationship = require('../models/CaregiverRelationship');
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
 const { calculateCanonicalAdherence } = require('../utils/adherence');
@@ -68,26 +69,14 @@ const authorizeAnalytics = (req, res, next) => {
   return res.status(403).json({ message: 'Analytics access required' });
 };
 
-router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) => {
-  try {
-    const patientId = req.analyticsPatientId;
-    const range = getDateRange(req.query);
+const calculateAnalytics = async (patientIds, range) => {
+  const today = formatDate(new Date());
+  const now = new Date();
 
-    if (!range) {
-      return res.status(400).json({ message: 'Invalid analytics date range' });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(patientId)) {
-      return res.status(400).json({ message: 'Invalid patient ID' });
-    }
-
-    const today = formatDate(new Date());
-    const now = new Date();
-
-    const doseStats = await DoseRecord.aggregate([
+  const doseStats = await DoseRecord.aggregate([
       {
         $match: {
-          userId: new mongoose.Types.ObjectId(patientId),
+          userId: { $in: patientIds },
           scheduledDate: { $gte: range.startDate, $lte: range.endDate },
           $expr: {
             $lte: ['$scheduledDate', today],
@@ -140,123 +129,170 @@ router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) =>
           ],
         },
       },
-    ]);
+  ]);
 
-    const stats = doseStats[0] || {};
-    const counts = { taken: 0, skipped: 0, missed: 0 };
-    for (const item of stats.overall || []) counts[item._id] = item.count;
+  const stats = doseStats[0] || {};
+  const counts = { taken: 0, skipped: 0, missed: 0 };
+  for (const item of stats.overall || []) counts[item._id] = item.count;
 
-    const canonicalRecords = (stats.records || []).filter((dose) => {
-      const status = String(dose?.status || '').toLowerCase();
-      if (!['taken', 'skipped', 'missed', 'pending'].includes(status)) {
-        return false;
-      }
-      if (!dose?.scheduledDate) {
-        return false;
-      }
-      if (new Date(`${dose.scheduledDate}T00:00:00`) > now) {
-        return false;
-      }
-      const expirationDate = dose?.medicationId?.expirationDate || dose?.medication?.expirationDate;
-      if (expirationDate && dose.scheduledDate > expirationDate) {
-        return false;
-      }
-      return true;
-    });
+  const canonicalRecords = (stats.records || []).filter((dose) => {
+    const status = String(dose?.status || '').toLowerCase();
+    if (!['taken', 'skipped', 'missed', 'pending'].includes(status)) {
+      return false;
+    }
+    if (!dose?.scheduledDate) {
+      return false;
+    }
+    if (new Date(`${dose.scheduledDate}T00:00:00`) > now) {
+      return false;
+    }
+    const expirationDate = dose?.medicationId?.expirationDate || dose?.medication?.expirationDate;
+    if (expirationDate && dose.scheduledDate > expirationDate) {
+      return false;
+    }
+    return true;
+  });
 
-    const totalEligible = counts.taken + counts.skipped + counts.missed;
-    const adherencePercentage = calculateCanonicalAdherence(canonicalRecords, { now });
-    const timeOfDay = Object.fromEntries(TIME_BUCKETS.map((bucket) => [bucket, emptyBucket()]));
+  const totalEligible = counts.taken + counts.skipped + counts.missed;
+  const adherencePercentage = calculateCanonicalAdherence(canonicalRecords, { now });
+  const timeOfDay = Object.fromEntries(TIME_BUCKETS.map((bucket) => [bucket, emptyBucket()]));
 
-    for (const item of stats.timeOfDay || []) {
-      const bucket = parseTimeOfDay(item._id.scheduledTime);
-      if (!bucket) continue;
-      timeOfDay[bucket].total += item.count;
-      timeOfDay[bucket][item._id.status] += item.count;
+  for (const item of stats.timeOfDay || []) {
+    const bucket = parseTimeOfDay(item._id.scheduledTime);
+    if (!bucket) continue;
+    timeOfDay[bucket].total += item.count;
+    timeOfDay[bucket][item._id.status] += item.count;
+  }
+
+  for (const bucket of TIME_BUCKETS) {
+    timeOfDay[bucket].adherencePercentage = percentage(timeOfDay[bucket].taken, timeOfDay[bucket].total);
+  }
+
+  const scheduleStats = await MedicationSchedule.aggregate([
+    {
+      $match: {
+        userId: { $in: patientIds },
+        enabled: true,
+      },
+    },
+    {
+      $lookup: {
+        from: Medication.collection.name,
+        localField: 'medicationId',
+        foreignField: '_id',
+        as: 'medication',
+      },
+    },
+    {
+      $unwind: {
+        path: '$medication',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $match: {
+        $or: [
+          { 'medication.expirationDate': null },
+          { 'medication.expirationDate': '' },
+          {
+            $expr: {
+              $gte: ['$medication.expirationDate', today],
+            },
+          },
+        ],
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        activeScheduleCount: { $sum: 1 },
+        weeklyScheduledDoses: { $sum: { $size: '$days' } },
+        medicationIds: { $addToSet: '$medicationId' },
+      },
+    },
+  ]);
+
+  const scheduleSummary = scheduleStats[0] || {
+    activeScheduleCount: 0,
+    weeklyScheduledDoses: 0,
+    medicationIds: [],
+  };
+  const scheduledDosesPerDay = Math.round((scheduleSummary.weeklyScheduledDoses / 7) * 100) / 100;
+  const activeMedicationCount = scheduleSummary.medicationIds?.length || 0;
+  const complexityScore = activeMedicationCount + scheduledDosesPerDay;
+  const complexityBucket = complexityScore <= 2 ? 'low' : complexityScore <= 4 ? 'moderate' : 'high';
+
+  return {
+    dateRange: range,
+    overall: {
+      adherencePercentage,
+      totalEligible,
+      taken: counts.taken,
+      skipped: counts.skipped,
+      missed: counts.missed,
+      pending: stats.pending?.[0]?.count || 0,
+    },
+    timeOfDay,
+    complexity: {
+      activeMedicationCount,
+      activeScheduleCount: scheduleSummary.activeScheduleCount,
+      scheduledDosesPerDay,
+      complexityScore,
+      complexityBucket,
+      note: 'Complexity is a transparent system measure, not a medically validated scale.',
+    },
+    dayNames: DAY_NAMES,
+  };
+};
+
+router.get('/adherence', authMiddleware, authorizeAnalytics, async (req, res) => {
+  try {
+    const patientId = req.analyticsPatientId;
+    const range = getDateRange(req.query);
+
+    if (!range) {
+      return res.status(400).json({ message: 'Invalid analytics date range' });
     }
 
-    for (const bucket of TIME_BUCKETS) {
-      timeOfDay[bucket].adherencePercentage = percentage(timeOfDay[bucket].taken, timeOfDay[bucket].total);
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+      return res.status(400).json({ message: 'Invalid patient ID' });
     }
 
-    const scheduleStats = await MedicationSchedule.aggregate([
-        {
-          $match: {
-            userId: new mongoose.Types.ObjectId(patientId),
-            enabled: true,
-          },
-        },
-        {
-          $lookup: {
-            from: Medication.collection.name,
-            localField: 'medicationId',
-            foreignField: '_id',
-            as: 'medication',
-          },
-        },
-        {
-          $unwind: {
-            path: '$medication',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        {
-          $match: {
-            $or: [
-              { 'medication.expirationDate': null },
-              { 'medication.expirationDate': '' },
-              {
-                $expr: {
-                  $gte: ['$medication.expirationDate', today],
-                },
-              },
-            ],
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            activeScheduleCount: { $sum: 1 },
-            weeklyScheduledDoses: { $sum: { $size: '$days' } },
-            medicationIds: { $addToSet: '$medicationId' },
-          },
-        },
-      ]);
-
-    const scheduleSummary = scheduleStats[0] || {
-      activeScheduleCount: 0,
-      weeklyScheduledDoses: 0,
-      medicationIds: [],
-    };
-    const scheduledDosesPerDay = Math.round((scheduleSummary.weeklyScheduledDoses / 7) * 100) / 100;
-    const activeMedicationCount = scheduleSummary.medicationIds?.length || 0;
-    const complexityScore = activeMedicationCount + scheduledDosesPerDay;
-    const complexityBucket = complexityScore <= 2 ? 'low' : complexityScore <= 4 ? 'moderate' : 'high';
-
-    res.json({
-      dateRange: range,
-      overall: {
-        adherencePercentage: adherencePercentage,
-        totalEligible,
-        taken: counts.taken,
-        skipped: counts.skipped,
-        missed: counts.missed,
-        pending: stats.pending?.[0]?.count || 0,
-      },
-      timeOfDay,
-      complexity: {
-        activeMedicationCount,
-        activeScheduleCount: scheduleSummary.activeScheduleCount,
-        scheduledDosesPerDay,
-        complexityScore,
-        complexityBucket,
-        note: 'Complexity is a transparent system measure, not a medically validated scale.',
-      },
-      dayNames: DAY_NAMES,
-    });
+    res.json(await calculateAnalytics([new mongoose.Types.ObjectId(patientId)], range));
   } catch (error) {
     console.error('Adherence analytics error:', error);
     res.status(500).json({ message: 'Failed to calculate adherence analytics' });
+  }
+});
+
+router.get('/adherence/caregiver-overview', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== 'caregiver') {
+      return res.status(403).json({ message: 'Caregiver access required' });
+    }
+
+    const range = getDateRange(req.query);
+    if (!range) {
+      return res.status(400).json({ message: 'Invalid analytics date range' });
+    }
+
+    const relationships = await CaregiverRelationship.find({
+      caregiver: req.user.userId,
+      status: 'active',
+    }).select('patient').lean();
+    const patientIds = relationships
+      .map((relationship) => relationship.patient)
+      .filter((patientId) => mongoose.Types.ObjectId.isValid(patientId))
+      .map((patientId) => new mongoose.Types.ObjectId(patientId));
+    const analytics = await calculateAnalytics(patientIds, range);
+
+    res.json({
+      ...analytics,
+      authorizedPatientCount: patientIds.length,
+    });
+  } catch (error) {
+    console.error('Caregiver overview analytics error:', error);
+    res.status(500).json({ message: 'Failed to calculate caregiver analytics' });
   }
 });
 
