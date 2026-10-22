@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { getAdminAdherenceTrend, getAdminStats } from '../services/api';
+import { getAdminStats } from '../services/api';
+import DashboardAnalyticsSection from './DashboardAnalyticsSection';
 
 const getStoredAuth = () => {
   try {
@@ -12,8 +13,8 @@ const getStoredAuth = () => {
 };
 
 const formatPercent = (value) => {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    return '0%';
+  if (value === null || value === undefined || typeof value !== 'number' || Number.isNaN(value)) {
+    return 'No data';
   }
 
   return `${Number(value.toFixed(2))}%`;
@@ -25,154 +26,6 @@ const getTimeBasedGreeting = (hour = new Date().getHours()) => {
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
-};
-
-const formatTrendDate = (value) => {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return String(value || 'Unknown date');
-
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-    .toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
-
-const getTrendPoints = (data) => (
-  (Array.isArray(data) ? data : []).map((item) => {
-    const taken = Number(item.taken) || 0;
-    const skipped = Number(item.skipped) || 0;
-    const missed = Number(item.missed) || 0;
-    const eligible = taken + skipped + missed;
-    const value = Number(item.adherenceRate);
-
-    return {
-      date: String(item.date || ''),
-      taken,
-      skipped,
-      missed,
-      eligible,
-      adherence: eligible > 0 && Number.isFinite(value)
-        ? Math.max(0, Math.min(100, value))
-        : null,
-    };
-  })
-);
-
-const AdherenceTrendChart = ({ data }) => {
-  const points = getTrendPoints(data);
-  const validPoints = points.filter((point) => point.adherence !== null);
-
-  if (!validPoints.length) {
-    return <div className="empty-state">No eligible dose data available for this period.</div>;
-  }
-
-  const width = 1000;
-  const height = 320;
-  const padding = { top: 24, right: 28, bottom: 62, left: 64 };
-  const plotWidth = width - padding.left - padding.right;
-  const plotHeight = height - padding.top - padding.bottom;
-  const xForIndex = (index) => (
-    points.length === 1
-      ? padding.left + plotWidth / 2
-      : padding.left + (index / (points.length - 1)) * plotWidth
-  );
-  const yForValue = (value) => (
-    padding.top + ((100 - value) / 100) * plotHeight
-  );
-
-  let lineSegments = [];
-  let currentSegment = [];
-
-  points.forEach((point, index) => {
-    if (point.adherence === null) {
-      if (currentSegment.length) lineSegments.push(currentSegment);
-      currentSegment = [];
-      return;
-    }
-
-    currentSegment.push(`${currentSegment.length ? 'L' : 'M'} ${xForIndex(index)} ${yForValue(point.adherence)}`);
-  });
-  if (currentSegment.length) lineSegments.push(currentSegment);
-
-  const labelIndexes = [...new Set(
-    [0, 0.25, 0.5, 0.75, 1]
-      .map((position) => Math.round((points.length - 1) * position))
-  )];
-
-  return (
-    <div className="adherence-trend-chart-wrap">
-      <svg
-        className="adherence-trend-chart"
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="Daily medication adherence over the last 30 days"
-      >
-        <title>Daily medication adherence over the last 30 days</title>
-        {[0, 25, 50, 75, 100].map((tick) => {
-          const y = yForValue(tick);
-          return (
-            <g key={tick}>
-              <line
-                x1={padding.left}
-                x2={width - padding.right}
-                y1={y}
-                y2={y}
-                className="adherence-trend-gridline"
-              />
-              <text
-                x={padding.left - 12}
-                y={y + 5}
-                textAnchor="end"
-                className="adherence-trend-axis-label"
-              >
-                {tick}%
-              </text>
-            </g>
-          );
-        })}
-        {lineSegments.map((segment, index) => (
-          <path
-            key={`segment-${index}`}
-            d={segment.join(' ')}
-            className="adherence-trend-line"
-          />
-        ))}
-        {points.map((point, index) => {
-          const x = xForIndex(index);
-          const y = point.adherence === null
-            ? padding.top + plotHeight
-            : yForValue(point.adherence);
-          const tooltip = point.adherence === null
-            ? `${point.date}: No eligible doses`
-            : `${point.date}: ${formatPercent(point.adherence)} adherence; ${point.taken} taken, ${point.skipped} skipped, ${point.missed} missed (${point.eligible} eligible)`;
-
-          return (
-            <g key={point.date || index}>
-              <circle
-                cx={x}
-                cy={y}
-                r={point.adherence === null ? 4 : 6}
-                className={point.adherence === null
-                  ? 'adherence-trend-no-data'
-                  : 'adherence-trend-point'}
-              >
-                <title>{tooltip}</title>
-              </circle>
-              {labelIndexes.includes(index) ? (
-                <text
-                  x={x}
-                  y={height - 24}
-                  textAnchor="middle"
-                  className="adherence-trend-axis-label adherence-trend-date-label"
-                >
-                  {formatTrendDate(point.date)}
-                </text>
-              ) : null}
-            </g>
-          );
-        })}
-      </svg>
-      <p className="adherence-trend-note">Gaps indicate dates with no eligible completed doses. Hover or focus a point for dose counts.</p>
-    </div>
-  );
 };
 
 const metricIconPaths = {
@@ -198,11 +51,9 @@ const DashboardMetricIcon = ({ name }) => (
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
-  const [trendData, setTrendData] = useState([]);
+  const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [trendLoading, setTrendLoading] = useState(true);
   const [error, setError] = useState('');
-  const [trendError, setTrendError] = useState('');
 
   const loadStats = async () => {
     const auth = getStoredAuth();
@@ -210,39 +61,29 @@ export default function AdminDashboardPage() {
     if (!auth?.token) {
       setError('Authentication is required.');
       setLoading(false);
-      setTrendError('Authentication is required.');
-      setTrendLoading(false);
       return;
     }
 
     setLoading(true);
-    setTrendLoading(true);
     setError('');
-    setTrendError('');
 
-    const [statsResult, trendResult] = await Promise.allSettled([
-      getAdminStats(auth.token),
-      getAdminAdherenceTrend(auth.token, 30),
-    ]);
-
-    if (statsResult.status === 'fulfilled') {
-      setStats(statsResult.value);
-    } else {
-      setError(statsResult.reason?.message || 'Unable to load dashboard statistics.');
+    try {
+      setStats(await getAdminStats(auth.token));
+    } catch (err) {
+      setError(err.message || 'Unable to load dashboard statistics.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-
-    if (trendResult.status === 'fulfilled') {
-      setTrendData(trendResult.value?.data || []);
-    } else {
-      setTrendError(trendResult.reason?.message || 'Unable to load adherence trend.');
-    }
-    setTrendLoading(false);
   };
 
   useEffect(() => {
     loadStats();
   }, []);
+
+  const refreshDashboard = () => {
+    setAnalyticsRefreshKey((current) => current + 1);
+    loadStats();
+  };
 
   if (loading) {
     return (
@@ -286,26 +127,9 @@ export default function AdminDashboardPage() {
         </div>
         <div className="header-actions">
           <span className="live-indicator"><span />Live data</span>
-          <button type="button" className="secondary-button" onClick={loadStats}>Refresh</button>
+          <button type="button" className="secondary-button" onClick={refreshDashboard}>Refresh</button>
         </div>
       </div>
-
-      <section className="panel adherence-trend-panel" aria-labelledby="adherence-trend-heading">
-        <div className="adherence-trend-heading">
-          <div>
-            <p className="eyebrow">Last 30 days</p>
-            <h3 id="adherence-trend-heading">Adherence Trend</h3>
-            <p className="adherence-trend-description">Daily medication adherence over the selected period</p>
-          </div>
-        </div>
-        {trendLoading ? (
-          <div className="loading-state">Loading adherence trend...</div>
-        ) : trendError ? (
-          <div className="error-state">{trendError}</div>
-        ) : (
-          <AdherenceTrendChart data={trendData} />
-        )}
-      </section>
 
       <div className="stat-grid dashboard-stat-grid">
         <div className="stat-card dashboard-stat-card dashboard-stat-card-rose">
@@ -369,6 +193,8 @@ export default function AdminDashboardPage() {
           <small>{formatNumber(stats?.users?.patients)} patients enrolled</small>
         </div>
       </div>
+
+      <DashboardAnalyticsSection refreshKey={analyticsRefreshKey} />
 
       <section className="attention-panel" aria-labelledby="attention-heading">
         <div className="section-heading">

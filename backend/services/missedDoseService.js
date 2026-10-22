@@ -3,6 +3,7 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 const { createMedicationNotifications } = require('./notificationService');
 const doseGenerator = require('./doseGenerator');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
+const { getMedicationExpirationDate } = require('../utils/medicationInventory');
 
 const MEDICATION_TIME_ZONE = 'Asia/Manila';
 const localDateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -189,14 +190,17 @@ const detectMissedDoses = async (now = new Date(), userId) => {
   }
 
   const pendingDoses = await DoseRecord.find(doseQuery)
-    .populate('medicationId', 'name expirationDate')
+    .populate('medicationId', 'name expirationDate stockBatches')
     .lean();
 
   let markedMissed = 0;
   let notificationsCreated = 0;
 
   for (const dose of pendingDoses) {
-    if (isDoseDateAfterExpiration(dose.scheduledDate, dose.medicationId?.expirationDate)) {
+    if (isDoseDateAfterExpiration(
+      dose.scheduledDate,
+      getMedicationExpirationDate(dose.medicationId)
+    )) {
       continue;
     }
 

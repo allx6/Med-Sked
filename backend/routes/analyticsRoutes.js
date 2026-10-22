@@ -7,7 +7,12 @@ const Medication = require('../models/Medication');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
-const { calculateCanonicalAdherence } = require('../utils/adherence');
+const {
+  buildEffectiveMedicationExpirationExpression,
+  buildEligibleDosePipeline,
+  calculateCanonicalAdherence,
+} = require('../utils/adherence');
+const { formatLocalDate } = require('../utils/medicationInventory');
 
 const router = express.Router();
 
@@ -15,12 +20,13 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIME_BUCKETS = ['morning', 'afternoon', 'evening', 'night'];
 
-const formatDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const formatDate = formatLocalDate;
 
 const getDateRange = (query) => {
-  const today = new Date();
-  const endDate = query.endDate || formatDate(today);
-  const startDate = query.startDate || formatDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6));
+  const endDate = query.endDate || formatDate();
+  const start = new Date(`${endDate}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - 6);
+  const startDate = query.startDate || formatDate(start);
 
   if (!DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate) || startDate > endDate) {
     return null;
@@ -71,45 +77,15 @@ const authorizeAnalytics = (req, res, next) => {
 
 const calculateAnalytics = async (patientIds, range) => {
   const today = formatDate(new Date());
-  const now = new Date();
 
   const doseStats = await DoseRecord.aggregate([
-      {
-        $match: {
-          userId: { $in: patientIds },
-          scheduledDate: { $gte: range.startDate, $lte: range.endDate },
-          $expr: {
-            $lte: ['$scheduledDate', today],
-          },
-        },
-      },
-      {
-        $lookup: {
-          from: Medication.collection.name,
-          localField: 'medicationId',
-          foreignField: '_id',
-          as: 'medication',
-        },
-      },
-      {
-        $unwind: {
-          path: '$medication',
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $match: {
-          $or: [
-            { 'medication.expirationDate': null },
-            { 'medication.expirationDate': '' },
-            {
-              $expr: {
-                $lte: ['$scheduledDate', '$medication.expirationDate'],
-              },
-            },
-          ],
-        },
-      },
+      ...buildEligibleDosePipeline({
+        medicationCollection: Medication.collection.name,
+        userIds: patientIds,
+        startDate: range.startDate,
+        endDate: range.endDate,
+        today,
+      }),
       {
         $facet: {
           records: [
@@ -135,26 +111,10 @@ const calculateAnalytics = async (patientIds, range) => {
   const counts = { taken: 0, skipped: 0, missed: 0 };
   for (const item of stats.overall || []) counts[item._id] = item.count;
 
-  const canonicalRecords = (stats.records || []).filter((dose) => {
-    const status = String(dose?.status || '').toLowerCase();
-    if (!['taken', 'skipped', 'missed', 'pending'].includes(status)) {
-      return false;
-    }
-    if (!dose?.scheduledDate) {
-      return false;
-    }
-    if (new Date(`${dose.scheduledDate}T00:00:00`) > now) {
-      return false;
-    }
-    const expirationDate = dose?.medicationId?.expirationDate || dose?.medication?.expirationDate;
-    if (expirationDate && dose.scheduledDate > expirationDate) {
-      return false;
-    }
-    return true;
-  });
+  const canonicalRecords = stats.records || [];
 
   const totalEligible = counts.taken + counts.skipped + counts.missed;
-  const adherencePercentage = calculateCanonicalAdherence(canonicalRecords, { now });
+  const adherencePercentage = calculateCanonicalAdherence(canonicalRecords, { now: today });
   const timeOfDay = Object.fromEntries(TIME_BUCKETS.map((bucket) => [bucket, emptyBucket()]));
 
   for (const item of stats.timeOfDay || []) {
@@ -190,13 +150,18 @@ const calculateAnalytics = async (patientIds, range) => {
       },
     },
     {
+      $addFields: {
+        effectiveMedicationExpiration: buildEffectiveMedicationExpirationExpression(),
+      },
+    },
+    {
       $match: {
         $or: [
-          { 'medication.expirationDate': null },
-          { 'medication.expirationDate': '' },
+          { effectiveMedicationExpiration: null },
+          { effectiveMedicationExpiration: '' },
           {
             $expr: {
-              $gte: ['$medication.expirationDate', today],
+              $gte: ['$effectiveMedicationExpiration', today],
             },
           },
         ],

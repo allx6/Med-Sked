@@ -44,8 +44,8 @@ test('future and post-expiration doses are excluded from adherence', () => {
   const doses = [
     buildDose({ status: 'taken', scheduledDate: '2026-10-03' }),
     buildDose({ status: 'pending', scheduledDate: '2026-10-04' }),
-    buildDose({ status: 'missed', scheduledDate: '2026-10-02', expirationDate: '2026-10-02' }),
-    buildDose({ status: 'taken', scheduledDate: '2026-10-02', expirationDate: '2026-10-02' }),
+    buildDose({ status: 'missed', scheduledDate: '2026-10-03', expirationDate: '2026-10-02' }),
+    buildDose({ status: 'taken', scheduledDate: '2026-10-03', expirationDate: '2026-10-02' }),
   ];
 
   assert.equal(calculateCanonicalAdherence(doses, { now: '2026-10-03' }), 100);

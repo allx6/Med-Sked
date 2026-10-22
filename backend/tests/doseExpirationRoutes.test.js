@@ -37,6 +37,8 @@ const invokeRoute = async ({ method, path, user, body, models }) => {
   const originals = {
     medicationFindOne: Medication.findOne,
     scheduleFindOne: MedicationSchedule.findOne,
+    scheduleFind: MedicationSchedule.find,
+    doseFind: DoseRecord.find,
     doseFindOne: DoseRecord.findOne,
     doseFindById: DoseRecord.findById,
     doseCreate: DoseRecord.create,
@@ -58,6 +60,13 @@ const invokeRoute = async ({ method, path, user, body, models }) => {
 
   Medication.findOne = models.medicationFindOne || (async () => models.medication || null);
   MedicationSchedule.findOne = models.scheduleFindOne || (async () => models.schedule || null);
+  MedicationSchedule.find = () => ({ lean: async () => [] });
+  DoseRecord.find = () => ({
+    populate() {
+      return this;
+    },
+    lean: async () => [],
+  });
   DoseRecord.findOne = models.doseFindOne || (async () => models.existingDose || null);
   DoseRecord.findById = models.doseFindById || (() => ({
     populate() {
@@ -87,6 +96,8 @@ const invokeRoute = async ({ method, path, user, body, models }) => {
   } finally {
     Medication.findOne = originals.medicationFindOne;
     MedicationSchedule.findOne = originals.scheduleFindOne;
+    MedicationSchedule.find = originals.scheduleFind;
+    DoseRecord.find = originals.doseFind;
     DoseRecord.findOne = originals.doseFindOne;
     DoseRecord.findById = originals.doseFindById;
     DoseRecord.create = originals.doseCreate;

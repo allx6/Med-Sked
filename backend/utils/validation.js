@@ -229,7 +229,7 @@ const requireMedicationExpirationDate = (value) => {
   return null;
 };
 
-const validateMedicationFields = (payload) => {
+const validateMedicationFields = (payload, { allowLegacyFrequency = false } = {}) => {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return 'Invalid medication payload';
   }
@@ -261,9 +261,11 @@ const validateMedicationFields = (payload) => {
     return 'Dosage amount cannot exceed 6 digits.';
   }
 
-  const frequencyMatch = frequency.match(/^Every\s+([1-9][0-9]?)\s+(hours|days)$/i);
-  if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
-    return 'Frequency must be a whole number from 1 to 99 hours or days.';
+  if (!allowLegacyFrequency) {
+    const frequencyMatch = frequency.match(/^Every\s+([1-9][0-9]?)\s+(hours|days)$/i);
+    if (!frequencyMatch || Number(frequencyMatch[1]) > 99) {
+      return 'Frequency must be a whole number from 1 to 99 hours or days.';
+    }
   }
 
   for (const [field, label] of [

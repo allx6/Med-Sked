@@ -134,11 +134,18 @@ Then update `backend/.env` with the team values:
 PORT=5000
 MONGODB_URI=YOUR_TEAM_MONGODB_ATLAS_URI
 JWT_SECRET=YOUR_TEAM_JWT_SECRET
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=YOUR_BREVO_SMTP_LOGIN
+SMTP_PASSWORD=YOUR_BREVO_SMTP_KEY
+EMAIL_FROM=MedSked <YOUR_VERIFIED_SENDER_EMAIL>
 ```
 
 Important notes:
 - These values are private and must never be committed to GitHub.
 - Do not share your `.env` file in commits or pull requests.
+- Registration verification, password reset, and administrator sign-in codes use the same SMTP settings. For Brevo, use the SMTP login and SMTP key from Brevo's SMTP settings, plus a sender address verified in Brevo; the Brevo API key is not the SMTP password.
+- Port `587` uses STARTTLS; port `465` uses implicit TLS.
 - Each developer may need to add their current public IP address to the MongoDB Atlas IP Access List.
 - The correct value is the developer's internet/public IP, not their local `192.168.x.x` address.
 - The local `192.168.x.x` address is only relevant for local device communication when using Expo Go on a phone.
@@ -261,6 +268,13 @@ Do not change Windows security policies unless the team decides it is absolutely
 ### Authentication
 - [ ] Register works
 - [ ] Login works
+- [ ] Administrator sign-in completes email-code verification
+
+### Administrator MFA and analytics
+- Administrator sign-in requires the account password and a one-time six-digit code sent to its verified email address.
+- Sign-in codes expire after 10 minutes, allow up to five verification attempts, and have a one-minute resend cooldown. Authenticator-app setup is no longer required.
+- Admin analytics default to a 30-day range and support selecting 1–90 days. Adherence excludes pending/future doses and doses scheduled after the medication's effective expiration; doses scheduled on the expiration date remain eligible.
+- Verify the admin email-code flow in the browser. Patient and caregiver password/OTP login flows remain separate.
 
 ### Patient features
 - [ ] Dashboard loads

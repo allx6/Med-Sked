@@ -2,12 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const DoseRecord = require('../models/DoseRecord');
 const Medication = require('../models/Medication');
+const MedicationSchedule = require('../models/MedicationSchedule');
 const Notification = require('../models/Notification');
 const doseRoutes = require('../routes/doseRoutes');
 
 const USER_ID = '507f1f77bcf86cd799439012';
 const MEDICATION_ID = '507f1f77bcf86cd799439011';
 const DOSE_ID = '507f1f77bcf86cd799439014';
+const STOCK_BATCH_ID = '507f1f77bcf86cd799439015';
 
 const notificationServicePath = require.resolve('../services/notificationService');
 const originalNotificationService = require.cache[notificationServicePath];
@@ -81,6 +83,7 @@ const invokeTakeOrSkip = async ({
   stock,
   dose,
   medicationUpdate,
+  stockBatches,
   refillThreshold = 1,
   lowRefillNotified = true,
 }) => {
@@ -89,9 +92,11 @@ const invokeTakeOrSkip = async ({
   ));
   const handler = layer.route.stack.at(-1).handle;
   const originals = {
+    scheduleFind: MedicationSchedule.find,
     medicationFindOne: Medication.findOne,
     medicationFindOneAndUpdate: Medication.findOneAndUpdate,
     medicationUpdateOne: Medication.updateOne,
+    doseFind: DoseRecord.find,
     doseFindOne: DoseRecord.findOne,
     doseFindOneAndUpdate: DoseRecord.findOneAndUpdate,
     doseFindById: DoseRecord.findById,
@@ -99,6 +104,16 @@ const invokeTakeOrSkip = async ({
   const updates = [];
   const flagUpdates = [];
   let doseTransitionAttempts = 0;
+  let currentStock = stock;
+  let batches = stockBatches || (currentStock > 0
+    ? [{
+      _id: STOCK_BATCH_ID,
+      quantityAdded: stock,
+      remainingQuantity: currentStock,
+      expirationDate: null,
+      receivedAt: new Date(),
+    }]
+    : []);
   const response = {
     statusCode: 200,
     body: null,
@@ -112,6 +127,9 @@ const invokeTakeOrSkip = async ({
     },
   };
 
+  MedicationSchedule.find = () => ({
+    lean: async () => [],
+  });
   Medication.findOne = async () => ({
     _id: MEDICATION_ID,
     userId: USER_ID,
@@ -119,28 +137,49 @@ const invokeTakeOrSkip = async ({
     expirationDate: null,
     refillThreshold,
     lowRefillNotified,
-    quantityOnHand: stock,
+    quantityOnHand: currentStock,
+    stockBatches: batches,
   });
   Medication.findOneAndUpdate = (filter, update) => {
     updates.push({ filter, update });
     if (medicationUpdate) return medicationUpdate(filter, update);
-    if (filter.quantityOnHand?.$gt === 0) {
-      return stock > 0 ? {
+    if (update.$inc?.['stockBatches.$.remainingQuantity'] === -1) {
+      const batchId = filter.stockBatches?.$elemMatch?._id;
+      const batch = batches.find((item) => String(item._id) === String(batchId));
+      if (currentStock <= 0 || !batch || batch.remainingQuantity <= 0) return null;
+      currentStock -= 1;
+      batch.remainingQuantity -= 1;
+      return {
         _id: MEDICATION_ID,
         userId: USER_ID,
         name: 'Medication',
-        quantityOnHand: stock - 1,
+        quantityOnHand: currentStock,
+        stockBatches: batches,
         refillThreshold,
         lowRefillNotified,
-      } : null;
+      };
     }
-    return { _id: MEDICATION_ID, quantityOnHand: stock + 1 };
+    if (update.$inc?.['stockBatches.$.remainingQuantity'] === 1) {
+      const batchId = filter['stockBatches._id'];
+      const batch = batches.find((item) => String(item._id) === String(batchId));
+      if (!batch) return null;
+      currentStock += 1;
+      batch.remainingQuantity += 1;
+      return { _id: MEDICATION_ID, quantityOnHand: currentStock, stockBatches: batches };
+    }
+    return null;
   };
   Medication.updateOne = async (filter, update) => {
     flagUpdates.push({ filter, update });
     return { modifiedCount: 1 };
   };
   DoseRecord.findOne = async () => dose;
+  DoseRecord.find = () => ({
+    populate() {
+      return this;
+    },
+    lean: async () => [],
+  });
   DoseRecord.findOneAndUpdate = () => {
     doseTransitionAttempts += 1;
     const transition = () => {
@@ -180,9 +219,11 @@ const invokeTakeOrSkip = async ({
       body: {},
     }, response);
   } finally {
+    MedicationSchedule.find = originals.scheduleFind;
     Medication.findOne = originals.medicationFindOne;
     Medication.findOneAndUpdate = originals.medicationFindOneAndUpdate;
     Medication.updateOne = originals.medicationUpdateOne;
+    DoseRecord.find = originals.doseFind;
     DoseRecord.findOne = originals.doseFindOne;
     DoseRecord.findOneAndUpdate = originals.doseFindOneAndUpdate;
     DoseRecord.findById = originals.doseFindById;
@@ -209,9 +250,50 @@ test('zero-stock TAKE is rejected and leaves the dose pending', async () => {
     dose: pendingDose(),
   });
 
+  test('TAKE consumes the earliest-expiring unexpired batch first', async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const today = new Date();
+    const dateString = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const expiredBatchId = '507f1f77bcf86cd799439016';
+    const todayBatchId = '507f1f77bcf86cd799439017';
+
+    const { response, updates } = await invokeTakeOrSkip({
+      action: 'take',
+      stock: 2,
+      dose: pendingDose(),
+      stockBatches: [
+        { _id: expiredBatchId, remainingQuantity: 1, expirationDate: dateString(yesterday), receivedAt: yesterday },
+        { _id: todayBatchId, remainingQuantity: 1, expirationDate: dateString(today), receivedAt: today },
+      ],
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(String(updates[0].filter.stockBatches.$elemMatch._id), todayBatchId);
+  });
+
+  test('TAKE rejects stock when every batch is expired', async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const expirationDate = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    const { response, updates, doseTransitionAttempts } = await invokeTakeOrSkip({
+      action: 'take',
+      stock: 1,
+      dose: pendingDose(),
+      stockBatches: [
+        { _id: STOCK_BATCH_ID, remainingQuantity: 1, expirationDate, receivedAt: yesterday },
+      ],
+    });
+
+    assert.equal(response.statusCode, 409);
+    assert.equal(response.body.message, 'Cannot take this dose because there is no unexpired medication stock remaining.');
+    assert.equal(updates.length, 0);
+    assert.equal(doseTransitionAttempts, 0);
+  });
+
   assert.equal(response.statusCode, 409);
-  assert.equal(response.body.message, 'Cannot take this dose because there is no medication stock remaining.');
-  assert.equal(updates.length, 1);
+  assert.equal(response.body.message, 'Cannot take this dose because there is no unexpired medication stock remaining.');
+  assert.equal(updates.length, 0);
   assert.equal(doseTransitionAttempts, 0);
 });
 
@@ -249,18 +331,21 @@ test('a repeated TAKE of an already-taken dose does not deduct again', async () 
 
 test('TAKE compensates a stock reservation if the dose transition fails', async () => {
   let quantity = 2;
+  let batchQuantity = 2;
   const { response, updates } = await invokeTakeOrSkip({
     action: 'take',
     stock: 2,
     dose: pendingDose({ updateError: new Error('test database failure') }),
     medicationUpdate: async (filter, update) => {
       quantity += update.$inc.quantityOnHand;
+      batchQuantity += update.$inc['stockBatches.$.remainingQuantity'];
       return { _id: MEDICATION_ID, quantityOnHand: quantity };
     },
   });
 
   assert.equal(response.statusCode, 500);
   assert.equal(quantity, 2);
+  assert.equal(batchQuantity, 2);
   assert.deepEqual(updates.map((entry) => entry.update.$inc.quantityOnHand), [-1, 1]);
 });
 

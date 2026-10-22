@@ -24,11 +24,15 @@ let getDoseActionErrorMessage;
 let validateRefillAmount;
 let getRefillErrorMessage;
 let validateMedicationExpirationDate;
+let validateBatchExpirationDate;
+let getSafeUserErrorMessage;
 
 test('load medication expiration helpers', async () => {
   const helpers = await import(moduleUrl);
   getMedicationExpirationState = helpers.getMedicationExpirationState;
   validateMedicationExpirationDate = helpers.validateMedicationExpirationDate;
+  validateBatchExpirationDate = helpers.validateBatchExpirationDate;
+  getSafeUserErrorMessage = helpers.getSafeUserErrorMessage;
   filterDoseRecordsByMedicationExpiration = helpers.filterDoseRecordsByMedicationExpiration;
   validateRefillAmount = helpers.validateRefillAmount;
   ({ getDoseActionErrorMessage } = await import(doseErrorsModuleUrl));
@@ -59,6 +63,20 @@ test('medication expiration validation rejects past dates and accepts today', ()
     validateMedicationExpirationDate(formatLocalDate(yesterday)),
     'Expiration date cannot be earlier than today.'
   );
+});
+
+test('batch expiration validation requires a valid date and rejects past dates', () => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  assert.equal(validateBatchExpirationDate(''), 'Batch expiration date is required.');
+  assert.equal(validateBatchExpirationDate('2026-02-30'), 'Batch expiration date must be a valid YYYY-MM-DD date.');
+  assert.equal(
+    validateBatchExpirationDate(formatLocalDate(yesterday)),
+    'Batch expiration date cannot be earlier than today.'
+  );
+  assert.equal(validateBatchExpirationDate(formatLocalDate(today)), '');
 });
 
 test('current dose filtering excludes post-expiration records but retains expiration-day, historical, and legacy records', () => {
@@ -102,6 +120,8 @@ test('refill amount validation rejects empty, malformed, zero, and negative valu
   assert.equal(validateRefillAmount('0'), 'Refill amount must be greater than 0.');
   assert.equal(validateRefillAmount('-2'), 'Refill amount must be greater than 0.');
   assert.equal(validateRefillAmount('2.5'), '');
+  assert.equal(validateRefillAmount('999999'), '');
+  assert.equal(validateRefillAmount('9999999'), 'Refill amount cannot exceed 6 digits.');
 });
 
 test('refill errors preserve backend permission/expiration messages and sanitize technical failures', () => {

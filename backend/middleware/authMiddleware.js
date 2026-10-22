@@ -29,6 +29,11 @@ const authMiddleware = (req, res, next) => {
       token,
       process.env.JWT_SECRET
     );
+    if (decoded.purpose && decoded.purpose !== 'access') {
+      return res.status(401).json({
+        message: 'Invalid or expired authentication token',
+      });
+    }
 
     // Store authenticated user information
     // so routes can access req.user

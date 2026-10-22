@@ -17,6 +17,7 @@ import {
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import TimeSelector from '../components/TimeSelector';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import {
   format12HourTime,
   to24HourTime,
@@ -30,6 +31,7 @@ import {
   createSchedule,
 } from '../services/api';
 import {
+  getScheduleFieldError,
   getScheduleSubmissionErrorMessage,
   parseLocalDate,
   validateScheduleFields,
@@ -126,6 +128,8 @@ export default function AddScheduleScreen({
   const [saving, setSaving] =
     useState(false);
   const [formError, setFormError] = useState('');
+  const [fieldError, setFieldError] = useState(null);
+  const [reviewVisible, setReviewVisible] = useState(false);
 
 
   // =====================================================
@@ -377,39 +381,24 @@ export default function AddScheduleScreen({
   // SAVE SCHEDULE
   // =====================================================
 
-  const handleSave = async () => {
+  const buildSchedulePayload = () => ({
+    medicationId: selectedMedication?._id || '',
+    time: to24HourTime(
+      timeSelection.hour,
+      timeSelection.minute,
+      timeSelection.period
+    ),
+    dose: (selectedMedication?.dosage || dose || '').trim(),
+    days: selectedDays,
+    startDate: formatDate(startDate),
+    endDate: endDate ? formatDate(endDate) : null,
+    enabled,
+  });
+
+  const handleSave = () => {
     setFormError('');
-
-    const medicationDose =
-      (selectedMedication?.dosage || dose || '').trim();
-
-    const schedule = {
-
-        medicationId:
-          selectedMedication?._id || '',
-
-        time:
-          to24HourTime(
-            timeSelection.hour,
-            timeSelection.minute,
-            timeSelection.period
-          ),
-
-        dose:
-          medicationDose,
-
-        days:
-          selectedDays,
-
-        startDate:
-          formatDate(startDate),
-
-        endDate:
-          endDate ? formatDate(endDate) : null,
-
-        enabled,
-
-      };
+    setFieldError(null);
+    const schedule = buildSchedulePayload();
 
     const scheduleError = validateScheduleFields(schedule, {
       medicationExpirationDate: selectedMedication?.expirationDate,
@@ -417,9 +406,16 @@ export default function AddScheduleScreen({
     });
     if (scheduleError) {
       setFormError(scheduleError);
+      setFieldError(getScheduleFieldError(scheduleError));
       return;
     }
 
+    setReviewVisible(true);
+  };
+
+  const confirmSaveSchedule = async () => {
+    const schedule = buildSchedulePayload();
+    setReviewVisible(false);
     try {
       setSaving(true);
 
@@ -472,7 +468,9 @@ export default function AddScheduleScreen({
         error
       );
 
-      setFormError(getScheduleSubmissionErrorMessage(error));
+      const message = getScheduleSubmissionErrorMessage(error);
+      setFormError(message);
+      setFieldError(getScheduleFieldError(message));
 
     } finally {
 
@@ -650,7 +648,22 @@ export default function AddScheduleScreen({
         </View>
 
       )}
+      {fieldError === 'medication' ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          Select a medication.
+        </Text>
+      ) : null}
 
+      {selectedMedication ? (
+        <View style={styles.frequencyInfo}>
+          <Text style={styles.frequencyInfoTitle}>
+            Medication frequency: {selectedMedication.frequency}
+          </Text>
+          <Text style={styles.frequencyInfoText}>
+            The selected time anchors the schedule. Hour-based intervals repeat from that time and can continue past midnight. Review the generated doses after saving.
+          </Text>
+        </View>
+      ) : null}
 
       {/* =================================================
           TIME
@@ -667,6 +680,11 @@ export default function AddScheduleScreen({
         onChange={setTimeSelection}
         disabled={saving}
       />
+      {fieldError === 'time' ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          Select a valid scheduled time.
+        </Text>
+      ) : null}
 
       <Text style={styles.selectedTimeText}>
         {format12HourTime(
@@ -689,6 +707,11 @@ export default function AddScheduleScreen({
         selectTextOnFocus={false}
         pointerEvents="none"
       />
+      {fieldError === 'dose' ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          A scheduled dose is required.
+        </Text>
+      ) : null}
 
 
       {/* =================================================
@@ -747,6 +770,11 @@ export default function AddScheduleScreen({
           )}
         </ScrollView>
       </View>
+      {fieldError === 'days' ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          Select at least one day.
+        </Text>
+      ) : null}
 
 
       {/* =================================================
@@ -816,6 +844,11 @@ export default function AddScheduleScreen({
           </>
         )}
       </View>
+      {fieldError === 'startDate' ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          Choose a valid start date.
+        </Text>
+      ) : null}
 
 
       {/* =================================================
@@ -931,6 +964,11 @@ export default function AddScheduleScreen({
           </>
         )}
       </View>
+      {fieldError === 'endDate' ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          Choose a valid end date within the medication's expiration date.
+        </Text>
+      ) : null}
 
 
       {/* =================================================
@@ -1007,6 +1045,23 @@ export default function AddScheduleScreen({
       </Pressable>
 
       </ScrollView>
+      <ConfirmationDialog
+        visible={reviewVisible}
+        title="Review medication schedule"
+        message={[
+          `Medication: ${selectedMedication?.name || ''}`,
+          `Product strength: ${selectedMedication?.dosage || 'Not specified'}`,
+          `Scheduled dose: ${buildSchedulePayload().dose || 'Not specified'}`,
+          `Time: ${format12HourTime(timeSelection.hour, timeSelection.minute, timeSelection.period)}`,
+          `Days: ${selectedDays.join(', ')}`,
+          `Date range: ${formatDate(startDate)} to ${endDate ? formatDate(endDate) : 'No end date'}`,
+          `Reminders: ${enabled ? 'Enabled' : 'Disabled'}`,
+        ].join('\n')}
+        confirmLabel="Add schedule"
+        cancelLabel="Back to edit"
+        onConfirm={confirmSaveSchedule}
+        onCancel={() => setReviewVisible(false)}
+      />
     </KeyboardAvoidingView>
 
   );
@@ -1170,6 +1225,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     marginTop: 2,
+  },
+  frequencyInfo: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#EAF5F6',
+  },
+  frequencyInfoTitle: {
+    color: '#0B4F59',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  frequencyInfoText: {
+    marginTop: 4,
+    color: '#375B63',
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   selectedText: {

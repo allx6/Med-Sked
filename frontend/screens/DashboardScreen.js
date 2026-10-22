@@ -1717,32 +1717,26 @@ const styles = StyleSheet.create({
   // ===================================================
 
   header: {
-
     flexDirection: 'row',
-
     alignItems: 'center',
-
-    justifyContent:
-      'space-between',
-
-    minHeight: 58,
+    justifyContent: 'space-between',
+    minHeight: 84,
     marginHorizontal: 16,
-    marginBottom: 9,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     overflow: 'hidden',
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#0B4F59',
-
   },
 
   headerDecoration: {
     position: 'absolute',
-    width: 94,
-    height: 94,
-    top: -36,
-    right: -18,
-    borderRadius: 47,
+    width: 120,
+    height: 120,
+    top: -42,
+    right: -20,
+    borderRadius: 60,
     backgroundColor: '#3D929B',
     pointerEvents: 'none',
   },
@@ -1754,54 +1748,36 @@ const styles = StyleSheet.create({
   },
 
   headerLogo: {
-    width: 31,
-    height: 31,
-    marginRight: 9,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    marginRight: 12,
+    borderRadius: 21,
     backgroundColor: '#FFFFFF',
-
   },
 
   headerText: {
-
     flex: 1,
-
     paddingRight: 8,
-
   },
 
   greeting: {
-
-    fontSize: 8,
-
+    fontSize: 10,
     fontWeight: '600',
-
     color: '#A7CDD0',
-
   },
 
   username: {
-
-    marginTop: 1,
-
-    fontSize: 13,
-
+    marginTop: 2,
+    fontSize: 18,
     fontWeight: '900',
-
     color: '#FFFFFF',
-
   },
 
   subtitle: {
-
-    marginTop: 2,
-
-    fontSize: 8,
-
-    lineHeight: 11,
-
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 15,
     color: '#A7CDD0',
-
   },
 
   // ===================================================
@@ -1847,13 +1823,13 @@ const styles = StyleSheet.create({
 
   aiCard: {
     backgroundColor: '#D7EDF3',
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#B5D4DC',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginHorizontal: 16,
-    marginBottom: 9,
+    marginBottom: 12,
   },
   aiCardPressed: {
     opacity: 0.9,
@@ -1863,16 +1839,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   aiIconWrap: {
-    width: 27,
-    height: 27,
-    borderRadius: 7,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: '#C5E3EA',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
   },
   aiIconText: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0B4F59',
   },
@@ -1880,21 +1856,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   aiTitle: {
-    fontSize: 9,
+    fontSize: 16,
     fontWeight: '800',
     color: '#1E2A4A',
   },
   aiSubtitle: {
-    marginTop: 2,
-    fontSize: 8,
-    lineHeight: 11,
+    marginTop: 3,
+    fontSize: 12,
+    lineHeight: 16,
     color: '#6B7280',
   },
   aiArrow: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
     color: '#6B7280',
-    marginLeft: 6,
+    marginLeft: 8,
   },
 
   analyticsSectionTitle: {

@@ -54,6 +54,44 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    mfaEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    mfaSecretEncrypted: {
+      type: String,
+      select: false,
+    },
+    mfaPendingSecretEncrypted: {
+      type: String,
+      select: false,
+    },
+    mfaPendingSecretExpiresAt: {
+      type: Date,
+      select: false,
+    },
+    mfaRecoveryCodeHashes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
+    adminMfaOtpHash: {
+      type: String,
+      select: false,
+    },
+    adminMfaOtpExpiresAt: {
+      type: Date,
+      select: false,
+    },
+    adminMfaOtpAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    adminMfaOtpLastSentAt: {
+      type: Date,
+      select: false,
+    },
 
     emailVerificationOtpHash: {
       type: String,

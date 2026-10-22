@@ -30,7 +30,7 @@ const handleResponse = async (response, options = {}) => {
       throw new Error(message || 'You are not authorized to access this resource.');
     }
 
-    if (response.status >= 500) {
+    if (response.status >= 500 && !options.isLogin) {
       throw new Error('Unable to connect to the MedSked backend.');
     }
 
@@ -65,6 +65,24 @@ export const loginAdmin = async (email, password) => {
   return handleResponse(response, { isLogin: true });
 };
 
+export const verifyAdminMfa = async (challengeToken, code) => {
+  const response = await fetch(`${API_URL}/api/auth/mfa/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeToken, code }),
+  });
+  return handleResponse(response, { isLogin: true });
+};
+
+export const resendAdminMfaCode = async (challengeToken) => {
+  const response = await fetch(`${API_URL}/api/auth/mfa/resend`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ challengeToken }),
+  });
+  return handleResponse(response, { isLogin: true });
+};
+
 export const validateAdminSession = async (token) => {
   const response = await fetch(`${API_URL}/api/auth/session`, {
     method: 'GET',
@@ -91,13 +109,13 @@ export const createUserAccount = async (payload) => {
 
 export const getAdminStats = async (token) => fetchWithToken('/api/admin/stats', token);
 
-export const getAdminDoseOutcomes = async (token) => fetchWithToken('/api/admin/analytics/dose-outcomes', token);
+export const getAdminDoseOutcomes = async (token, days = 30) => fetchWithToken(`/api/admin/analytics/dose-outcomes?days=${days}`, token);
 
 export const getAdminAdherenceTrend = async (token, days = 30) => fetchWithToken(`/api/admin/analytics/adherence-trend?days=${days}`, token);
 
-export const getAdminTimeOfDay = async (token) => fetchWithToken('/api/admin/analytics/time-of-day', token);
+export const getAdminTimeOfDay = async (token, days = 30) => fetchWithToken(`/api/admin/analytics/time-of-day?days=${days}`, token);
 
-export const getAdminRegimenComplexity = async (token) => fetchWithToken('/api/admin/analytics/regimen-complexity', token);
+export const getAdminRegimenComplexity = async (token, days = 30) => fetchWithToken(`/api/admin/analytics/regimen-complexity?days=${days}`, token);
 
 export const getAdminUserRoles = async (token) => fetchWithToken('/api/admin/analytics/users', token);
 
@@ -217,10 +235,10 @@ export const rejectPrivilegedActionRequest = async (token, requestId, reason) =>
 
 export const getAdminAnalytics = async (token, days = 30) => {
   const [doseOutcomes, adherenceTrend, timeOfDay, regimenComplexity, userRoles, notifications, refills] = await Promise.all([
-    getAdminDoseOutcomes(token),
+    getAdminDoseOutcomes(token, days),
     getAdminAdherenceTrend(token, days),
-    getAdminTimeOfDay(token),
-    getAdminRegimenComplexity(token),
+    getAdminTimeOfDay(token, days),
+    getAdminRegimenComplexity(token, days),
     getAdminUserRoles(token),
     getAdminNotifications(token),
     getAdminRefills(token),

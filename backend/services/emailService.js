@@ -1,16 +1,30 @@
 const nodemailer = require('nodemailer');
 
 const createEmailTransporter = () => {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env;
+  const {
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_USER,
+    SMTP_PASSWORD,
+  } = process.env;
 
-  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASSWORD) {
+  const port = Number(SMTP_PORT);
+  if (
+    !SMTP_HOST
+    || !SMTP_PORT
+    || !Number.isInteger(port)
+    || port < 1
+    || port > 65535
+    || !SMTP_USER
+    || !SMTP_PASSWORD
+  ) {
     throw new Error('Email configuration is incomplete.');
   }
 
   return nodemailer.createTransport({
     host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: false,
+    port,
+    secure: port === 465,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASSWORD,
@@ -51,8 +65,16 @@ const sendPasswordResetEmail = (email, otp) => sendEmail(
     + 'Do not share this code with anyone. If you did not request a password reset, you can ignore this email.'
 );
 
+const sendAdminLoginCode = (email, otp) => sendEmail(
+  email,
+  'Your MedSked administrator sign-in code',
+  `Your MedSked administrator sign-in code is ${otp}. It expires in 10 minutes. `
+    + 'If you did not try to sign in, change your password and contact your administrator.'
+);
+
 module.exports = {
   createEmailTransporter,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendAdminLoginCode,
 };

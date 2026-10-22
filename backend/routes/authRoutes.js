@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const User = require('../models/User');
 const emailService = require('../services/emailService');
@@ -20,6 +21,9 @@ const {
 } = require('../services/loginAttemptProtection');
 
 const router = express.Router();
+const ADMIN_MFA_CODE_LIFETIME_MS = 10 * 60 * 1000;
+const ADMIN_MFA_RESEND_COOLDOWN_MS = 60 * 1000;
+const ADMIN_MFA_MAX_ATTEMPTS = 5;
 const emailVerificationService = createEmailVerificationService({
   User,
   emailService,
@@ -34,8 +38,38 @@ const loginAttemptProtection = createLoginAttemptProtection({
 });
 
 const logAuthFailure = (operation, error) => {
+  const errorCode = typeof error?.code === 'string'
+    && /^[A-Z0-9_]{1,32}$/.test(error.code)
+    ? error.code
+    : undefined;
+  const command = typeof error?.command === 'string'
+    && /^[A-Z0-9_ -]{1,32}$/i.test(error.command)
+    ? error.command
+    : undefined;
+  let failureReason;
+  if (error?.message === 'Email configuration is incomplete.') {
+    failureReason = 'SMTP_CONFIGURATION_INCOMPLETE';
+  } else if (error?.message === 'Email sender is not configured.') {
+    failureReason = 'EMAIL_FROM_MISSING';
+  } else if (errorCode === 'EAUTH') {
+    failureReason = 'SMTP_AUTHENTICATION_REJECTED';
+  } else if (errorCode === 'ECONNECTION' || errorCode === 'ETIMEDOUT') {
+    failureReason = 'SMTP_CONNECTION_FAILED';
+  }
+
   console.error(`${operation} failed:`, {
     errorName: error?.name || 'UnknownError',
+    ...(failureReason ? { failureReason } : {}),
+    ...(errorCode ? { errorCode } : {}),
+    ...(Number.isInteger(error?.responseCode) ? { responseCode: error.responseCode } : {}),
+    ...(command ? { command } : {}),
+    emailConfig: {
+      smtpHostConfigured: Boolean(process.env.SMTP_HOST),
+      smtpPortConfigured: Boolean(process.env.SMTP_PORT),
+      smtpUserConfigured: Boolean(process.env.SMTP_USER),
+      smtpPasswordConfigured: Boolean(process.env.SMTP_PASSWORD),
+      emailFromConfigured: Boolean(process.env.EMAIL_FROM),
+    },
   });
 };
 
@@ -67,6 +101,7 @@ const createAuthenticationPayload = (user) => ({
       userId: user._id.toString(),
       username: user.username,
       role: user.role,
+      purpose: 'access',
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -78,6 +113,145 @@ const createAuthenticationPayload = (user) => ({
     patientId: user.patientId,
     role: user.role,
   },
+});
+
+const createMfaChallenge = (user) => jwt.sign(
+  {
+    userId: user._id.toString(),
+    role: user.role,
+    purpose: 'mfa_challenge',
+  },
+  process.env.JWT_SECRET,
+  { expiresIn: '10m' }
+);
+
+const getAdminPublicUser = (user) => ({
+  id: user._id,
+  username: user.username,
+  email: user.email,
+  role: user.role,
+});
+
+const verifyMfaChallenge = (token) => {
+  if (typeof token !== 'string' || !token) {
+    return null;
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return decoded.purpose === 'mfa_challenge'
+      && decoded.role === 'admin'
+      ? decoded
+      : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const findAdminForMfa = (userId) => User.findOne({
+  _id: userId,
+  role: 'admin',
+  emailVerified: true,
+}).select(
+  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt'
+);
+
+class AdminMfaError extends Error {
+  constructor(status, code, message, retryAfterSeconds) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+const issueAdminMfaCode = async (userId) => {
+  const user = await findAdminForMfa(userId);
+  if (!user) {
+    throw new AdminMfaError(401, 'ADMIN_MFA_UNAVAILABLE', 'Administrator sign-in is unavailable.');
+  }
+
+  const now = Date.now();
+  const lastSentAt = user.adminMfaOtpLastSentAt
+    ? new Date(user.adminMfaOtpLastSentAt).getTime()
+    : null;
+  if (
+    lastSentAt !== null
+    && now - lastSentAt < ADMIN_MFA_RESEND_COOLDOWN_MS
+  ) {
+    return {
+      user,
+      retryAfterSeconds: Math.ceil(
+        (ADMIN_MFA_RESEND_COOLDOWN_MS - (now - lastSentAt)) / 1000
+      ),
+    };
+  }
+
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  const codeHash = await bcrypt.hash(code, 10);
+  const sentAt = new Date(now);
+  const updated = await User.findOneAndUpdate(
+    {
+      _id: user._id,
+      role: 'admin',
+      emailVerified: true,
+      adminMfaOtpLastSentAt: user.adminMfaOtpLastSentAt || null,
+    },
+    {
+      $set: {
+        adminMfaOtpHash: codeHash,
+        adminMfaOtpExpiresAt: new Date(now + ADMIN_MFA_CODE_LIFETIME_MS),
+        adminMfaOtpAttempts: 0,
+        adminMfaOtpLastSentAt: sentAt,
+        mfaEnabled: false,
+      },
+      $unset: {
+        mfaSecretEncrypted: 1,
+        mfaPendingSecretEncrypted: 1,
+        mfaPendingSecretExpiresAt: 1,
+        mfaRecoveryCodeHashes: 1,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (!updated) {
+    throw new AdminMfaError(
+      409,
+      'ADMIN_MFA_CODE_CHANGED',
+      'Unable to issue a sign-in code. Please try signing in again.'
+    );
+  }
+
+  try {
+    await emailService.sendAdminLoginCode(user.email, code);
+  } catch (error) {
+    await User.updateOne(
+      { _id: user._id, adminMfaOtpHash: codeHash },
+      {
+        $unset: {
+          adminMfaOtpHash: 1,
+          adminMfaOtpExpiresAt: 1,
+          adminMfaOtpLastSentAt: 1,
+        },
+        $set: { adminMfaOtpAttempts: 0 },
+      }
+    );
+    logAuthFailure('Administrator sign-in code email', error);
+    throw new AdminMfaError(
+      503,
+      'ADMIN_MFA_EMAIL_FAILED',
+      'Unable to send the sign-in code. Please try again.'
+    );
+  }
+
+  return { user: updated, retryAfterSeconds: 0 };
+};
+
+const createAdminMfaChallengeResponse = (user, retryAfterSeconds = 0) => ({
+  message: 'A sign-in code has been sent to your verified email address.',
+  mfaRequired: true,
+  challengeToken: createMfaChallenge(user),
+  retryAfterSeconds,
+  user: getAdminPublicUser(user),
 });
 
 
@@ -425,6 +599,14 @@ router.post('/login', async (req, res) => {
     }
 
     await ensurePatientId(user);
+    if (user.role === 'admin') {
+      const mfaChallenge = await issueAdminMfaCode(user._id);
+      return res.json(createAdminMfaChallengeResponse(
+        mfaChallenge.user,
+        mfaChallenge.retryAfterSeconds
+      ));
+    }
+
     const authentication = createAuthenticationPayload(user);
     await loginAttemptProtection.clearAccountFailures(normalizedEmail);
 
@@ -440,12 +622,176 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
+    if (error instanceof AdminMfaError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+      });
+    }
     logAuthFailure('Login', error);
 
     return res.status(500).json({
       message:
         'Failed to log in.',
     });
+  }
+});
+
+router.post('/mfa/verify', async (req, res) => {
+  try {
+    const challenge = verifyMfaChallenge(req.body?.challengeToken);
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!challenge) {
+      return res.status(401).json({ message: 'Administrator sign-in challenge is invalid or expired.' });
+    }
+
+    const user = await findAdminForMfa(challenge.userId);
+    if (!user) {
+      return res.status(401).json({ message: 'Administrator sign-in challenge is invalid or expired.' });
+    }
+
+    const retryAfterSeconds = await loginAttemptProtection.getRetryAfter(user.email, req.ip);
+    if (retryAfterSeconds > 0) {
+      return res.status(429).json({
+        code: 'MFA_ATTEMPTS_EXCEEDED',
+        message: 'Too many incorrect sign-in codes. Please try again later.',
+        retryAfterSeconds,
+      });
+    }
+
+    if (
+      !user.adminMfaOtpHash
+      || !user.adminMfaOtpExpiresAt
+      || new Date(user.adminMfaOtpExpiresAt).getTime() <= Date.now()
+    ) {
+      return res.status(400).json({
+        code: 'ADMIN_MFA_CODE_EXPIRED',
+        message: 'That sign-in code has expired. Request a new code.',
+      });
+    }
+
+    if ((user.adminMfaOtpAttempts || 0) >= ADMIN_MFA_MAX_ATTEMPTS) {
+      return res.status(429).json({
+        code: 'ADMIN_MFA_ATTEMPTS_EXCEEDED',
+        message: 'Too many incorrect codes. Request a new sign-in code.',
+      });
+    }
+
+    const verified = /^\d{6}$/.test(code)
+      && await bcrypt.compare(code, user.adminMfaOtpHash);
+    if (!verified) {
+      const updatedUser = await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          role: 'admin',
+          emailVerified: true,
+          adminMfaOtpHash: user.adminMfaOtpHash,
+          adminMfaOtpExpiresAt: { $gt: new Date() },
+          adminMfaOtpAttempts: { $lt: ADMIN_MFA_MAX_ATTEMPTS },
+        },
+        { $inc: { adminMfaOtpAttempts: 1 } },
+        { returnDocument: 'after' }
+      );
+      await loginAttemptProtection.recordFailedLogin(user.email, req.ip);
+      if (!updatedUser || updatedUser.adminMfaOtpAttempts >= ADMIN_MFA_MAX_ATTEMPTS) {
+        await User.updateOne(
+          { _id: user._id, adminMfaOtpHash: user.adminMfaOtpHash },
+          { $unset: { adminMfaOtpHash: 1, adminMfaOtpExpiresAt: 1 } }
+        );
+        return res.status(429).json({
+          code: 'ADMIN_MFA_ATTEMPTS_EXCEEDED',
+          message: 'Too many incorrect codes. Request a new sign-in code.',
+        });
+      }
+      return res.status(401).json({
+        code: 'ADMIN_MFA_CODE_INVALID',
+        message: 'The sign-in code is incorrect.',
+      });
+    }
+
+    const authenticatedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        role: 'admin',
+        emailVerified: true,
+        adminMfaOtpHash: user.adminMfaOtpHash,
+        adminMfaOtpExpiresAt: { $gt: new Date() },
+        adminMfaOtpAttempts: { $lt: ADMIN_MFA_MAX_ATTEMPTS },
+      },
+      {
+        $set: { adminMfaOtpAttempts: 0 },
+        $unset: {
+          adminMfaOtpHash: 1,
+          adminMfaOtpExpiresAt: 1,
+          adminMfaOtpLastSentAt: 1,
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    if (!authenticatedUser) {
+      return res.status(401).json({
+        code: 'ADMIN_MFA_CODE_INVALID',
+        message: 'The sign-in code is invalid or has expired. Request a new code.',
+      });
+    }
+
+    await loginAttemptProtection.clearAccountFailures(user.email);
+    return res.json({
+      message: 'Administrator sign-in verified.',
+      ...createAuthenticationPayload(authenticatedUser),
+    });
+  } catch (error) {
+    if (error instanceof AdminMfaError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+      });
+    }
+    logAuthFailure('Administrator MFA verification', error);
+    return res.status(500).json({ message: 'Unable to verify the sign-in code.' });
+  }
+});
+
+router.post('/mfa/resend', async (req, res) => {
+  try {
+    const challenge = verifyMfaChallenge(req.body?.challengeToken);
+    if (!challenge) {
+      return res.status(401).json({ message: 'Administrator sign-in challenge is invalid or expired.' });
+    }
+
+    const user = await findAdminForMfa(challenge.userId);
+    if (!user) {
+      return res.status(401).json({ message: 'Administrator sign-in challenge is invalid or expired.' });
+    }
+    const retryAfterSeconds = await loginAttemptProtection.getRetryAfter(user.email, req.ip);
+    if (retryAfterSeconds > 0) {
+      return res.status(429).json({
+        code: 'MFA_ATTEMPTS_EXCEEDED',
+        message: 'Too many incorrect sign-in codes. Please try again later.',
+        retryAfterSeconds,
+      });
+    }
+
+    const result = await issueAdminMfaCode(challenge.userId);
+    return res.json({
+      message: result.retryAfterSeconds > 0
+        ? 'A code was recently sent. Check your email or wait before requesting another.'
+        : 'A new sign-in code has been sent to your verified email address.',
+      challengeToken: createMfaChallenge(result.user),
+      retryAfterSeconds: result.retryAfterSeconds,
+    });
+  } catch (error) {
+    if (error instanceof AdminMfaError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+      });
+    }
+    logAuthFailure('Administrator sign-in code resend', error);
+    return res.status(500).json({ message: 'Unable to resend the sign-in code.' });
   }
 });
 
@@ -459,6 +805,9 @@ router.get('/session', async (req, res) => {
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.purpose && decoded.purpose !== 'access') {
+      return res.status(401).json({ message: 'Invalid or expired authentication token' });
+    }
     const user = await User.findById(decoded.userId).select('_id username email role patientId');
 
     if (!user) {
@@ -497,11 +846,28 @@ router.post('/verify-email', async (req, res) => {
 
     const verifiedUser = await emailVerificationService.verifyEmail(email, otp);
     await ensurePatientId(verifiedUser);
+    if (verifiedUser.role === 'admin') {
+      const mfaChallenge = await issueAdminMfaCode(verifiedUser._id);
+      return res.json({
+        message: 'Email verified successfully.',
+        ...createAdminMfaChallengeResponse(
+          mfaChallenge.user,
+          mfaChallenge.retryAfterSeconds
+        ),
+      });
+    }
     return res.json({
       message: 'Email verified successfully.',
       ...createAuthenticationPayload(verifiedUser),
     });
   } catch (error) {
+    if (error instanceof AdminMfaError) {
+      return res.status(error.status).json({
+        code: error.code,
+        message: error.message,
+        ...(error.retryAfterSeconds ? { retryAfterSeconds: error.retryAfterSeconds } : {}),
+      });
+    }
     if (error instanceof EmailVerificationError) {
       return res.status(error.status).json({
         code: error.code,
