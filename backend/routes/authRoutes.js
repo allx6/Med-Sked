@@ -593,9 +593,9 @@ router.post('/login', async (req, res) => {
     }
 
     if (user.accountStatus === 'deactivated') {
-      await loginAttemptProtection.recordFailedLogin(normalizedEmail, req.ip);
-      return res.status(401).json({
-        message: 'Invalid email or password.',
+      return res.status(403).json({
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Your account is deactivated. Contact an administrator for assistance.',
       });
     }
 

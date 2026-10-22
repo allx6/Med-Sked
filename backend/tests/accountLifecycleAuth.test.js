@@ -75,7 +75,12 @@ test('deactivated administrators cannot log in or complete MFA', async () => {
       email: user.email,
       password: 'secure-pass',
     });
-    assert.equal(login.statusCode, 401);
+    assert.equal(login.statusCode, 403);
+    assert.equal(login.body.code, 'ACCOUNT_DEACTIVATED');
+    assert.equal(
+      login.body.message,
+      'Your account is deactivated. Contact an administrator for assistance.'
+    );
     assert.equal(login.body.token, undefined);
     assert.equal(login.body.challengeToken, undefined);
     assert.equal(emailsSent, 0);

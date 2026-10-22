@@ -106,6 +106,7 @@ const invokeTakeOrSkip = async ({
   requestBody = {},
   requestUser = { role: 'patient', userId: USER_ID },
   previousTakenDose = null,
+  takenDoseHistory = [],
   pendingRebaseDoses = [],
   medicationUpdate,
   stockBatches,
@@ -216,6 +217,8 @@ const invokeTakeOrSkip = async ({
   DoseRecord.find = (filter = {}) => (
     filter.status === 'pending'
       ? Promise.resolve(pendingRebaseDoses)
+      : filter.status === 'taken'
+        ? { lean: async () => takenDoseHistory }
       : {
         populate() {
           return this;
@@ -487,6 +490,23 @@ test('explicit early interval TAKE is recorded after the verified interval elaps
   assert.equal(response.body.takenTiming, 'early');
 });
 
+test('interval TAKE is rejected when a dose is due but the prior administration was too recent', async () => {
+  const dose = scheduledDoseAfterMinutes(-10, { refillDeducted: true });
+  const previousTakenAt = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  const { response, updates, doseTransitionAttempts } = await invokeTakeOrSkip({
+    action: 'take',
+    stock: 2,
+    dose,
+    frequency: 'Every 8 hours',
+    previousTakenDose: { takenAt: previousTakenAt },
+  });
+
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.code, 'DOSE_INTERVAL_NOT_ELAPSED');
+  assert.equal(updates.length, 0);
+  assert.equal(doseTransitionAttempts, 0);
+});
+
 test('taking an interval dose later shifts the next pending dose by the same delay', async () => {
   const originalNextDose = scheduledDoseAfterMinutes(8 * 60, {
     _id: '507f1f77bcf86cd799439018',
@@ -540,6 +560,28 @@ test('correcting a missed dose deducts stock once while recording the past admin
   assert.equal(response.body.correctionReason, 'Patient confirmed the dose was taken.');
   assert.equal(updates.length, 1);
   assert.equal(updates[0].update.$inc.quantityOnHand, -1);
+});
+
+test('interval correction is rejected when it conflicts with a later recorded administration', async () => {
+  const actualTakenAt = new Date(Date.now() - 30 * 60 * 1000);
+  const nextTakenAt = new Date(actualTakenAt.getTime() + 5 * 60 * 1000);
+  const dose = scheduledDoseAfterMinutes(-90, { status: 'missed' });
+  const { response, updates, doseTransitionAttempts } = await invokeTakeOrSkip({
+    action: 'correct-taken',
+    stock: 3,
+    dose,
+    frequency: 'Every 8 hours',
+    takenDoseHistory: [{ takenAt: nextTakenAt }],
+    requestBody: {
+      takenAt: actualTakenAt.toISOString(),
+      correctionReason: 'Patient confirmed the dose was taken.',
+    },
+  });
+
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.body.code, 'DOSE_INTERVAL_CONFLICT');
+  assert.equal(updates.length, 0);
+  assert.equal(doseTransitionAttempts, 0);
 });
 
 test('a repeated TAKE of an already-taken dose does not deduct again', async () => {

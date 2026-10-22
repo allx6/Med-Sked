@@ -522,6 +522,15 @@ router.put(
       }
       const isEarly = nowWallClock < scheduledAt;
       const intervalMinutes = getMedicationFrequencyInterval(medication);
+      let previousTakenDose = null;
+      if (intervalMinutes) {
+        previousTakenDose = await DoseRecord.findOne({
+          userId: doseOwnerId,
+          scheduleId: existingDose.scheduleId,
+          status: 'taken',
+          takenAt: { $ne: null },
+        }).sort({ takenAt: -1 }).lean();
+      }
       if (isEarly) {
         if (req.body?.earlyDoseConfirmed !== true) {
           return res.status(409).json({
@@ -535,28 +544,24 @@ router.put(
             message: 'Early recording is only available for an explicit interval-based medication schedule.',
           });
         }
-        const previousDose = await DoseRecord.findOne({
-          userId: doseOwnerId,
-          scheduleId: existingDose.scheduleId,
-          status: 'taken',
-          takenAt: { $ne: null },
-        }).sort({ takenAt: -1 }).lean();
-        if (!previousDose?.takenAt) {
+        if (!previousTakenDose?.takenAt) {
           return res.status(409).json({
             code: 'EARLY_DOSE_INTERVAL_UNVERIFIED',
             message: 'The minimum interval cannot be verified for this dose. Follow the prescription or contact your care team.',
           });
         }
+      }
+      if (previousTakenDose?.takenAt) {
         const previousTakenAt = toWallClockTimestamp(
-          getMedicationLocalParts(new Date(previousDose.takenAt))
+          getMedicationLocalParts(new Date(previousTakenDose.takenAt))
         );
         if (
           nowWallClock.getTime() - previousTakenAt.getTime()
           < intervalMinutes * 60 * 1000
         ) {
           return res.status(409).json({
-            code: 'EARLY_DOSE_INTERVAL_NOT_MET',
-            message: 'The prescribed interval since the last recorded dose has not elapsed.',
+            code: isEarly ? 'EARLY_DOSE_INTERVAL_NOT_MET' : 'DOSE_INTERVAL_NOT_ELAPSED',
+            message: 'The prescribed minimum interval since the last recorded dose has not elapsed.',
           });
         }
       }
@@ -845,27 +850,46 @@ router.put(
             message: 'An early dose correction is only available for an explicit interval-based medication schedule.',
           });
         }
-        const previousDose = await DoseRecord.findOne({
+      }
+      const intervalTakenDoses = intervalMinutes
+        ? await DoseRecord.find({
           userId: doseOwnerId,
           scheduleId: existingDose.scheduleId,
           status: 'taken',
           takenAt: { $ne: null },
-        }).sort({ takenAt: -1 }).lean();
-        if (!previousDose?.takenAt) {
-          return res.status(409).json({
-            code: 'EARLY_DOSE_INTERVAL_UNVERIFIED',
-            message: 'The minimum interval cannot be verified for this correction.',
-          });
-        }
-        const previousWallClock = toWallClockTimestamp(
-          getMedicationLocalParts(new Date(previousDose.takenAt))
-        );
-        if (actualWallClock.getTime() - previousWallClock.getTime() < intervalMinutes * 60 * 1000) {
-          return res.status(409).json({
-            code: 'EARLY_DOSE_INTERVAL_NOT_MET',
-            message: 'The prescribed interval since the last recorded dose had not elapsed.',
-          });
-        }
+        }).lean()
+        : [];
+      const intervalTakenTimes = intervalTakenDoses
+        .map((dose) => dose.takenAt && toWallClockTimestamp(
+          getMedicationLocalParts(new Date(dose.takenAt))
+        ))
+        .filter(Boolean);
+      const previousIntervalTakenAt = intervalTakenTimes
+        .filter((value) => value <= actualWallClock)
+        .sort((a, b) => b - a)[0];
+      const nextIntervalTakenAt = intervalTakenTimes
+        .filter((value) => value >= actualWallClock)
+        .sort((a, b) => a - b)[0];
+
+      if (intervalMinutes && isEarly && !previousIntervalTakenAt) {
+        return res.status(409).json({
+          code: 'EARLY_DOSE_INTERVAL_UNVERIFIED',
+          message: 'The minimum interval cannot be verified for this correction.',
+        });
+      }
+      if (
+        intervalMinutes
+        && (
+          (previousIntervalTakenAt
+            && actualWallClock.getTime() - previousIntervalTakenAt.getTime() < intervalMinutes * 60 * 1000)
+          || (nextIntervalTakenAt
+            && nextIntervalTakenAt.getTime() - actualWallClock.getTime() < intervalMinutes * 60 * 1000)
+        )
+      ) {
+        return res.status(409).json({
+          code: 'DOSE_INTERVAL_CONFLICT',
+          message: 'This correction would place recorded doses closer together than the prescribed interval.',
+        });
       }
 
       const takenTiming = isEarly
@@ -935,7 +959,7 @@ router.put(
         });
       }
 
-      if (intervalMinutes) {
+      if (intervalMinutes && !nextIntervalTakenAt) {
         await rebasePendingIntervalDoses({
           userId: doseOwnerId,
           scheduleId: existingDose.scheduleId,
