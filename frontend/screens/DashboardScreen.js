@@ -96,6 +96,7 @@ export default function DashboardScreen({
     error,
     setError,
   ] = useState('');
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -150,6 +151,7 @@ export default function DashboardScreen({
           }
 
           setError('');
+          setSessionExpired(false);
 
           const medicationsStart = performance.now();
           const medicationPromise = getMedications(token).then((data) => {
@@ -188,6 +190,7 @@ export default function DashboardScreen({
             err
           );
 
+          setSessionExpired(err.statusCode === 401);
           setError(
             getSafeUserErrorMessage(
               err,
@@ -859,9 +862,7 @@ export default function DashboardScreen({
             </Text>
 
             <Pressable
-              onPress={() =>
-                loadDashboard()
-              }
+              onPress={sessionExpired ? onLogout : () => loadDashboard()}
             >
 
               <Text
@@ -869,7 +870,7 @@ export default function DashboardScreen({
                   styles.retryText
                 }
               >
-                Retry
+                {sessionExpired ? 'Log in again' : 'Retry'}
               </Text>
 
             </Pressable>

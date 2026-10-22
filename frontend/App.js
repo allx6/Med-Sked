@@ -182,8 +182,7 @@ export default function App() {
   // LOGOUT
   // =====================================================
 
-  function handleLogout() {
-
+  const handleLogout = useCallback(() => {
     setUser(null);
 
     setToken('');
@@ -197,8 +196,7 @@ export default function App() {
     setAnalyticsPatientId(null);
 
     setScreen('login');
-  }
-
+  }, []);
 
   // =====================================================
   // EDIT MEDICATION
@@ -596,6 +594,7 @@ export default function App() {
           <CaregiverConnectionsScreen
 
             token={token}
+            onLogout={handleLogout}
 
             onOpenPatientMonitoring={
               handleSelectPatient

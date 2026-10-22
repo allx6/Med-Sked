@@ -37,15 +37,24 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const user = await User.findById(decoded.userId)
-      .select('_id accountStatus +authTokenVersion')
+      .select('_id accountStatus authTokenVersion')
       .lean();
-    if (
-      !user
-      || user.accountStatus === 'deactivated'
-      || Number(user.authTokenVersion || 0) !== Number(decoded.sessionVersion || 0)
-    ) {
+    if (!user) {
       return res.status(401).json({
-        message: 'Session is invalid or the account is inactive.',
+        code: 'USER_NOT_FOUND',
+        message: 'The account for this session could not be found.',
+      });
+    }
+    if (user.accountStatus === 'deactivated') {
+      return res.status(401).json({
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Your account is deactivated. Contact an administrator for assistance.',
+      });
+    }
+    if (Number(user.authTokenVersion || 0) !== Number(decoded.sessionVersion || 0)) {
+      return res.status(401).json({
+        code: 'SESSION_VERSION_MISMATCH',
+        message: 'Your session is no longer valid. Please sign in again.',
       });
     }
 

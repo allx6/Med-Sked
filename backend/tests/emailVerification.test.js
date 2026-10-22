@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const LoginAttemptState = require('../models/LoginAttemptState');
 const emailService = require('../services/emailService');
+const authMiddleware = require('../middleware/authMiddleware');
 const authRoutes = require('../routes/authRoutes');
 const {
   createEmailVerificationService,
@@ -120,6 +121,7 @@ const expectVerificationError = async (promise, code) => {
 const installRouteStore = (initialUser, sendEmail = async () => {}) => {
   const originals = {
     findOne: User.findOne,
+    findById: User.findById,
     findOneAndUpdate: User.findOneAndUpdate,
     updateOne: User.updateOne,
     exists: User.exists,
@@ -134,13 +136,27 @@ const installRouteStore = (initialUser, sendEmail = async () => {}) => {
   const sentCodes = [];
   const loginStates = new Map();
 
-  User.findOne = async (filter) => {
-    const current = store.get();
-    if (!current) return null;
-    return Object.entries(filter).every(([key, value]) => current[key] === value)
-      ? current
-      : null;
-  };
+  User.findOne = (filter) => ({
+    select() {
+      return this;
+    },
+    then(resolve, reject) {
+      const current = store.get();
+      const match = current
+        && Object.entries(filter).every(([key, value]) => current[key] === value);
+      return Promise.resolve(match ? current : null).then(resolve, reject);
+    },
+  });
+  User.findById = (id) => ({
+    select() {
+      return this;
+    },
+    then(resolve, reject) {
+      const current = store.get();
+      return Promise.resolve(current && current._id === id ? current : null)
+        .then(resolve, reject);
+    },
+  });
   User.findOneAndUpdate = store.findOneAndUpdate;
   User.updateOne = store.updateOne;
   User.exists = async () => false;
@@ -200,6 +216,7 @@ const installRouteStore = (initialUser, sendEmail = async () => {}) => {
     restore: () => {
       Object.assign(User, {
         findOne: originals.findOne,
+        findById: originals.findById,
         findOneAndUpdate: originals.findOneAndUpdate,
         updateOne: originals.updateOne,
         exists: originals.exists,
@@ -715,6 +732,133 @@ test('verified login preserves the existing token response and claims', async ()
     );
     assert.ok(claims.exp - claims.iat <= 7 * 24 * 60 * 60);
     assert.equal(mocks.loginStates.size, 0);
+  } finally {
+    mocks.restore();
+    if (originalSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = originalSecret;
+    }
+  }
+});
+
+test('reactivated caregiver login issues a token accepted at the current session version', async () => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'reactivated-caregiver-session-test-secret';
+  const user = {
+    _id: 'user-1',
+    username: 'reactivated-caregiver',
+    email: 'caregiver@example.com',
+    password: await bcrypt.hash('secure-pass', 4),
+    role: 'caregiver',
+    emailVerified: true,
+    accountStatus: 'active',
+    authTokenVersion: 1,
+  };
+  const mocks = installRouteStore(user);
+
+  try {
+    const response = await invokeAuthRoute('/login', {
+      email: user.email,
+      password: 'secure-pass',
+    });
+    assert.equal(response.statusCode, 200);
+
+    const claims = jwt.verify(response.body.token, process.env.JWT_SECRET);
+    assert.equal(claims.sessionVersion, 1);
+
+    User.findById = () => ({
+      select() {
+        return this;
+      },
+      lean: async () => ({
+        _id: user._id,
+        accountStatus: user.accountStatus,
+        authTokenVersion: user.authTokenVersion,
+      }),
+    });
+    const middlewareResponse = {
+      statusCode: 200,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        this.body = body;
+        return this;
+      },
+    };
+    let nextCalled = false;
+    await authMiddleware({
+      headers: { authorization: `Bearer ${response.body.token}` },
+    }, middlewareResponse, () => { nextCalled = true; });
+
+    assert.equal(middlewareResponse.statusCode, 200);
+    assert.equal(nextCalled, true);
+  } finally {
+    mocks.restore();
+    if (originalSecret === undefined) {
+      delete process.env.JWT_SECRET;
+    } else {
+      process.env.JWT_SECRET = originalSecret;
+    }
+  }
+});
+
+test('reactivated patient login issues a token with the current session version', async () => {
+  const originalSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'reactivated-patient-session-test-secret';
+  const user = {
+    _id: 'user-2',
+    username: 'reactivated-patient',
+    email: 'patient@example.com',
+    password: await bcrypt.hash('secure-pass', 4),
+    role: 'patient',
+    patientId: 'MSK-123456',
+    emailVerified: true,
+    accountStatus: 'active',
+    authTokenVersion: 2,
+  };
+  const mocks = installRouteStore(user);
+
+  try {
+    const response = await invokeAuthRoute('/login', {
+      email: user.email,
+      password: 'secure-pass',
+    });
+    assert.equal(response.statusCode, 200);
+
+    const claims = jwt.verify(response.body.token, process.env.JWT_SECRET);
+    assert.equal(claims.sessionVersion, 2);
+    assert.equal(claims.role, 'patient');
+
+    User.findById = () => ({
+      select() {
+        return this;
+      },
+      lean: async () => ({
+        _id: user._id,
+        accountStatus: user.accountStatus,
+        authTokenVersion: user.authTokenVersion,
+      }),
+    });
+    const middlewareResponse = {
+      statusCode: 200,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        this.body = body;
+        return this;
+      },
+    };
+    let nextCalled = false;
+    await authMiddleware({
+      headers: { authorization: `Bearer ${response.body.token}` },
+    }, middlewareResponse, () => { nextCalled = true; });
+    assert.equal(middlewareResponse.statusCode, 200);
+    assert.equal(nextCalled, true);
   } finally {
     mocks.restore();
     if (originalSecret === undefined) {
