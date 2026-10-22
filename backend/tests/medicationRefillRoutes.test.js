@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const mongoose = require('mongoose');
 const Medication = require('../models/Medication');
+const MedicationSchedule = require('../models/MedicationSchedule');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const notificationServicePath = require.resolve('../services/notificationService');
 const originalNotificationService = require.cache[notificationServicePath];
@@ -40,6 +42,7 @@ const invokeRefillRoute = async ({
   relationshipExists = true,
   medication = { _id: MEDICATION_ID, userId: PATIENT_ID, quantityOnHand: 2, refillThreshold: 5, expirationDate: null },
   refillAmount,
+  expirationDate,
 }) => {
   const layer = medicationRoutes.stack.find((item) => (
     item.route?.path === '/:id/refill' && item.route.methods.post
@@ -51,6 +54,7 @@ const invokeRefillRoute = async ({
     medicationFindOneAndUpdate: Medication.findOneAndUpdate,
     relationshipFindOne: CaregiverRelationship.findOne,
   };
+  let currentMedication = medication;
   const captured = { medicationQuery: null, updateFilter: null, updateData: null };
   const response = {
     statusCode: 200,
@@ -67,20 +71,34 @@ const invokeRefillRoute = async ({
 
   Medication.findOne = async (query) => {
     captured.medicationQuery = query;
-    return medication;
+    return currentMedication;
   };
   lowRefillNotificationCalls.length = 0;
   Medication.findOneAndUpdate = async (filter, update) => {
     captured.updateFilter = filter;
     captured.updateData = update;
-    const newQuantity = medication.quantityOnHand + Number(refillAmount);
-    return {
-      ...medication,
+    if (update.$set?.stockBatches) {
+      currentMedication = {
+        ...currentMedication,
+        stockBatches: update.$set.stockBatches,
+      };
+      return currentMedication;
+    }
+    const newQuantity = currentMedication.quantityOnHand + Number(refillAmount);
+    const newBatches = [
+      ...(currentMedication.stockBatches || []),
+      ...(update.$push?.stockBatches ? [update.$push.stockBatches] : []),
+    ];
+    currentMedication = {
+      ...currentMedication,
       quantityOnHand: newQuantity,
-      lowRefillNotified: newQuantity > medication.refillThreshold
+      stockBatches: newBatches,
+      expirationDate: update.$set?.expirationDate ?? currentMedication.expirationDate,
+      lowRefillNotified: newQuantity > currentMedication.refillThreshold
         ? false
-        : medication.lowRefillNotified,
+        : currentMedication.lowRefillNotified,
     };
+    return currentMedication;
   };
   CaregiverRelationship.findOne = async () => (
     relationshipExists ? { permission } : null
@@ -90,7 +108,12 @@ const invokeRefillRoute = async ({
     user: { role, userId },
     params: { id: MEDICATION_ID },
     query: patientId ? { patientId } : {},
-    body: { refillAmount },
+    body: {
+      refillAmount,
+      ...(expirationDate !== undefined
+        ? { expirationDate }
+        : {}),
+    },
   };
 
   try {
@@ -136,6 +159,12 @@ test('patient refill increments stock by a positive amount and preserves other f
   assert.equal(response.body.expirationDate, null);
   assert.equal(response.body.name, 'Medicine');
   assert.equal(response.body.lowRefillNotified, false);
+  assert.deepEqual(
+    response.body.stockBatches.map((batch) => batch.remainingQuantity),
+    [9, 10]
+  );
+  assert.equal(response.body.stockBatches[0].source, 'legacy');
+  assert.equal(response.body.stockBatches[1].source, 'refill');
   assert.equal(String(captured.medicationQuery.userId), PATIENT_ID);
   assert.equal(captured.updateData.$inc.quantityOnHand, 10);
   assert.equal(captured.updateData.$set.lowRefillNotified, false);
@@ -217,6 +246,40 @@ test('refill is allowed on expiration day and rejected after expiration', async 
   assert.equal(expired.response.body.message, 'Cannot refill an expired medication.');
 });
 
+test('new refill batch requires a valid non-past expiration date', async () => {
+  const today = formatLocalDate(new Date());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const todayBatch = await invokeRefillRoute({
+    refillAmount: 1,
+    expirationDate: today,
+    medication: {
+      _id: MEDICATION_ID,
+      userId: PATIENT_ID,
+      quantityOnHand: 2,
+      refillThreshold: 5,
+      expirationDate: formatLocalDate(yesterday),
+    },
+  });
+  assert.equal(todayBatch.response.statusCode, 200);
+  assert.equal(todayBatch.response.body.stockBatches.at(-1).expirationDate, today);
+
+  const pastBatch = await invokeRefillRoute({
+    refillAmount: 1,
+    expirationDate: formatLocalDate(yesterday),
+  });
+  assert.equal(pastBatch.response.statusCode, 400);
+  assert.equal(pastBatch.response.body.message, 'Batch expiration date cannot be earlier than today.');
+
+  const invalidBatch = await invokeRefillRoute({
+    refillAmount: 1,
+    expirationDate: '2026-02-30',
+  });
+  assert.equal(invalidBatch.response.statusCode, 400);
+  assert.equal(invalidBatch.response.body.message, 'Batch expiration date must be a valid YYYY-MM-DD date.');
+});
+
 test('ADHERENCE_SUPPORT caregiver can refill the selected patient medication', async () => {
   const { response, captured } = await invokeRefillRoute({
     role: 'caregiver',
@@ -224,11 +287,15 @@ test('ADHERENCE_SUPPORT caregiver can refill the selected patient medication', a
     patientId: PATIENT_ID,
     permission: 'ADHERENCE_SUPPORT',
     refillAmount: 3,
+    expirationDate: '2099-12-31',
     medication: { _id: MEDICATION_ID, userId: PATIENT_ID, quantityOnHand: 2, refillThreshold: 5, expirationDate: null },
   });
 
   assert.equal(response.statusCode, 200);
   assert.equal(String(captured.medicationQuery.userId), PATIENT_ID);
+  const refillBatch = response.body.stockBatches.find((batch) => batch.source === 'refill');
+  assert.equal(refillBatch.expirationDate, '2099-12-31');
+  assert.equal(String(refillBatch.receivedBy), CAREGIVER_ID);
 });
 
 test('VIEW_ONLY caregiver cannot refill', async () => {
@@ -265,8 +332,10 @@ test('manual quantity update above threshold re-arms existing low-refill notific
   ));
   const handler = layer.route.stack.at(-1).handle;
   const originals = {
+    startSession: mongoose.startSession,
     medicationFindOne: Medication.findOne,
     medicationFindOneAndUpdate: Medication.findOneAndUpdate,
+    scheduleFindOne: MedicationSchedule.findOne,
   };
   let update;
   const response = {
@@ -282,11 +351,31 @@ test('manual quantity update above threshold re-arms existing low-refill notific
     },
   };
 
-  Medication.findOne = async () => null;
+  let medicationLookupCount = 0;
+  Medication.findOne = async () => {
+    medicationLookupCount += 1;
+    return medicationLookupCount === 1
+      ? {
+        _id: MEDICATION_ID,
+        userId: PATIENT_ID,
+        name: 'Medicine',
+        dosage: '10 mg',
+        frequency: 'Every 8 hours',
+        expirationDate: '2099-01-01',
+      }
+      : null;
+  };
   Medication.findOneAndUpdate = async (_filter, fields) => {
     update = fields;
     return { _id: MEDICATION_ID, quantityOnHand: fields.quantityOnHand, refillThreshold: fields.refillThreshold };
   };
+  MedicationSchedule.findOne = () => ({
+    session: async () => null,
+  });
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
 
   try {
     await handler({
@@ -302,8 +391,10 @@ test('manual quantity update above threshold re-arms existing low-refill notific
       },
     }, response);
   } finally {
+    mongoose.startSession = originals.startSession;
     Medication.findOne = originals.medicationFindOne;
     Medication.findOneAndUpdate = originals.medicationFindOneAndUpdate;
+    MedicationSchedule.findOne = originals.scheduleFindOne;
   }
 
   assert.equal(response.statusCode, 200);

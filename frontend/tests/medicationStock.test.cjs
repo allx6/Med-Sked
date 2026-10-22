@@ -9,9 +9,15 @@ const source = fs.readFileSync(
 );
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
 let isMedicationLowStock;
+let getUsableMedicationQuantity;
+let getNextBatchExpirationDate;
 
 test('load medication stock helper', async () => {
-  ({ isMedicationLowStock } = await import(moduleUrl));
+  ({
+    getNextBatchExpirationDate,
+    getUsableMedicationQuantity,
+    isMedicationLowStock,
+  } = await import(moduleUrl));
 });
 
 test('stock status includes zero and quantities at the refill threshold', () => {
@@ -22,6 +28,26 @@ test('stock status includes zero and quantities at the refill threshold', () => 
 
 test('stock status is in-stock only above the refill threshold', () => {
   assert.equal(isMedicationLowStock({ quantityOnHand: 3, refillThreshold: 2 }), false);
+});
+
+test('expired batches do not count toward usable stock or low-stock status', () => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const medication = {
+    quantityOnHand: 12,
+    refillThreshold: 3,
+    stockBatches: [
+      { remainingQuantity: 10, expirationDate: `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}` },
+      { remainingQuantity: 2, expirationDate: `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}` },
+    ],
+  };
+
+  assert.equal(getUsableMedicationQuantity(medication, today), 2);
+  assert.equal(isMedicationLowStock(medication), true);
+  assert.equal(getNextBatchExpirationDate(medication, today), medication.stockBatches[1].expirationDate);
 });
 
 test('patient monitoring presents the stock label and expiration date with semantic colors', () => {

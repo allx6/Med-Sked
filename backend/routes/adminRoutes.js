@@ -324,8 +324,12 @@ router.get('/stats', async (req, res) => {
 
 router.get('/analytics/dose-outcomes', async (req, res) => {
   try {
-    return res.json(await getDoseOutcomes());
+    const days = parseDays(req.query.days);
+    return res.json(await getDoseOutcomes(days));
   } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     console.error('Admin dose outcomes error:', error.message);
     return res.status(500).json({
       message: 'Failed to retrieve dose outcome analytics.',
@@ -351,8 +355,12 @@ router.get('/analytics/adherence-trend', async (req, res) => {
 
 router.get('/analytics/time-of-day', async (req, res) => {
   try {
-    return res.json(await getTimeOfDay());
+    const days = parseDays(req.query.days);
+    return res.json(await getTimeOfDay(days));
   } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     console.error('Admin time-of-day analytics error:', error.message);
     return res.status(500).json({
       message: 'Failed to retrieve time-of-day analytics.',
@@ -362,8 +370,12 @@ router.get('/analytics/time-of-day', async (req, res) => {
 
 router.get('/analytics/regimen-complexity', async (req, res) => {
   try {
-    return res.json(await getRegimenComplexity());
+    const days = parseDays(req.query.days);
+    return res.json(await getRegimenComplexity(days));
   } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ message: error.message });
+    }
     console.error('Admin regimen complexity error:', error.message);
     return res.status(500).json({
       message: 'Failed to retrieve regimen complexity analytics.',

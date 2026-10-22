@@ -6,14 +6,14 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 const DoseRecord = require('../models/DoseRecord');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const Notification = require('../models/Notification');
+const { formatLocalDate } = require('../utils/medicationInventory');
+const { buildEligibleDosePipeline } = require('../utils/adherence');
 
 const TIME_BUCKETS = ['morning', 'afternoon', 'evening', 'night'];
 const OUTCOME_STATUSES = ['taken', 'skipped', 'missed'];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-const formatDate = (date) => (
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-);
+const formatDate = formatLocalDate;
 
 const parseDays = (value, fallback = 30) => {
   if (value === undefined) {
@@ -32,15 +32,13 @@ const parseDays = (value, fallback = 30) => {
 };
 
 const getDateRange = (days) => {
-  const end = new Date();
-  end.setHours(0, 0, 0, 0);
-
-  const start = new Date(end);
-  start.setDate(start.getDate() - days + 1);
+  const endDate = formatDate();
+  const start = new Date(`${endDate}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - days + 1);
 
   return {
     startDate: formatDate(start),
-    endDate: formatDate(end),
+    endDate,
   };
 };
 
@@ -92,30 +90,13 @@ const timeOfDay = (value) => {
   return 'night';
 };
 
-const getOutcomeAggregation = ({ startDate, endDate } = {}) => {
-  const match = {
-    ...(startDate || endDate
-      ? { scheduledDate: { ...(startDate ? { $gte: startDate } : {}), ...(endDate ? { $lte: endDate } : {}) } }
-      : {}),
-  };
-
-  return [
-    { $match: match },
-    {
-      $group: {
-        _id: { status: '$status', scheduledDate: '$scheduledDate' },
-        count: { $sum: 1 },
-      },
-    },
-  ];
-};
-
 const getStats = async () => {
   const [
     users,
     medications,
     schedules,
     doses,
+    adherenceCounts,
     relationships,
     notifications,
   ] = await Promise.all([
@@ -165,6 +146,15 @@ const getStats = async () => {
         },
       },
     ]),
+    DoseRecord.aggregate([
+      ...buildEligibleDosePipeline({
+        medicationCollection: Medication.collection.name,
+        ...getDateRange(30),
+        today: formatDate(new Date()),
+      }),
+      { $match: { status: { $in: OUTCOME_STATUSES } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]),
     CaregiverRelationship.aggregate([
       {
         $group: {
@@ -213,7 +203,11 @@ const getStats = async () => {
     notificationByType[item._id] = item.count;
   }
 
-  const eligible = doseStats.taken + doseStats.skipped + doseStats.missed;
+  const adherenceStats = emptyOutcomeCounts();
+  for (const item of adherenceCounts) {
+    addOutcome(adherenceStats, item._id, item.count);
+  }
+  const eligible = adherenceStats.taken + adherenceStats.skipped + adherenceStats.missed;
 
   return {
     users: {
@@ -233,11 +227,12 @@ const getStats = async () => {
     },
     doses: doseStats,
     adherence: {
-      taken: doseStats.taken,
-      skipped: doseStats.skipped,
-      missed: doseStats.missed,
+      days: 30,
+      taken: adherenceStats.taken,
+      skipped: adherenceStats.skipped,
+      missed: adherenceStats.missed,
       eligible: eligible,
-      rate: percentage(doseStats.taken, eligible),
+      rate: eligible > 0 ? percentage(adherenceStats.taken, eligible) : null,
     },
     relationships: relationshipStats,
     notifications: {
@@ -252,14 +247,15 @@ const getStats = async () => {
   };
 };
 
-const getDoseOutcomes = async () => {
+const getDoseOutcomes = async (days = 30) => {
+  const range = getDateRange(days);
   const grouped = await DoseRecord.aggregate([
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-      },
-    },
+    ...buildEligibleDosePipeline({
+      medicationCollection: Medication.collection.name,
+      ...range,
+      today: range.endDate,
+    }),
+    { $group: { _id: '$status', count: { $sum: 1 } } },
   ]);
   const counts = emptyOutcomeCounts();
 
@@ -268,6 +264,7 @@ const getDoseOutcomes = async () => {
   }
 
   return {
+    days,
     data: OUTCOME_STATUSES.map((status) => ({
       status,
       count: counts[status],
@@ -276,9 +273,21 @@ const getDoseOutcomes = async () => {
   };
 };
 
-const getAdherenceTrend = async (days) => {
+const getAdherenceTrend = async (days = 30) => {
   const range = getDateRange(days);
-  const grouped = await DoseRecord.aggregate(getOutcomeAggregation(range));
+  const grouped = await DoseRecord.aggregate([
+    ...buildEligibleDosePipeline({
+      medicationCollection: Medication.collection.name,
+      ...range,
+      today: range.endDate,
+    }),
+    {
+      $group: {
+        _id: { status: '$status', scheduledDate: '$scheduledDate' },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
   const daily = new Map();
 
   for (const item of grouped) {
@@ -289,8 +298,8 @@ const getAdherenceTrend = async (days) => {
   }
 
   const data = [];
-  const current = new Date(`${range.startDate}T00:00:00`);
-  const end = new Date(`${range.endDate}T00:00:00`);
+  const current = new Date(`${range.startDate}T00:00:00Z`);
+  const end = new Date(`${range.endDate}T00:00:00Z`);
 
   while (current <= end) {
     const date = formatDate(current);
@@ -301,21 +310,23 @@ const getAdherenceTrend = async (days) => {
       taken: counts.taken,
       skipped: counts.skipped,
       missed: counts.missed,
-      adherenceRate: percentage(counts.taken, eligible),
+      adherenceRate: eligible > 0 ? percentage(counts.taken, eligible) : null,
     });
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return { days, data };
 };
 
-const getTimeOfDay = async () => {
+const getTimeOfDay = async (days = 30) => {
+  const range = getDateRange(days);
   const grouped = await DoseRecord.aggregate([
-    {
-      $match: {
-        status: { $in: OUTCOME_STATUSES },
-      },
-    },
+    ...buildEligibleDosePipeline({
+      medicationCollection: Medication.collection.name,
+      ...range,
+      today: range.endDate,
+    }),
+    { $match: { status: { $in: OUTCOME_STATUSES } } },
     {
       $group: {
         _id: { status: '$status', scheduledTime: '$scheduledTime' },
@@ -335,19 +346,21 @@ const getTimeOfDay = async () => {
   }
 
   return {
+    days,
     data: TIME_BUCKETS.map((timeBucket) => {
       const counts = buckets[timeBucket];
       const eligible = counts.taken + counts.skipped + counts.missed;
       return {
         timeOfDay: timeBucket,
         ...counts,
-        adherenceRate: percentage(counts.taken, eligible),
+        adherenceRate: eligible > 0 ? percentage(counts.taken, eligible) : null,
       };
     }),
   };
 };
 
-const getRegimenComplexity = async () => {
+const getRegimenComplexity = async (days = 30) => {
+  const range = getDateRange(days);
   const scheduleGroups = await MedicationSchedule.aggregate([
     { $match: { enabled: true } },
     {
@@ -365,11 +378,12 @@ const getRegimenComplexity = async () => {
     },
   ]);
   const doseGroups = await DoseRecord.aggregate([
-    {
-      $match: {
-        status: { $in: OUTCOME_STATUSES },
-      },
-    },
+    ...buildEligibleDosePipeline({
+      medicationCollection: Medication.collection.name,
+      ...range,
+      today: range.endDate,
+    }),
+    { $match: { status: { $in: OUTCOME_STATUSES } } },
     {
       $group: {
         _id: { userId: '$userId', status: '$status' },

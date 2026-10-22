@@ -22,6 +22,7 @@ const {
   generateTodayDoses,
   reconcilePendingDosesForSchedule,
 } = require('../services/doseGenerator');
+const { getMedicationExpirationDate } = require('../utils/medicationInventory');
 
 const router = express.Router();
 
@@ -269,7 +270,7 @@ router.post(
       }
 
       const validationError = validateScheduleFields(payload, {
-        medicationExpirationDate: medication.expirationDate,
+        medicationExpirationDate: getMedicationExpirationDate(medication),
         rejectExpiredMedication: true,
       });
 
@@ -525,7 +526,7 @@ router.put(
         enabled: updateFields.enabled,
       }, {
         allowPastStartDate: true,
-        medicationExpirationDate: medication.expirationDate,
+        medicationExpirationDate: getMedicationExpirationDate(medication),
         validateStartDateExpiration: false,
         validateEndDateExpiration: true,
       });

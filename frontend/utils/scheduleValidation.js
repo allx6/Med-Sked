@@ -130,6 +130,17 @@ export const validateScheduleFields = (schedule, {
   return '';
 };
 
+export const getScheduleFieldError = (message) => {
+  if (!message) return null;
+  if (/start date/i.test(message)) return 'startDate';
+  if (/end date|expiration date/i.test(message)) return 'endDate';
+  if (/medication/i.test(message)) return 'medication';
+  if (/time/i.test(message)) return 'time';
+  if (/dose/i.test(message)) return 'dose';
+  if (/day/i.test(message)) return 'days';
+  return null;
+};
+
 export const getScheduleSubmissionErrorMessage = (error) => {
   const message = typeof error?.message === 'string' ? error.message.trim() : '';
   const genericError = /^(?:TypeError:|Network request failed$|Failed to fetch$|fetch failed$|Unable to connect to the Med-Sked server\b|Failed to process schedule request\b|Request failed with status \d+)/i;

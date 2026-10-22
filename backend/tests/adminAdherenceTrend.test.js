@@ -44,8 +44,13 @@ test('admin adherence trend returns daily dose outcome counts from dose records'
       taken: 0,
       skipped: 0,
       missed: 0,
-      adherenceRate: 0,
+      adherenceRate: null,
     });
+    assert.ok(pipeline.some((stage) => stage.$lookup?.from === 'medications'));
+    assert.ok(pipeline.some((stage) => (
+      stage.$addFields?.effectiveMedicationExpiration?.$let?.vars?.remainingBatches?.$filter?.input
+        ?.$ifNull?.[0] === '$medication.stockBatches'
+    )));
     assert.ok(pipeline.some((stage) => stage.$group?._id?.scheduledDate === '$scheduledDate'));
     assert.ok(pipeline.some((stage) => stage.$group?._id?.status === '$status'));
   } finally {

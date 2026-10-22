@@ -12,6 +12,7 @@ const { createNotification } = require('../services/notificationService');
 const { createAuditLog } = require('../services/auditLogService');
 const { generateTodayDoses } = require('../services/doseGenerator');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
+const { getMedicationExpirationDate } = require('../utils/medicationInventory');
 
 const router = express.Router();
 const PATIENT_SEARCH_RESULT_LIMIT = 10;
@@ -442,7 +443,10 @@ router.get(
             );
 
             return dose.scheduledDate === today
-              && !isDoseDateAfterExpiration(dose.scheduledDate, medication?.expirationDate);
+              && !isDoseDateAfterExpiration(
+                dose.scheduledDate,
+                getMedicationExpirationDate(medication)
+              );
           }
         );
 

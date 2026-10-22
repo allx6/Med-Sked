@@ -21,11 +21,12 @@ import MedicineNameInput from '../components/MedicineNameInput';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import {
+  getMedicationFieldErrors,
   getSafeUserErrorMessage,
   isValidMedicationNumericInput,
   isValidMedicationFrequencyInput,
-  validateMedicationFields,
 } from '../utils/medicationValidation';
 
 
@@ -52,6 +53,8 @@ export default function AddMedicationScreen({
   todayStart.setHours(0, 0, 0, 0);
 
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [reviewVisible, setReviewVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const openExpirationDatePicker = () => {
@@ -73,25 +76,34 @@ export default function AddMedicationScreen({
   };
 
 
-  async function handleSubmit() {
-    setError('');
-
+  const getMedicationValues = () => {
     const dosage = `${dosageAmount.trim()} ${dosageUnit}`;
     const frequency = `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
-    const medicationError = validateMedicationFields({
+    return {
       name,
       dosage,
       frequency,
       expirationDate,
       quantityOnHand,
       refillThreshold,
-    });
+    };
+  };
 
-    if (medicationError) {
-      setError(medicationError);
+  function handleSubmit() {
+    setError('');
+    const errors = getMedicationFieldErrors(getMedicationValues());
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError('Please correct the highlighted fields.');
       return;
     }
 
+    setReviewVisible(true);
+  }
+
+  async function confirmSaveMedication() {
+    const { dosage, frequency } = getMedicationValues();
+    setReviewVisible(false);
     try {
       setLoading(true);
 
@@ -177,6 +189,7 @@ export default function AddMedicationScreen({
             onChangeText={(value) => {
               if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
                 setName(value);
+                setFieldErrors((previous) => ({ ...previous, name: undefined }));
               }
             }}
             autoCapitalize="words"
@@ -184,17 +197,19 @@ export default function AddMedicationScreen({
             editable={!loading}
             labelStyle={styles.fieldLabel}
             inputStyle={styles.fieldInput}
+            error={fieldErrors.name}
           />
 
           <View style={[styles.fieldRow, !wideLayout && styles.fieldRowStacked]}>
-            <View style={styles.fieldColumn}>
+            <View style={[styles.fieldColumn, !wideLayout && styles.fieldColumnStacked]}>
               <TextField
-                label="Dosage amount"
+                label="Product strength / dosage"
                 placeholder="e.g. 500"
                 value={dosageAmount}
                 onChangeText={(value) => {
                   if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
                     setDosageAmount(value);
+                    setFieldErrors((previous) => ({ ...previous, dosage: undefined }));
                   }
                 }}
                 maxLength={7}
@@ -202,9 +217,10 @@ export default function AddMedicationScreen({
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
                 inputStyle={styles.fieldInput}
+                error={fieldErrors.dosage}
               />
             </View>
-            <View style={styles.fieldColumn}>
+            <View style={[styles.fieldColumn, !wideLayout && styles.fieldColumnStacked]}>
               <Text style={styles.unitLabel}>Dosage unit</Text>
               <View style={styles.unitRow}>
                 {['mg', 'mcg', 'g', 'mL', 'tablet'].map((unit) => (
@@ -228,7 +244,7 @@ export default function AddMedicationScreen({
           </View>
 
           <View style={[styles.fieldRow, !wideLayout && styles.fieldRowStacked]}>
-            <View style={styles.fieldColumn}>
+            <View style={[styles.fieldColumn, !wideLayout && styles.fieldColumnStacked]}>
               <TextField
                 label="Quantity on hand"
                 placeholder="e.g. 30"
@@ -236,6 +252,7 @@ export default function AddMedicationScreen({
                 onChangeText={(value) => {
                   if (isValidMedicationNumericInput(value)) {
                     setQuantityOnHand(value);
+                    setFieldErrors((previous) => ({ ...previous, quantityOnHand: undefined }));
                   }
                 }}
                 maxLength={6}
@@ -243,9 +260,10 @@ export default function AddMedicationScreen({
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
                 inputStyle={styles.fieldInput}
+                error={fieldErrors.quantityOnHand}
               />
             </View>
-            <View style={styles.fieldColumn}>
+            <View style={[styles.fieldColumn, !wideLayout && styles.fieldColumnStacked]}>
               <TextField
                 label="Refill threshold"
                 placeholder="e.g. 5"
@@ -253,6 +271,7 @@ export default function AddMedicationScreen({
                 onChangeText={(value) => {
                   if (isValidMedicationNumericInput(value)) {
                     setRefillThreshold(value);
+                    setFieldErrors((previous) => ({ ...previous, refillThreshold: undefined }));
                   }
                 }}
                 maxLength={6}
@@ -260,19 +279,23 @@ export default function AddMedicationScreen({
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
                 inputStyle={styles.fieldInput}
+                error={fieldErrors.refillThreshold}
               />
             </View>
           </View>
 
           <View style={[styles.fieldRow, styles.frequencyFieldRow, !wideLayout && styles.fieldRowStacked]}>
-            <View style={styles.fieldColumn}>
+            <View style={[styles.fieldColumn, !wideLayout && styles.fieldColumnStacked]}>
               <Text style={styles.fieldLabel}>Expiration date (required) — YYYY-MM-DD</Text>
               {Platform.OS === 'web' ? (
                 <input
                   type="date"
                   value={expirationDate}
                   min={formatDateOnly(todayStart)}
-                  onChange={(event) => setExpirationDate(event.target.value)}
+                  onChange={(event) => {
+                    setExpirationDate(event.target.value);
+                    setFieldErrors((previous) => ({ ...previous, expirationDate: undefined }));
+                  }}
                   disabled={loading}
                   onFocus={() => setExpirationDateFocused(true)}
                   onBlur={() => setExpirationDateFocused(false)}
@@ -313,6 +336,7 @@ export default function AddMedicationScreen({
                       onValueChange={(_event, date) => {
                         if (date) {
                           setExpirationDate(formatDateOnly(date));
+                          setFieldErrors((previous) => ({ ...previous, expirationDate: undefined }));
                         }
                       }}
                       onDismiss={() => setShowExpirationDatePicker(false)}
@@ -320,8 +344,13 @@ export default function AddMedicationScreen({
                   ) : null}
                 </>
               )}
+              {fieldErrors.expirationDate ? (
+                <Text style={styles.error} accessibilityRole="alert">
+                  {fieldErrors.expirationDate}
+                </Text>
+              ) : null}
             </View>
-            <View style={styles.fieldColumn}>
+            <View style={[styles.fieldColumn, !wideLayout && styles.fieldColumnStacked]}>
               <TextField
                 label="Frequency interval"
                 placeholder="e.g. 8"
@@ -329,12 +358,14 @@ export default function AddMedicationScreen({
                 onChangeText={(value) => {
                   if (isValidMedicationFrequencyInput(value)) {
                     setFrequencyAmount(value);
+                    setFieldErrors((previous) => ({ ...previous, frequency: undefined }));
                   }
                 }}
                 keyboardType="number-pad"
                 editable={!loading}
                 labelStyle={styles.fieldLabel}
                 inputStyle={styles.fieldInput}
+                error={fieldErrors.frequency}
               />
               <Text style={styles.unitLabel}>Frequency unit</Text>
               <View style={styles.unitRow}>
@@ -355,12 +386,15 @@ export default function AddMedicationScreen({
                   </Pressable>
                 ))}
               </View>
+              <Text style={styles.frequencyHint}>
+                This interval is used after you choose a starting time and active days in Add Schedule. Hour-based doses may continue past midnight.
+              </Text>
             </View>
           </View>
 
 
           {error ? (
-            <Text style={styles.error}>
+            <Text style={styles.error} accessibilityRole="alert">
               {error}
             </Text>
           ) : null}
@@ -386,6 +420,24 @@ export default function AddMedicationScreen({
       />
 
     </KeyboardAvoidingView>
+    <ConfirmationDialog
+      visible={reviewVisible}
+      title="Review medication"
+      message={[
+        `Medication: ${name.trim()}`,
+        `Product strength: ${getMedicationValues().dosage}`,
+        `Frequency interval: ${getMedicationValues().frequency}`,
+        `Quantity on hand: ${quantityOnHand}`,
+        `Refill threshold: ${refillThreshold}`,
+        `Expiration date: ${expirationDate}`,
+        '',
+        'Schedule time and active days are set separately in Add Schedule.',
+      ].join('\n')}
+      confirmLabel="Save medication"
+      cancelLabel="Back to edit"
+      onConfirm={confirmSaveMedication}
+      onCancel={() => setReviewVisible(false)}
+    />
     </Portal.Host>
   );
 }
@@ -453,7 +505,7 @@ const styles = StyleSheet.create({
 
   fieldRowStacked: {
     flexDirection: 'column',
-    gap: 0,
+    gap: 10,
   },
 
   fieldColumn: {
@@ -461,11 +513,24 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
+  fieldColumnStacked: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    width: '100%',
+  },
+
   fieldLabel: {
     marginBottom: 7,
     fontSize: 13,
     fontWeight: '700',
     color: '#35515A',
+  },
+  frequencyHint: {
+    marginTop: 6,
+    color: '#557078',
+    fontSize: 12,
+    lineHeight: 17,
   },
 
   fieldInput: {

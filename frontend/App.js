@@ -5,6 +5,7 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  LogBox,
 } from 'react-native';
 
 import {
@@ -45,6 +46,8 @@ import BottomNavigation from './components/BottomNavigation';
 import CaregiverBottomNavigation from './components/CaregiverBottomNavigation';
 import { colors } from './theme';
 import { getUnreadNotificationCount } from './services/api';
+
+LogBox.ignoreLogs(['SafeAreaView has been deprecated', 'SafeAreaView']);
 
 export default function App() {
 

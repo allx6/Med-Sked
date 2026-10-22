@@ -359,7 +359,8 @@ export const refillMedication = async (
   token,
   medicationId,
   refillAmount,
-  patientId
+  patientId,
+  expirationDate
 ) => {
   const patientQuery = patientId
     ? `?patientId=${encodeURIComponent(patientId)}`
@@ -373,7 +374,7 @@ export const refillMedication = async (
         'Content-Type': 'application/json',
         ...authHeaders(token),
       },
-      body: JSON.stringify({ refillAmount }),
+      body: JSON.stringify({ refillAmount, expirationDate }),
     }
   );
 

@@ -7,6 +7,7 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 const {
   generateDosesForDate,
   parseTime,
+  reconcilePendingDosesForSchedule,
   scheduleAppliesToDate,
 } = require('../services/doseGenerator');
 
@@ -75,6 +76,36 @@ test('fixed schedule times remain explicit and do not use interval arithmetic', 
   const scheduleTime = parseTime('20:00');
   assert.equal(formatTime(scheduleTime.hours, scheduleTime.minutes), '8:00 PM');
   assert.notEqual(formatTime(scheduleTime.hours, scheduleTime.minutes), '12:00 AM');
+});
+
+test('schedule reconciliation deletes only pending doses from the current date forward and uses the transaction session', async () => {
+  const originalDeleteMany = DoseRecord.deleteMany;
+  const session = {};
+  let captured;
+  DoseRecord.deleteMany = async (filter, options) => {
+    captured = { filter, options };
+    return { deletedCount: 2 };
+  };
+
+  try {
+    const deleted = await reconcilePendingDosesForSchedule({
+      userId: 'user-id',
+      scheduleId: 'schedule-id',
+      fromDate: new Date(2026, 9, 20),
+      session,
+    });
+
+    assert.equal(deleted, 2);
+    assert.deepEqual(captured.filter, {
+      userId: 'user-id',
+      scheduleId: 'schedule-id',
+      status: 'pending',
+      scheduledDate: { $gte: '2026-10-20' },
+    });
+    assert.deepEqual(captured.options, { session });
+  } finally {
+    DoseRecord.deleteMany = originalDeleteMany;
+  }
 });
 
 test('eight-hour intervals remain distinct from fixed schedule times', () => {

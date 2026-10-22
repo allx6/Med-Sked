@@ -20,15 +20,17 @@ import MedicineNameInput from '../components/MedicineNameInput';
 import TextField from '../components/TextField';
 import PrimaryButton from '../components/PrimaryButton';
 import SecondaryButton from '../components/SecondaryButton';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import {
-  getMedicationExpirationState,
+  getMedicationFieldErrors,
   getSafeUserErrorMessage,
   isValidMedicationNumericInput,
   isValidMedicationFrequencyInput,
-  validateMedicationFields,
+  validateBatchExpirationDate,
   validateRefillAmount,
 } from '../utils/medicationValidation';
 import { getRefillErrorMessage } from '../utils/refillErrors';
+import { getUsableMedicationQuantity } from '../utils/medicationStock';
 
 const dosageUnits = ['mg', 'mcg', 'g', 'mL', 'tablet'];
 const frequencyUnits = ['hours', 'days'];
@@ -66,8 +68,13 @@ export default function EditMedicationScreen({
   const [quantityOnHand, setQuantityOnHand] = useState(String(medication.quantityOnHand ?? 0));
   const [refillThreshold, setRefillThreshold] = useState(String(medication.refillThreshold ?? 0));
   const [refillAmount, setRefillAmount] = useState('');
+  const [refillExpirationDate, setRefillExpirationDate] = useState('');
+  const [stockBatches, setStockBatches] = useState(
+    Array.isArray(medication.stockBatches) ? medication.stockBatches : []
+  );
   const [expirationDate, setExpirationDate] = useState(medication.expirationDate || '');
   const [showExpirationDatePicker, setShowExpirationDatePicker] = useState(false);
+  const [showRefillExpirationPicker, setShowRefillExpirationPicker] = useState(false);
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const [legacyDosage, setLegacyDosage] = useState(parsedDosage ? '' : medication.dosage || '');
@@ -75,13 +82,17 @@ export default function EditMedicationScreen({
 
   const [error, setError] =
     useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [reviewVisible, setReviewVisible] = useState(false);
 
   const [loading, setLoading] =
     useState(false);
 
   const [refilling, setRefilling] = useState(false);
   const [refillError, setRefillError] = useState('');
+  const [refillDateError, setRefillDateError] = useState('');
   const [refillSuccess, setRefillSuccess] = useState('');
+  const [reviewRefillVisible, setReviewRefillVisible] = useState(false);
 
   const openExpirationDatePicker = () => {
     if (Platform.OS === 'android') {
@@ -101,33 +112,64 @@ export default function EditMedicationScreen({
     setShowExpirationDatePicker((isVisible) => !isVisible);
   };
 
+  const openRefillExpirationPicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: parseDateOnly(refillExpirationDate) || todayStart,
+        mode: 'date',
+        minimumDate: todayStart,
+        onValueChange: (_event, date) => {
+          if (date) {
+            setRefillExpirationDate(formatDateOnly(date));
+            setRefillDateError('');
+          }
+        },
+      });
+      return;
+    }
+
+    setShowRefillExpirationPicker((isVisible) => !isVisible);
+  };
+
 
   // =====================================================
   // SAVE CHANGES
   // =====================================================
 
-  const handleSubmit = async () => {
-
+  const getMedicationValues = () => {
     const dosage = legacyDosage.trim() || `${dosageAmount.trim()} ${dosageUnit}`;
     const frequency = legacyFrequency.trim() || `Every ${frequencyAmount.trim()} ${frequencyUnit}`;
-    const medicationError = validateMedicationFields({
+    return {
       name,
       dosage,
       frequency,
       expirationDate,
       quantityOnHand,
       refillThreshold,
-    });
+    };
+  };
 
-    if (medicationError) {
-      setError(medicationError);
+  const handleSubmit = () => {
+    const values = getMedicationValues();
+    const errors = getMedicationFieldErrors(values, {
+      allowLegacyFrequency: Boolean(
+        legacyFrequency && legacyFrequency === medication.frequency
+      ),
+    });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setError('Please correct the highlighted fields.');
       return;
     }
 
+    setError('');
+    setReviewVisible(true);
+  };
 
+  const confirmSaveMedication = async () => {
+    const { dosage, frequency } = getMedicationValues();
+    setReviewVisible(false);
     try {
-
-      setError('');
 
       setLoading(true);
 
@@ -193,6 +235,7 @@ export default function EditMedicationScreen({
   const handleRefill = async () => {
     setRefillError('');
     setRefillSuccess('');
+    setRefillDateError('');
 
     const amountError = validateRefillAmount(refillAmount);
     if (amountError) {
@@ -200,23 +243,36 @@ export default function EditMedicationScreen({
       return;
     }
 
-    if (getMedicationExpirationState(expirationDate).expired) {
-      setRefillError('Cannot refill an expired medication.');
+    const batchDateError = validateBatchExpirationDate(refillExpirationDate);
+    if (batchDateError) {
+      setRefillDateError(batchDateError);
       return;
     }
 
+    setReviewRefillVisible(true);
+  };
+
+  const confirmRefill = async () => {
+    setReviewRefillVisible(false);
     try {
       setRefilling(true);
       const updatedMedication = await refillMedication(
         token,
         medication._id,
         Number(refillAmount),
-        patientId
+        patientId,
+        refillExpirationDate
       );
       const updatedQuantity = String(updatedMedication.quantityOnHand);
       setQuantityOnHand(updatedQuantity);
+      setStockBatches(
+        Array.isArray(updatedMedication.stockBatches)
+          ? updatedMedication.stockBatches
+          : stockBatches
+      );
       setRefillAmount('');
-      setRefillSuccess(`Refill added. Quantity on hand: ${updatedQuantity}.`);
+      setRefillExpirationDate('');
+      setRefillSuccess(`Refill batch added. Quantity on hand: ${updatedQuantity}.`);
     } catch (error) {
       setRefillError(getRefillErrorMessage(error));
     } finally {
@@ -275,11 +331,13 @@ export default function EditMedicationScreen({
             onChangeText={(value) => {
               if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
                 setName(value);
+                setFieldErrors((previous) => ({ ...previous, name: undefined }));
               }
             }}
             autoCapitalize="words"
             maxLength={100}
             editable={!loading}
+            error={fieldErrors.name}
           />
 
 
@@ -296,17 +354,19 @@ export default function EditMedicationScreen({
           ) : (
             <>
               <TextField
-                label="Dosage amount"
+                label="Product strength / dosage"
                 placeholder="e.g. 500"
                 value={dosageAmount}
                 onChangeText={(value) => {
                   if (isValidMedicationNumericInput(value, { allowDecimal: true })) {
                     setDosageAmount(value);
+                    setFieldErrors((previous) => ({ ...previous, dosage: undefined }));
                   }
                 }}
                 keyboardType="decimal-pad"
                 maxLength={7}
                 editable={!loading}
+                error={fieldErrors.dosage}
               />
               <Text style={styles.unitLabel}>Dosage unit</Text>
               <View style={styles.unitRow}>
@@ -323,13 +383,25 @@ export default function EditMedicationScreen({
           {/* FREQUENCY */}
 
           {legacyFrequency ? (
-            <TextField
-              label="Frequency"
-              value={legacyFrequency}
-              onChangeText={setLegacyFrequency}
-              editable={!loading}
-              hint="Legacy format preserved. You can edit it as text."
-            />
+            <>
+              <TextField
+                label="Existing frequency"
+                value={legacyFrequency}
+                editable={false}
+                hint="This existing instruction will be preserved when you save other changes."
+              />
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setLegacyFrequency('');
+                  setFrequencyAmount('');
+                  setFrequencyUnit('hours');
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.replaceFrequencyText}>Replace with a standard interval</Text>
+              </Pressable>
+            </>
           ) : (
             <>
               <TextField
@@ -339,10 +411,12 @@ export default function EditMedicationScreen({
                 onChangeText={(value) => {
                   if (isValidMedicationFrequencyInput(value)) {
                     setFrequencyAmount(value);
+                    setFieldErrors((previous) => ({ ...previous, frequency: undefined }));
                   }
                 }}
                 keyboardType="number-pad"
                 editable={!loading}
+                error={fieldErrors.frequency}
               />
               <Text style={styles.unitLabel}>Frequency unit</Text>
               <View style={styles.unitRow}>
@@ -354,19 +428,26 @@ export default function EditMedicationScreen({
               </View>
             </>
           )}
+          {!legacyFrequency ? (
+            <Text style={styles.frequencyHint}>
+              This interval is used after you choose a starting time and active days in Add Schedule. Hour-based doses may continue past midnight.
+            </Text>
+          ) : null}
 
           <TextField
-            label="Quantity on hand"
+            label="Total quantity on hand (all batches)"
             placeholder="e.g. 30"
             value={quantityOnHand}
             onChangeText={(value) => {
               if (isValidMedicationNumericInput(value)) {
                 setQuantityOnHand(value);
+                setFieldErrors((previous) => ({ ...previous, quantityOnHand: undefined }));
               }
             }}
             keyboardType="number-pad"
             maxLength={6}
             editable={!loading && !refilling}
+            error={fieldErrors.quantityOnHand}
           />
 
           <TextField
@@ -385,6 +466,58 @@ export default function EditMedicationScreen({
             editable={!loading && !refilling}
           />
 
+          <Text style={styles.fieldLabel}>New batch expiration date (required)</Text>
+          {Platform.OS === 'web' ? (
+            <input
+              type="date"
+              value={refillExpirationDate}
+              min={formatDateOnly(todayStart)}
+              onChange={(event) => {
+                setRefillExpirationDate(event.target.value);
+                setRefillDateError('');
+              }}
+              disabled={loading || refilling}
+              style={styles.webDateInput}
+            />
+          ) : (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose refill batch expiration date"
+                onPress={openRefillExpirationPicker}
+                disabled={loading || refilling}
+                style={styles.expirationDateButton}
+              >
+                <Text style={refillExpirationDate ? styles.expirationDateText : styles.expirationDatePlaceholder}>
+                  {refillExpirationDate || 'YYYY-MM-DD'}
+                </Text>
+                <MaterialCommunityIcons
+                  name="calendar-month-outline"
+                  size={20}
+                  color="#0B4F59"
+                />
+              </Pressable>
+              {showRefillExpirationPicker ? (
+                <DateTimePicker
+                  value={parseDateOnly(refillExpirationDate) || todayStart}
+                  mode="date"
+                  minimumDate={todayStart}
+                  display="spinner"
+                  onValueChange={(_event, date) => {
+                    if (date) {
+                      setRefillExpirationDate(formatDateOnly(date));
+                      setRefillDateError('');
+                    }
+                  }}
+                  onDismiss={() => setShowRefillExpirationPicker(false)}
+                />
+              ) : null}
+            </>
+          )}
+          {refillDateError ? (
+            <Text style={styles.error} accessibilityRole="alert">{refillDateError}</Text>
+          ) : null}
+
           <PrimaryButton
             label="Add refill"
             onPress={handleRefill}
@@ -401,6 +534,38 @@ export default function EditMedicationScreen({
             <Text style={styles.refillSuccess} accessibilityRole="status">{refillSuccess}</Text>
           ) : null}
 
+          <View style={styles.batchList}>
+            <Text style={styles.batchListTitle}>Stock batches</Text>
+            <Text style={styles.batchListEmpty}>
+              Usable stock today: {getUsableMedicationQuantity({
+                quantityOnHand: Number(quantityOnHand),
+                stockBatches,
+              })}
+            </Text>
+            {stockBatches.length === 0 ? (
+              <Text style={styles.batchListEmpty}>
+                Existing stock has no batch history yet. New refills will be tracked separately.
+              </Text>
+            ) : (
+              [...stockBatches]
+                .sort((left, right) => {
+                  if (!left.expirationDate) return right.expirationDate ? 1 : 0;
+                  if (!right.expirationDate) return -1;
+                  return left.expirationDate.localeCompare(right.expirationDate);
+                })
+                .map((batch) => (
+                  <View key={batch._id} style={styles.batchRow}>
+                    <Text style={styles.batchQuantity}>
+                      {batch.remainingQuantity} remaining
+                    </Text>
+                    <Text style={styles.batchExpiration}>
+                      Expires: {batch.expirationDate || 'Unknown'}
+                    </Text>
+                  </View>
+                ))
+            )}
+          </View>
+
           <TextField
             label="Refill threshold"
             placeholder="e.g. 5"
@@ -408,11 +573,13 @@ export default function EditMedicationScreen({
             onChangeText={(value) => {
               if (isValidMedicationNumericInput(value)) {
                 setRefillThreshold(value);
+                setFieldErrors((previous) => ({ ...previous, refillThreshold: undefined }));
               }
             }}
             keyboardType="number-pad"
             maxLength={6}
             editable={!loading && !refilling}
+            error={fieldErrors.refillThreshold}
           />
 
           <Text style={styles.fieldLabel}>Expiration date (required) — YYYY-MM-DD</Text>
@@ -421,7 +588,10 @@ export default function EditMedicationScreen({
               type="date"
               value={expirationDate}
               min={formatDateOnly(todayStart)}
-              onChange={(event) => setExpirationDate(event.target.value)}
+              onChange={(event) => {
+                setExpirationDate(event.target.value);
+                setFieldErrors((previous) => ({ ...previous, expirationDate: undefined }));
+              }}
               disabled={loading}
               style={styles.webDateInput}
             />
@@ -452,6 +622,7 @@ export default function EditMedicationScreen({
                   onValueChange={(_event, date) => {
                     if (date) {
                       setExpirationDate(formatDateOnly(date));
+                      setFieldErrors((previous) => ({ ...previous, expirationDate: undefined }));
                     }
                   }}
                   onDismiss={() => setShowExpirationDatePicker(false)}
@@ -459,13 +630,16 @@ export default function EditMedicationScreen({
               ) : null}
             </>
           )}
+          {fieldErrors.expirationDate ? (
+            <Text style={styles.error} accessibilityRole="alert">{fieldErrors.expirationDate}</Text>
+          ) : null}
 
 
           {/* ERROR */}
 
           {error ? (
 
-            <Text style={styles.error}>
+            <Text style={styles.error} accessibilityRole="alert">
               {error}
             </Text>
 
@@ -497,6 +671,39 @@ export default function EditMedicationScreen({
       />
 
     </KeyboardAvoidingView>
+    <ConfirmationDialog
+      visible={reviewVisible}
+      title="Review medication changes"
+      message={[
+        `Medication: ${name.trim()}`,
+        `Product strength: ${getMedicationValues().dosage}`,
+        `Frequency interval: ${getMedicationValues().frequency}`,
+        `Quantity on hand: ${quantityOnHand}`,
+        `Refill threshold: ${refillThreshold}`,
+        `Expiration date: ${expirationDate}`,
+        '',
+        'Saving updates the linked schedule dose and recalculates pending doses if frequency changed.',
+      ].join('\n')}
+      confirmLabel="Save changes"
+      cancelLabel="Back to edit"
+      onConfirm={confirmSaveMedication}
+      onCancel={() => setReviewVisible(false)}
+    />
+    <ConfirmationDialog
+      visible={reviewRefillVisible}
+      title="Review refill batch"
+      message={[
+        `Medication: ${name.trim()}`,
+        `Product strength: ${getMedicationValues().dosage}`,
+        `Quantity added: ${refillAmount}`,
+        `Batch expiration date: ${refillExpirationDate}`,
+      ].join('\n')}
+      confirmLabel="Add batch"
+      cancelLabel="Back to edit"
+      onConfirm={confirmRefill}
+      onCancel={() => setReviewRefillVisible(false)}
+    />
+
     </Portal.Host>
 
   );
@@ -557,6 +764,55 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 5,
     fontWeight: '700',
+  },
+  frequencyHint: {
+    marginTop: 2,
+    marginBottom: 12,
+    color: '#557078',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  replaceFrequencyText: {
+    marginTop: -2,
+    marginBottom: 12,
+    color: '#0B4F59',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  batchList: {
+    marginTop: 12,
+    marginBottom: 18,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#EAF5F6',
+  },
+  batchListTitle: {
+    marginBottom: 6,
+    color: '#0B4F59',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  batchListEmpty: {
+    color: '#557078',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  batchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#D3E5E7',
+  },
+  batchQuantity: {
+    color: '#17313A',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  batchExpiration: {
+    color: '#557078',
+    fontSize: 13,
   },
 
   expirationDateButton: {
