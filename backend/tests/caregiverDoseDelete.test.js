@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const CaregiverRelationship = require('../models/CaregiverRelationship');
+const User = require('../models/User');
 const DoseRecord = require('../models/DoseRecord');
 const doseRoutes = require('../routes/doseRoutes');
 
@@ -13,6 +14,7 @@ const invokeDelete = async ({
   relationship,
   existingDose = null,
   deletedDose = null,
+  patientActive = true,
   user = { role: 'caregiver', userId: CAREGIVER_ID },
   body = { patientId: PATIENT_ID },
 }) => {
@@ -23,6 +25,7 @@ const invokeDelete = async ({
   const handler = route.route.stack.at(-1).handle;
   const originals = {
     relationshipFindOne: CaregiverRelationship.findOne,
+    patientFindOne: User.findOne,
     doseFindOneAndDelete: DoseRecord.findOneAndDelete,
     doseFindOne: DoseRecord.findOne,
   };
@@ -46,6 +49,9 @@ const invokeDelete = async ({
     relationshipFilter = filter;
     return relationship;
   };
+  User.findOne = (filter) => ({
+    select: async () => (patientActive ? { _id: filter._id } : null),
+  });
   DoseRecord.findOneAndDelete = async (filter) => {
     deleteFilter = filter;
     return deletedDose;
@@ -65,6 +71,7 @@ const invokeDelete = async ({
     await middleware(request, response, () => handler(request, response));
   } finally {
     CaregiverRelationship.findOne = originals.relationshipFindOne;
+    User.findOne = originals.patientFindOne;
     DoseRecord.findOneAndDelete = originals.doseFindOneAndDelete;
     DoseRecord.findOne = originals.doseFindOne;
   }
@@ -107,6 +114,15 @@ test('caregiver cannot delete a dose without an active patient relationship', as
 test('VIEW_ONLY caregiver cannot delete a patient dose', async () => {
   const { response, deleteFilter } = await invokeDelete({
     relationship: { permission: 'VIEW_ONLY' },
+  });
+
+  test('caregiver cannot access a deactivated patient', async () => {
+    const { response, deleteFilter } = await invokeDelete({
+      relationship: { permission: 'ADHERENCE_SUPPORT' },
+      patientActive: false,
+    });
+    assert.equal(response.statusCode, 403);
+    assert.equal(deleteFilter, undefined);
   });
 
   assert.equal(response.statusCode, 403);

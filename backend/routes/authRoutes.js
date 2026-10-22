@@ -102,6 +102,7 @@ const createAuthenticationPayload = (user) => ({
       username: user.username,
       role: user.role,
       purpose: 'access',
+      sessionVersion: Number(user.authTokenVersion || 0),
     },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
@@ -151,8 +152,9 @@ const findAdminForMfa = (userId) => User.findOne({
   _id: userId,
   role: 'admin',
   emailVerified: true,
+  accountStatus: { $ne: 'deactivated' },
 }).select(
-  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt'
+  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt +authTokenVersion'
 );
 
 class AdminMfaError extends Error {
@@ -194,6 +196,7 @@ const issueAdminMfaCode = async (userId) => {
       _id: user._id,
       role: 'admin',
       emailVerified: true,
+      accountStatus: { $ne: 'deactivated' },
       adminMfaOtpLastSentAt: user.adminMfaOtpLastSentAt || null,
     },
     {
@@ -558,7 +561,7 @@ router.post('/login', async (req, res) => {
       await User.findOne({
         email:
           normalizedEmail,
-      });
+      }).select('+authTokenVersion');
 
 
     if (!user) {
@@ -586,6 +589,13 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         message:
           'Invalid email or password.',
+      });
+    }
+
+    if (user.accountStatus === 'deactivated') {
+      return res.status(403).json({
+        code: 'ACCOUNT_DEACTIVATED',
+        message: 'Your account is deactivated. Contact an administrator for assistance.',
       });
     }
 
@@ -686,6 +696,7 @@ router.post('/mfa/verify', async (req, res) => {
           _id: user._id,
           role: 'admin',
           emailVerified: true,
+          accountStatus: { $ne: 'deactivated' },
           adminMfaOtpHash: user.adminMfaOtpHash,
           adminMfaOtpExpiresAt: { $gt: new Date() },
           adminMfaOtpAttempts: { $lt: ADMIN_MFA_MAX_ATTEMPTS },
@@ -715,6 +726,7 @@ router.post('/mfa/verify', async (req, res) => {
         _id: user._id,
         role: 'admin',
         emailVerified: true,
+        accountStatus: { $ne: 'deactivated' },
         adminMfaOtpHash: user.adminMfaOtpHash,
         adminMfaOtpExpiresAt: { $gt: new Date() },
         adminMfaOtpAttempts: { $lt: ADMIN_MFA_MAX_ATTEMPTS },
@@ -808,9 +820,16 @@ router.get('/session', async (req, res) => {
     if (decoded.purpose && decoded.purpose !== 'access') {
       return res.status(401).json({ message: 'Invalid or expired authentication token' });
     }
-    const user = await User.findById(decoded.userId).select('_id username email role patientId');
+    const user = await User.findById(decoded.userId)
+      .select('_id username email role patientId accountStatus +authTokenVersion');
 
     if (!user) {
+      return res.status(401).json({ message: 'Session is invalid.' });
+    }
+    if (
+      user.accountStatus === 'deactivated'
+      || Number(user.authTokenVersion || 0) !== Number(decoded.sessionVersion || 0)
+    ) {
       return res.status(401).json({ message: 'Session is invalid.' });
     }
 

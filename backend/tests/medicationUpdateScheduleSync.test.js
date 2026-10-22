@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
+const User = require('../models/User');
 
 const doseGeneratorPath = require.resolve('../services/doseGenerator');
 const notificationServicePath = require.resolve('../services/notificationService');
@@ -75,6 +76,7 @@ const invokeUpdate = async ({
     scheduleFindOne: MedicationSchedule.findOne,
     scheduleUpdate: MedicationSchedule.updateOne,
     relationshipFindOne: CaregiverRelationship.findOne,
+    patientFindOne: User.findOne,
   };
   let medicationFindCount = 0;
   const updatedMedication = {
@@ -110,6 +112,9 @@ const invokeUpdate = async ({
   });
   MedicationSchedule.updateOne = async () => ({ matchedCount: 1 });
   CaregiverRelationship.findOne = async () => ({ permission });
+  User.findOne = (filter) => ({
+    select: async () => ({ _id: filter._id }),
+  });
   mongoose.startSession = async () => transactionSession;
   reconciledSchedules.length = 0;
   generatedForUsers.length = 0;
@@ -141,6 +146,7 @@ const invokeUpdate = async ({
     MedicationSchedule.findOne = originals.scheduleFindOne;
     MedicationSchedule.updateOne = originals.scheduleUpdate;
     CaregiverRelationship.findOne = originals.relationshipFindOne;
+    User.findOne = originals.patientFindOne;
   }
 
   return { response: res, scheduleDocument, medicationUpdate };

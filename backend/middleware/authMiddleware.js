@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -32,6 +33,19 @@ const authMiddleware = (req, res, next) => {
     if (decoded.purpose && decoded.purpose !== 'access') {
       return res.status(401).json({
         message: 'Invalid or expired authentication token',
+      });
+    }
+
+    const user = await User.findById(decoded.userId)
+      .select('_id accountStatus +authTokenVersion')
+      .lean();
+    if (
+      !user
+      || user.accountStatus === 'deactivated'
+      || Number(user.authTokenVersion || 0) !== Number(decoded.sessionVersion || 0)
+    ) {
+      return res.status(401).json({
+        message: 'Session is invalid or the account is inactive.',
       });
     }
 

@@ -677,13 +677,20 @@ export const generateDoses = async (token) => {
 
 export const takeDose = async (
   token,
-  doseId
+  doseId,
+  options = {}
 ) => {
+  const body = options.earlyDoseConfirmed === true
+    ? JSON.stringify({ earlyDoseConfirmed: true })
+    : undefined;
   const response = await fetch(
     `${API_URL}/api/doses/${doseId}/take`,
     {
       method: 'PUT',
-      headers: authHeaders(token),
+      headers: body
+        ? { 'Content-Type': 'application/json', ...authHeaders(token) }
+        : authHeaders(token),
+      body,
     }
   );
 
@@ -720,7 +727,8 @@ export const skipDose = async (
 export const takePatientDose = async (
   token,
   doseId,
-  patientId
+  patientId,
+  options = {}
 ) => {
   const response = await fetch(
     `${API_URL}/api/doses/${doseId}/take`,
@@ -730,7 +738,50 @@ export const takePatientDose = async (
         'Content-Type': 'application/json',
         ...authHeaders(token),
       },
-      body: JSON.stringify({ patientId }),
+      body: JSON.stringify({
+        patientId,
+        ...(options.earlyDoseConfirmed === true ? { earlyDoseConfirmed: true } : {}),
+      }),
+    }
+  );
+
+  return handleResponse(response);
+};
+
+// -----------------------------------------------------
+// CORRECT AN AUTO-MISSED DOSE
+// PUT /api/doses/:doseId/correct-taken
+// -----------------------------------------------------
+
+export const correctMissedDose = async (
+  token,
+  doseId,
+  correction
+) => {
+  const response = await fetch(
+    `${API_URL}/api/doses/${doseId}/correct-taken`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify(correction),
+    }
+  );
+
+  return handleResponse(response);
+};
+
+export const correctPatientMissedDose = async (
+  token,
+  doseId,
+  patientId,
+  correction
+) => {
+  const response = await fetch(
+    `${API_URL}/api/doses/${doseId}/correct-taken`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+      body: JSON.stringify({ ...correction, patientId }),
     }
   );
 

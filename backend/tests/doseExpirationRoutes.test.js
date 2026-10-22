@@ -3,6 +3,10 @@ const assert = require('node:assert/strict');
 const DoseRecord = require('../models/DoseRecord');
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
+const {
+  getMedicationLocalParts,
+  toWallClockTimestamp,
+} = require('../utils/medicationTime');
 
 const notificationServicePath = require.resolve('../services/notificationService');
 const originalNotificationService = require.cache[notificationServicePath];
@@ -27,7 +31,12 @@ const MEDICATION_ID = '507f1f77bcf86cd799439011';
 const SCHEDULE_ID = '507f1f77bcf86cd799439013';
 const DOSE_ID = '507f1f77bcf86cd799439014';
 
-const formatLocalDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const formatLocalDate = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+const getYesterdayMedicationDate = () => {
+  const today = toWallClockTimestamp(getMedicationLocalParts(new Date()));
+  today.setUTCDate(today.getUTCDate() - 1);
+  return today;
+};
 
 const invokeRoute = async ({ method, path, user, body, models }) => {
   const layer = doseRoutes.stack.find((item) => (
@@ -197,8 +206,7 @@ test('POST /api/doses rejects a date after expiration with the specific date mes
 });
 
 test('take route allows a pending dose scheduled on expiration day after expiration', async () => {
-  const expirationDate = new Date();
-  expirationDate.setDate(expirationDate.getDate() - 1);
+  const expirationDate = getYesterdayMedicationDate();
   const expirationDateString = formatLocalDate(expirationDate);
 
   const response = await invokeRoute({
@@ -207,6 +215,10 @@ test('take route allows a pending dose scheduled on expiration day after expirat
     models: {
       medication: { expirationDate: expirationDateString },
       existingDose: pendingDose(expirationDateString),
+      doseFindOneAndUpdate: async (_filter, update) => ({
+        ...pendingDose(expirationDateString),
+        ...update.$set,
+      }),
       doseFindById: () => ({
         populate() {
           return this;
@@ -218,13 +230,85 @@ test('take route allows a pending dose scheduled on expiration day after expirat
     },
   });
 
-  assert.equal(response.statusCode, 200);
+  assert.equal(response.statusCode, 200, JSON.stringify(response.body));
   assert.equal(response.body.status, 'taken');
 });
 
+test('a missed dose can be corrected with an actual past time and a required reason', async () => {
+  const expirationDate = getYesterdayMedicationDate();
+  const scheduledDate = formatLocalDate(expirationDate);
+  const actualTakenAt = new Date(Date.now() - 30 * 60 * 1000);
+  let update;
+  const response = await invokeRoute({
+    method: 'put',
+    path: '/:id/correct-taken',
+    user: { role: 'caregiver', userId: '507f1f77bcf86cd799439019' },
+    body: {
+      patientId: USER_ID,
+      takenAt: actualTakenAt.toISOString(),
+      correctionReason: 'Dose was taken before the missed status was noticed.',
+    },
+    models: {
+      medication: { expirationDate: null, frequency: 'Daily' },
+      existingDose: pendingDose(scheduledDate, {
+        status: 'missed',
+        refillDeducted: true,
+      }),
+      doseFindOneAndUpdate: async (_filter, doseUpdate) => {
+        update = doseUpdate;
+        return { ...pendingDose(scheduledDate), ...doseUpdate.$set };
+      },
+      doseFindById: () => ({
+        populate() {
+          return this;
+        },
+        then(resolve) {
+          resolve({ ...pendingDose(scheduledDate), ...update.$set });
+        },
+      }),
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.status, 'taken');
+  assert.equal(response.body.takenTiming, 'late');
+  assert.equal(response.body.takenAt.toISOString(), actualTakenAt.toISOString());
+  assert.equal(response.body.correctionFromStatus, 'missed');
+  assert.ok(response.body.correctedAt instanceof Date);
+  assert.equal(response.body.correctionReason, 'Dose was taken before the missed status was noticed.');
+  assert.equal(response.body.takenByRole, 'caregiver');
+  assert.equal(response.body.takenBy, '507f1f77bcf86cd799439019');
+});
+
+test('missed-dose correction rejects a missing reason and future administration time', async () => {
+  const pastDose = pendingDose(formatLocalDate(getYesterdayMedicationDate()), {
+    status: 'missed',
+    refillDeducted: true,
+  });
+  const missingReason = await invokeRoute({
+    method: 'put',
+    path: '/:id/correct-taken',
+    body: { takenAt: new Date().toISOString() },
+    models: { medication: { expirationDate: null }, existingDose: pastDose },
+  });
+  const futureTime = await invokeRoute({
+    method: 'put',
+    path: '/:id/correct-taken',
+    body: {
+      takenAt: new Date(Date.now() + 60 * 1000).toISOString(),
+      correctionReason: 'Entered in error.',
+    },
+    models: { medication: { expirationDate: null }, existingDose: pastDose },
+  });
+
+  assert.equal(missingReason.statusCode, 400);
+  assert.match(missingReason.body.message, /reason/i);
+  assert.equal(futureTime.statusCode, 400);
+  assert.match(futureTime.body.message, /future/i);
+});
+
 test('skip route allows a pending dose scheduled on expiration day after expiration', async () => {
-  const expirationDate = new Date();
-  expirationDate.setDate(expirationDate.getDate() - 1);
+  const expirationDate = getYesterdayMedicationDate();
   const expirationDateString = formatLocalDate(expirationDate);
 
   const response = await invokeRoute({

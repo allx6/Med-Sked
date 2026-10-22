@@ -38,7 +38,7 @@ const ALLOWED_ROLES = [
 ];
 
 const MAX_LIMIT = 100;
-const SAFE_USER_FIELDS = '_id username email patientId role createdAt updatedAt';
+const SAFE_USER_FIELDS = '_id username email patientId role accountStatus createdAt updatedAt';
 const SAFE_RELATIONSHIP_FIELDS = '_id caregiver patient status permission createdAt updatedAt';
 const RELATIONSHIP_STATUSES = ['pending', 'active', 'revoked'];
 const AUDIT_ACTIONS = [
@@ -52,10 +52,13 @@ const AUDIT_ACTIONS = [
   'CAREGIVER_REQUEST_DECLINED',
   'CAREGIVER_RELATIONSHIP_REVOKED',
   'PRIVILEGED_ACTION_REQUESTED',
+  'PRIVILEGED_ACTION_UPDATED',
+  'PRIVILEGED_ACTION_CANCELED',
   'PRIVILEGED_ACTION_APPROVED',
   'PRIVILEGED_ACTION_REJECTED',
   'PRIVILEGED_ACTION_EXECUTED',
   'PRIVILEGED_ACTION_EXECUTION_FAILED',
+  'LEGACY_USER_DELETE_REQUEST_CANCELED',
 ];
 
 const escapeRegex = (value) => (
@@ -122,6 +125,7 @@ const sanitizeUserDocument = (user) => {
     email: user.email,
     patientId: user.patientId || null,
     role: user.role,
+    accountStatus: user.accountStatus || 'active',
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -707,11 +711,17 @@ router.get('/users', async (req, res) => {
     const role = typeof req.query.role === 'string'
       ? req.query.role.trim()
       : '';
+    const accountStatus = typeof req.query.accountStatus === 'string'
+      ? req.query.accountStatus.trim()
+      : '';
 
     if (role && !ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({
         message: 'Invalid role filter.',
       });
+    }
+    if (accountStatus && !['active', 'deactivated'].includes(accountStatus)) {
+      return res.status(400).json({ message: 'Invalid account status filter.' });
     }
 
     const query = {};
@@ -726,6 +736,21 @@ router.get('/users', async (req, res) => {
 
     if (role) {
       query.role = role;
+    }
+    if (accountStatus) {
+      if (accountStatus === 'active') {
+        query.$and = [
+          ...(query.$and || []),
+          {
+            $or: [
+              { accountStatus: 'active' },
+              { accountStatus: { $exists: false } },
+            ],
+          },
+        ];
+      } else {
+        query.accountStatus = accountStatus;
+      }
     }
 
     const skip = (page - 1) * limit;

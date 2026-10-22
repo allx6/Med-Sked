@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const DoseRecord = require('../models/DoseRecord');
+const MedicationSchedule = require('../models/MedicationSchedule');
 const {
   MISSED_DOSE_GRACE_MINUTES,
   parseScheduledDateTime,
@@ -20,6 +21,12 @@ test('dose records use the protected status values and unique identity index', (
   assert.ok(uniqueIndexes.some((fields) => fields.includes('scheduleId')
     && fields.includes('scheduledDate')
     && fields.includes('scheduledTime')));
+  assert.deepEqual(
+    DoseRecord.schema.path('takenTiming').enumValues,
+    ['on_time', 'late', 'early']
+  );
+  assert.equal(DoseRecord.schema.path('correctionFromStatus').enumValues[0], 'missed');
+  assert.equal(MedicationSchedule.schema.path('timeZone').defaultValue, 'Asia/Manila');
 });
 
 test('dose scheduled date and time stay in the local calendar', () => {
@@ -35,5 +42,5 @@ test('dose scheduled date and time stay in the local calendar', () => {
 test('invalid dose date/time values are ignored by missed-dose detection', () => {
   assert.equal(parseScheduledDateTime('2026-02-30', '08:00'), null);
   assert.equal(parseScheduledDateTime('2026-09-24', '25:00'), null);
-  assert.equal(MISSED_DOSE_GRACE_MINUTES, 0);
+  assert.equal(MISSED_DOSE_GRACE_MINUTES, 15);
 });

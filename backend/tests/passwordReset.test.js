@@ -139,7 +139,11 @@ const installRouteMocks = (initialUser, sendEmail = async () => {}) => {
   const store = createMemoryStore(initialUser);
   const emails = [];
   const loginStates = new Map();
-  User.findOne = store.findOne;
+  User.findOne = (filter) => {
+    const result = store.findOne(filter);
+    result.select = () => store.findOne(filter);
+    return result;
+  };
   User.findOneAndUpdate = store.findOneAndUpdate;
   User.updateOne = store.updateOne;
   LoginAttemptState.findById = (key) => ({
@@ -277,6 +281,18 @@ test('unknown email and unverified account receive the same generic response wit
     { statusCode: 202, body: { message: GENERIC_REQUEST_MESSAGE } },
     { statusCode: 202, body: { message: GENERIC_REQUEST_MESSAGE } },
   ]);
+});
+
+test('deactivated accounts cannot use password reset to regain access', async () => {
+  const fixture = createFixture({
+    user: verifiedUser({ accountStatus: 'deactivated' }),
+  });
+  await fixture.resetService.requestPasswordReset('person@example.com');
+  assert.equal(fixture.emails.length, 0);
+  await expectResetError(
+    fixture.resetService.verifyPasswordResetCode('person@example.com', '123456'),
+    'PASSWORD_RESET_CODE_INVALID'
+  );
 });
 
 test('malformed forgot-password email is rejected', async () => {

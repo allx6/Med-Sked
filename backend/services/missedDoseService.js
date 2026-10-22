@@ -4,66 +4,19 @@ const { createMedicationNotifications } = require('./notificationService');
 const doseGenerator = require('./doseGenerator');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 const { getMedicationExpirationDate } = require('../utils/medicationInventory');
+const {
+  formatMedicationLocalDate,
+  getMedicationLocalParts,
+  parseScheduledDateTime,
+  toWallClockTimestamp,
+} = require('../utils/medicationTime');
 
-const MEDICATION_TIME_ZONE = 'Asia/Manila';
-const localDateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: MEDICATION_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-});
-
-// A pending dose becomes missed as soon as it is past its scheduled local time.
-// This keeps historical doses from staying stuck as pending on the next day.
-const MISSED_DOSE_GRACE_MINUTES = 0;
-
-const getMedicationLocalParts = (date) => {
-  const parts = Object.fromEntries(
-    localDateTimeFormatter
-      .formatToParts(date)
-      .filter(({ type }) => type !== 'literal')
-      .map(({ type, value }) => [type, Number(value)])
-  );
-
-  return {
-    year: parts.year,
-    month: parts.month,
-    day: parts.day,
-    hour: parts.hour,
-    minute: parts.minute,
-    second: parts.second,
-    millisecond: date.getUTCMilliseconds(),
-  };
-};
-
-const formatMedicationLocalDate = (date) => {
-  const { year, month, day } = getMedicationLocalParts(date);
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-};
+// Keep a dose actionable for a short grace period after its due time.
+const MISSED_DOSE_GRACE_MINUTES = 15;
 
 const formatCalendarDate = (date) => (
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  formatMedicationLocalDate(date)
 );
-
-// Compare schedule wall-clock parts directly so the backend host timezone is irrelevant.
-const toWallClockTimestamp = ({
-  year,
-  month,
-  day,
-  hour = 0,
-  minute = 0,
-  second = 0,
-  millisecond = 0,
-}) => {
-  const timestamp = new Date(0);
-  timestamp.setUTCFullYear(year, month - 1, day);
-  timestamp.setUTCHours(hour, minute, second, millisecond);
-  return timestamp;
-};
 
 const parseLocalDateString = (value) => {
   if (!value || typeof value !== 'string') {
@@ -79,12 +32,12 @@ const parseLocalDateString = (value) => {
     return null;
   }
 
-  const parsed = new Date(year, month - 1, day);
+  const parsed = toWallClockTimestamp({ year, month, day });
 
   if (
-    parsed.getFullYear() !== year
-    || parsed.getMonth() !== month - 1
-    || parsed.getDate() !== day
+    parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() !== month - 1
+    || parsed.getUTCDate() !== day
   ) {
     return null;
   }
@@ -96,7 +49,7 @@ const backfillPastDoses = async (now = new Date(), userId) => {
   const today = parseLocalDateString(formatMedicationLocalDate(now));
 
   const maxPastDate = new Date(today);
-  maxPastDate.setDate(maxPastDate.getDate() - 1);
+  maxPastDate.setUTCDate(maxPastDate.getUTCDate() - 1);
 
   const scheduleQuery = {
     enabled: true,
@@ -120,65 +73,9 @@ const backfillPastDoses = async (now = new Date(), userId) => {
       if (doseGenerator.scheduleAppliesToDate(schedule, cursor)) {
         await doseGenerator.generateDosesForDate(schedule.userId, cursor);
       }
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
   }
-};
-
-const parseScheduledDateTime = (scheduledDate, scheduledTime) => {
-  const dateMatch = String(scheduledDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  const normalizedTime = String(scheduledTime || '').trim();
-  const twelveHourMatch = normalizedTime.match(
-    /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i
-  );
-  const twentyFourHourMatch = normalizedTime.match(
-    /^(\d{2}):(\d{2})$/
-  );
-
-  if (
-    !dateMatch ||
-    (!twelveHourMatch && !twentyFourHourMatch)
-  ) {
-    return null;
-  }
-
-  const year = Number(dateMatch[1]);
-  const month = Number(dateMatch[2]);
-  const day = Number(dateMatch[3]);
-  let hours = Number((twelveHourMatch || twentyFourHourMatch)[1]);
-  const minutes = Number((twelveHourMatch || twentyFourHourMatch)[2]);
-
-  if (
-    minutes > 59 ||
-    (twelveHourMatch && (hours < 1 || hours > 12)) ||
-    (twentyFourHourMatch && hours > 23)
-  ) {
-    return null;
-  }
-
-  if (twelveHourMatch) {
-    const period = twelveHourMatch[3].toUpperCase();
-    if (period === 'AM' && hours === 12) hours = 0;
-    if (period === 'PM' && hours !== 12) hours += 12;
-  }
-
-  const scheduledAt = toWallClockTimestamp({
-    year,
-    month,
-    day,
-    hour: hours,
-    minute: minutes,
-  });
-
-  if (
-    scheduledAt.getUTCFullYear() !== year ||
-    scheduledAt.getUTCMonth() !== month - 1 ||
-    scheduledAt.getUTCDate() !== day
-  ) {
-    return null;
-  }
-
-  return scheduledAt;
 };
 
 const detectMissedDoses = async (now = new Date(), userId) => {
@@ -204,10 +101,9 @@ const detectMissedDoses = async (now = new Date(), userId) => {
       continue;
     }
 
-    const scheduledAt = parseScheduledDateTime(
-      dose.scheduledDate,
-      dose.scheduledTime
-    );
+    const scheduledAt = dose.effectiveDueAt
+      ? new Date(dose.effectiveDueAt)
+      : parseScheduledDateTime(dose.scheduledDate, dose.scheduledTime);
 
     if (!scheduledAt) {
       continue;

@@ -3,6 +3,16 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 const Medication = require('../models/Medication');
 const { isDoseDateAfterExpiration } = require('../utils/medicationExpiration');
 const { getMedicationExpirationDate } = require('../utils/medicationInventory');
+const {
+  formatMedicationLocalDate,
+  getMedicationLocalParts,
+  parseScheduledDateTime,
+  toWallClockTimestamp,
+} = require('../utils/medicationTime');
+const {
+  getMedicationFrequencyConfig,
+  parseIntervalFrequencyMinutes,
+} = require('../utils/medicationFrequency');
 
 const logDoseTiming = (label, startTime) => {
   const elapsed = performance.now() - startTime;
@@ -30,19 +40,7 @@ const DAYS_OF_WEEK = [
 // YYYY-MM-DD
 // =====================================================
 
-const formatDate = (date) => {
-  const year = date.getFullYear();
-
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, '0');
-
-  const day = String(
-    date.getDate()
-  ).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-};
+const formatDate = formatMedicationLocalDate;
 
 
 // =====================================================
@@ -78,7 +76,7 @@ const parseLocalDateString = (dateString) => {
     return new Date(NaN);
   }
 
-  return new Date(year, month, day);
+  return toWallClockTimestamp({ year, month: month + 1, day });
 };
 
 
@@ -203,46 +201,12 @@ const parseTime = (timeString) => {
 const getFrequencyInterval = (
   frequency
 ) => {
-  if (!frequency) {
-    return null;
-  }
-
-  const text =
-    frequency
-      .toLowerCase()
-      .trim();
-
-  const match = text.match(
-    /(\d+(?:\.\d+)?)\s*(minutes?|hours?|days?)/
-  );
-
-  if (!match) {
-    return null;
-  }
-
-  const amount =
-    Number(match[1]);
-
-  if (!(amount > 0)) {
-    return null;
-  }
-
-  const unit = match[2].toLowerCase();
-
-  if (unit.startsWith('minute')) {
-    return amount;
-  }
-
-  if (unit.startsWith('hour')) {
-    return amount * 60;
-  }
-
-  if (unit.startsWith('day')) {
-    return amount * 24 * 60;
-  }
-
-  return null;
+  return parseIntervalFrequencyMinutes(frequency);
 };
+
+const getMedicationFrequencyInterval = (medication) => (
+  getMedicationFrequencyConfig(medication).intervalMinutes
+);
 
 
 // =====================================================
@@ -260,7 +224,8 @@ const getFrequencyInterval = (
 // =====================================================
 
 const getDailyDoseCount = (
-  frequency
+  frequency,
+  configuredInterval
 ) => {
   if (!frequency) {
     return 1;
@@ -271,10 +236,7 @@ const getDailyDoseCount = (
       .toLowerCase()
       .trim();
 
-  const interval =
-    getFrequencyInterval(
-      text
-    );
+  const interval = configuredInterval ?? getFrequencyInterval(text);
 
   if (interval) {
     return Math.ceil((24 * 60) / interval);
@@ -356,7 +318,7 @@ const scheduleAppliesToDate = (
 
   const dayName =
     DAYS_OF_WEEK[
-      date.getDay()
+      date.getUTCDay()
     ];
 
   if (
@@ -384,6 +346,7 @@ const createDoseIfNotExists = async ({
   scheduleId,
   scheduledDate,
   scheduledTime,
+  effectiveDueAt,
 }) => {
 
   try {
@@ -399,6 +362,8 @@ const createDoseIfNotExists = async ({
         scheduledDate,
 
         scheduledTime,
+
+        effectiveDueAt,
 
         status: 'pending',
 
@@ -542,10 +507,15 @@ const generateDosesForDate = async (
     // GET FREQUENCY
     // -------------------------------------------------
 
-    const interval =
-      getFrequencyInterval(
-        medication.frequency
-      );
+    const interval = getMedicationFrequencyInterval(medication);
+    const latestTakenDose = interval
+      ? await DoseRecord.findOne({
+        userId,
+        scheduleId: schedule._id,
+        status: 'taken',
+        takenAt: { $ne: null },
+      }).sort({ takenAt: -1 }).lean()
+      : null;
 
 
     // -------------------------------------------------
@@ -563,7 +533,8 @@ const generateDosesForDate = async (
 
       const count =
         getDailyDoseCount(
-          medication.frequency
+          medication.frequency,
+          interval
         );
 
 
@@ -617,8 +588,8 @@ const generateDosesForDate = async (
           );
 
 
-        doseDate.setDate(
-          doseDate.getDate() +
+        doseDate.setUTCDate(
+          doseDate.getUTCDate() +
           dayOffset
         );
 
@@ -698,6 +669,27 @@ const generateDosesForDate = async (
     for (
       const doseData of dosesToCreate
     ) {
+      const originalDueAt = parseScheduledDateTime(
+        doseData.scheduledDate,
+        doseData.scheduledTime
+      );
+      let effectiveDueAt = originalDueAt;
+
+      if (interval && latestTakenDose?.takenAt && originalDueAt) {
+        const lastScheduledAt = parseScheduledDateTime(
+          latestTakenDose.scheduledDate,
+          latestTakenDose.scheduledTime
+        );
+        if (lastScheduledAt && originalDueAt > lastScheduledAt) {
+          const takenParts = getMedicationLocalParts(new Date(latestTakenDose.takenAt));
+          const actualTakenAt = toWallClockTimestamp(takenParts);
+          effectiveDueAt = new Date(
+            originalDueAt.getTime()
+            + actualTakenAt.getTime()
+            - lastScheduledAt.getTime()
+          );
+        }
+      }
 
       if (isDoseDateAfterExpiration(
         doseData.scheduledDate,
@@ -721,6 +713,8 @@ const generateDosesForDate = async (
 
           scheduledTime:
             doseData.scheduledTime,
+
+          effectiveDueAt,
         });
 
 
@@ -756,16 +750,12 @@ const generateTodayDoses = async (
   console.log('[Backend][Dose] Generation started');
   const totalStart = performance.now();
 
-  const today =
-    new Date();
-
-
-  today.setHours(
-    0,
-    0,
-    0,
-    0
-  );
+  const todayParts = getMedicationLocalParts(new Date());
+  const today = toWallClockTimestamp({
+    year: todayParts.year,
+    month: todayParts.month,
+    day: todayParts.day,
+  });
 
 
   const yesterday =
@@ -774,8 +764,8 @@ const generateTodayDoses = async (
     );
 
 
-  yesterday.setDate(
-    yesterday.getDate() - 1
+  yesterday.setUTCDate(
+    yesterday.getUTCDate() - 1
   );
 
 
@@ -811,5 +801,7 @@ module.exports = {
   generateDosesForDate,
   reconcilePendingDosesForSchedule,
   parseTime,
+  getFrequencyInterval,
+  getMedicationFrequencyInterval,
   scheduleAppliesToDate,
 };

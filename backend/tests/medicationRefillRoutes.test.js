@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Medication = require('../models/Medication');
 const MedicationSchedule = require('../models/MedicationSchedule');
 const CaregiverRelationship = require('../models/CaregiverRelationship');
+const User = require('../models/User');
 const notificationServicePath = require.resolve('../services/notificationService');
 const originalNotificationService = require.cache[notificationServicePath];
 const lowRefillNotificationCalls = [];
@@ -40,6 +41,7 @@ const invokeRefillRoute = async ({
   patientId,
   permission = 'ADHERENCE_SUPPORT',
   relationshipExists = true,
+  patientActive = true,
   medication = { _id: MEDICATION_ID, userId: PATIENT_ID, quantityOnHand: 2, refillThreshold: 5, expirationDate: null },
   refillAmount,
   expirationDate,
@@ -53,6 +55,7 @@ const invokeRefillRoute = async ({
     medicationFindOne: Medication.findOne,
     medicationFindOneAndUpdate: Medication.findOneAndUpdate,
     relationshipFindOne: CaregiverRelationship.findOne,
+    patientFindOne: User.findOne,
   };
   let currentMedication = medication;
   const captured = { medicationQuery: null, updateFilter: null, updateData: null };
@@ -103,6 +106,9 @@ const invokeRefillRoute = async ({
   CaregiverRelationship.findOne = async () => (
     relationshipExists ? { permission } : null
   );
+  User.findOne = (filter) => ({
+    select: async () => (patientActive ? { _id: filter._id } : null),
+  });
 
   const req = {
     user: { role, userId },
@@ -132,6 +138,7 @@ const invokeRefillRoute = async ({
     Medication.findOne = originals.medicationFindOne;
     Medication.findOneAndUpdate = originals.medicationFindOneAndUpdate;
     CaregiverRelationship.findOne = originals.relationshipFindOne;
+    User.findOne = originals.patientFindOne;
   }
 
   return { response, captured, lowRefillNotificationCalls: [...lowRefillNotificationCalls] };

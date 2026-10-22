@@ -31,6 +31,8 @@ const {
   getUsableMedicationQuantity,
   validateBatchExpirationDate,
 } = require('../utils/medicationInventory');
+const { getFrequencyConfigFromText } = require('../utils/medicationFrequency');
+const { isMedicineInDataset } = require('../utils/medicineDataset');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -54,6 +56,16 @@ const parseNonNegativeNumber = (value, fieldName) => {
   }
 
   return Number(value);
+};
+
+const validateDatasetMedicineName = (name) => {
+  if (!isMedicineInDataset(name)) {
+    const error = new Error(
+      'Medicine not in the current dataset. Select a medicine from the dropdown.'
+    );
+    error.statusCode = 400;
+    throw error;
+  }
 };
 
 const parsePositiveRefillAmount = (value) => {
@@ -308,8 +320,7 @@ router.post('/', authMiddleware, async (req, res) => {
     );
 
     res.status(error.statusCode || 500).json({
-      message:
-        'Failed to create medication',
+      message: error.statusCode ? error.message : 'Failed to create medication',
     });
 
   }
@@ -318,6 +329,7 @@ router.post('/', authMiddleware, async (req, res) => {
 const createMedicationForOwner = async (req, res) => {
   try {
     const payload = validateMedicationPayload(req.body);
+    validateDatasetMedicineName(payload.name);
     const {
       name,
       dosage,
@@ -373,6 +385,8 @@ const createMedicationForOwner = async (req, res) => {
 
         frequency:
           frequency.trim(),
+
+        ...getFrequencyConfigFromText(frequency.trim()),
 
         expirationDate: normalizedExpirationDate,
 
@@ -526,6 +540,7 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
       name: name.trim(),
       dosage: dosage.trim(),
       frequency: frequency.trim(),
+      ...getFrequencyConfigFromText(frequency.trim()),
       normalizedMedicationKey,
     };
 

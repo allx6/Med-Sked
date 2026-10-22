@@ -41,6 +41,7 @@ const createPasswordResetService = ({
     const user = await User.findOne({
       email: normalizedEmail,
       emailVerified: true,
+      accountStatus: { $ne: 'deactivated' },
     });
 
     if (!user) {
@@ -114,6 +115,7 @@ const createPasswordResetService = ({
     const user = await User.findOne({
       email: normalizedEmail,
       emailVerified: true,
+      accountStatus: { $ne: 'deactivated' },
     });
 
     if (!user || !/^\d{6}$/.test(otp)) {
@@ -151,6 +153,7 @@ const createPasswordResetService = ({
         {
           _id: user._id,
           emailVerified: true,
+          accountStatus: { $ne: 'deactivated' },
           passwordResetOtpHash: user.passwordResetOtpHash,
           passwordResetOtpExpires: { $gt: new Date(now()) },
           passwordResetAttempts: { $lt: MAX_ATTEMPTS },
@@ -199,6 +202,7 @@ const createPasswordResetService = ({
       {
         _id: user._id,
         emailVerified: true,
+        accountStatus: { $ne: 'deactivated' },
         passwordResetOtpHash: user.passwordResetOtpHash,
         passwordResetOtpExpires: { $gt: new Date(now()) },
         passwordResetAttempts: { $lt: MAX_ATTEMPTS },
@@ -244,6 +248,7 @@ const createPasswordResetService = ({
       passwordResetAuthorizationHash: authorizationHash,
       passwordResetAuthorizationExpires: { $gt: new Date(nowMs) },
       emailVerified: true,
+      accountStatus: { $ne: 'deactivated' },
     });
     if (!authorizedUser) {
       throw new PasswordResetError(
@@ -274,11 +279,13 @@ const createPasswordResetService = ({
         passwordResetAuthorizationHash: authorizationHash,
         passwordResetAuthorizationExpires: { $gt: new Date(nowMs) },
         emailVerified: true,
+        accountStatus: { $ne: 'deactivated' },
       },
       {
         $set: {
           password: passwordHash,
         },
+        $inc: { authTokenVersion: 1 },
         $unset: {
           passwordResetOtpHash: 1,
           passwordResetOtpExpires: 1,

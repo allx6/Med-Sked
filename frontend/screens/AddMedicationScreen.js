@@ -40,6 +40,7 @@ export default function AddMedicationScreen({
   const wideLayout = width >= 640;
   const medicineNameInputRef = useRef(null);
   const [name, setName] = useState('');
+  const [selectedMedicineName, setSelectedMedicineName] = useState('');
   const [dosageAmount, setDosageAmount] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
   const [frequencyAmount, setFrequencyAmount] = useState('');
@@ -92,6 +93,12 @@ export default function AddMedicationScreen({
   function handleSubmit() {
     setError('');
     const errors = getMedicationFieldErrors(getMedicationValues());
+    if (
+      !selectedMedicineName
+      || selectedMedicineName.toLocaleLowerCase() !== name.trim().toLocaleLowerCase()
+    ) {
+      errors.name = 'Medicine not in the current dataset. Select a medicine from the dropdown.';
+    }
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
       setError('Please correct the highlighted fields.');
@@ -184,13 +191,20 @@ export default function AddMedicationScreen({
           <MedicineNameInput
             ref={medicineNameInputRef}
             label="Medication name"
+            showDatasetWarning
             placeholder="Enter Medication name"
             value={name}
             onChangeText={(value) => {
               if (value.length <= 100 && !/[\u0000-\u001F\u007F]/.test(value)) {
                 setName(value);
+                setSelectedMedicineName('');
                 setFieldErrors((previous) => ({ ...previous, name: undefined }));
               }
+            }}
+            onSelectMedicine={(medicine) => {
+              setName(medicine);
+              setSelectedMedicineName(medicine);
+              setFieldErrors((previous) => ({ ...previous, name: undefined }));
             }}
             autoCapitalize="words"
             maxLength={100}

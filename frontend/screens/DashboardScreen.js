@@ -25,12 +25,20 @@ import {
   getAdherenceAnalytics,
   takeDose,
   skipDose,
+  correctMissedDose,
 } from '../services/api';
 import {
   filterDoseRecordsByMedicationExpiration,
   getSafeUserErrorMessage,
 } from '../utils/medicationValidation';
+import {
+  formatActualTakenAt,
+  getDoseDueDisplay,
+  isDoseDue,
+  isIntervalFrequency,
+} from '../utils/doseTiming';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import DoseCorrectionDialog from '../components/DoseCorrectionDialog';
 import TimeOfDayPieChart from '../components/TimeOfDayPieChart';
 
 const medSkedLogo = require('../assets/medsked.png');
@@ -94,6 +102,8 @@ export default function DashboardScreen({
   const [analyticsError, setAnalyticsError] = useState('');
 
   const [pendingDoseAction, setPendingDoseAction] = useState(null);
+  const [doseCorrection, setDoseCorrection] = useState(null);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
 
 
   // =====================================================
@@ -324,8 +334,8 @@ export default function DashboardScreen({
   // TAKE DOSE
   // =====================================================
 
-  const requestDoseAction = (doseId, action) => {
-    setPendingDoseAction({ doseId, action });
+  const requestDoseAction = (doseId, action, earlyDoseConfirmed = false) => {
+    setPendingDoseAction({ doseId, action, earlyDoseConfirmed });
   };
 
   const confirmDoseAction = async () => {
@@ -338,19 +348,53 @@ export default function DashboardScreen({
 
     try {
       const actionRequest = current.action === 'take' ? takeDose : skipDose;
-      const updatedDose = await actionRequest(token, current.doseId);
+      const updatedDose = current.action === 'take'
+        ? await actionRequest(token, current.doseId, {
+          earlyDoseConfirmed: current.earlyDoseConfirmed,
+        })
+        : await actionRequest(token, current.doseId);
 
       setDoses((previous) => previous.map((dose) => (
         dose._id === current.doseId ? updatedDose : dose
       )));
       await loadDashboardAnalytics();
-    } catch {
+    } catch (actionError) {
       Alert.alert(
         'Unable to update dose',
-        current.action === 'take'
-          ? 'Unable to mark this dose as taken. Please try again.'
-          : 'Unable to skip this dose. Please try again.'
+        getSafeUserErrorMessage(
+          actionError,
+          current.action === 'take'
+            ? 'Unable to mark this dose as taken. Please try again.'
+            : 'Unable to skip this dose. Please try again.'
+        )
       );
+    }
+  };
+
+  const submitDoseCorrection = async (correction) => {
+    if (!doseCorrection?.doseId) return;
+    try {
+      setCorrectionSaving(true);
+      const updatedDose = await correctMissedDose(
+        token,
+        doseCorrection.doseId,
+        correction
+      );
+      setDoses((previous) => previous.map((dose) => (
+        dose._id === doseCorrection.doseId ? updatedDose : dose
+      )));
+      setDoseCorrection(null);
+      await loadDashboardAnalytics();
+    } catch (correctionError) {
+      Alert.alert(
+        'Unable to correct dose record',
+        getSafeUserErrorMessage(
+          correctionError,
+          'Unable to correct this missed dose. Please try again.'
+        )
+      );
+    } finally {
+      setCorrectionSaving(false);
     }
   };
 
@@ -443,6 +487,9 @@ export default function DashboardScreen({
       const status =
         dose.status ||
         'pending';
+      const dueDisplay = getDoseDueDisplay(dose);
+      const canTakeNow = isDoseDue(dose);
+      const canConfirmEarly = isIntervalFrequency(medication);
 
 
       return (
@@ -469,9 +516,11 @@ export default function DashboardScreen({
                   styles.doseTime
                 }
               >
-                {dose.scheduledTime ||
-                  '--'}
+                {dueDisplay.time || '--'}
               </Text>
+              {dueDisplay.adjusted ? (
+                <Text style={styles.doseTimeNote}>Adjusted due</Text>
+              ) : null}
 
             </View>
 
@@ -505,6 +554,22 @@ export default function DashboardScreen({
                   {dosage}
                 </Text>
 
+              ) : null}
+              {dose.takenAt ? (
+                <Text style={styles.doseTimingMeta}>
+                  Taken {formatActualTakenAt(dose.takenAt)}
+                  {dose.takenTiming ? ` (${dose.takenTiming.replace('_', ' ')})` : ''}
+                  {dose.takenByRole ? ` - recorded by ${dose.takenByRole}` : ''}
+                </Text>
+              ) : dueDisplay.adjusted ? (
+                <Text style={styles.doseTimingMeta}>
+                  Original schedule: {dose.scheduledTime || 'Time not specified'}
+                </Text>
+              ) : null}
+              {dose.correctionReason ? (
+                <Text style={styles.doseTimingMeta}>
+                  Correction: {dose.correctionReason}
+                </Text>
               ) : null}
 
             </View>
@@ -551,32 +616,43 @@ export default function DashboardScreen({
               }
             >
 
-              <Pressable
-
-                onPress={() =>
-                  requestDoseAction(dose._id, 'take')
-                }
-
-                style={({ pressed }) => [
-
-                  styles.takeButton,
-
-                  pressed &&
-                    styles.buttonPressed,
-
-                ]}
-
-              >
-
-                <Text
-                  style={
-                    styles.takeButtonText
-                  }
+              {canTakeNow ? (
+                <Pressable
+                  onPress={() => requestDoseAction(dose._id, 'take')}
+                  style={({ pressed }) => [
+                    styles.takeButton,
+                    pressed && styles.buttonPressed,
+                  ]}
                 >
-                  ✓ Mark as Taken
-                </Text>
-
-              </Pressable>
+                  <Text style={styles.takeButtonText}>✓ Mark as Taken</Text>
+                </Pressable>
+              ) : canConfirmEarly ? (
+                <Pressable
+                  onPress={() => requestDoseAction(dose._id, 'take', true)}
+                  style={({ pressed }) => [
+                    styles.takeButton,
+                    styles.earlyDoseButton,
+                    pressed && styles.buttonPressed,
+                  ]}
+                >
+                  <Text style={styles.takeButtonText}>Confirm Early Dose</Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.notDueText}>Not due yet</Text>
+              )}
+              {status === 'missed' && (
+                <View style={styles.doseActions}>
+                  <Pressable
+                    onPress={() => setDoseCorrection({
+                      doseId: dose._id,
+                      medicationName,
+                    })}
+                    style={styles.correctionButton}
+                  >
+                    <Text style={styles.takeButtonText}>Correct missed record</Text>
+                  </Pressable>
+                </View>
+              )}
 
 
               <Pressable
@@ -1535,13 +1611,26 @@ export default function DashboardScreen({
         visible={Boolean(pendingDoseAction)}
         title={pendingDoseAction?.action === 'take' ? 'Mark dose as taken?' : 'Skip this dose?'}
         message={pendingDoseAction?.action === 'take'
-          ? 'Confirm that this dose was taken.'
+          ? pendingDoseAction.earlyDoseConfirmed
+            ? 'This dose is scheduled for later. Confirm only if your prescription or care team specifically instructs you to take it now. The minimum interval must also be verified.'
+            : 'Confirm that this dose was taken.'
           : 'Are you sure you want to skip this dose?'}
-        confirmLabel={pendingDoseAction?.action === 'take' ? 'Mark as Taken' : 'Skip'}
+        confirmLabel={pendingDoseAction?.action === 'take'
+          ? pendingDoseAction.earlyDoseConfirmed ? 'Confirm Early Dose' : 'Mark as Taken'
+          : 'Skip'}
         cancelLabel="Cancel"
         danger={pendingDoseAction?.action === 'skip'}
         onConfirm={confirmDoseAction}
         onCancel={() => setPendingDoseAction(null)}
+      />
+      <DoseCorrectionDialog
+        visible={Boolean(doseCorrection)}
+        doseName={doseCorrection?.medicationName}
+        submitting={correctionSaving}
+        onCancel={() => {
+          if (!correctionSaving) setDoseCorrection(null);
+        }}
+        onSubmit={submitDoseCorrection}
       />
 
     </View>
@@ -2249,6 +2338,16 @@ const styles = StyleSheet.create({
 
   },
 
+  doseTimeNote: {
+
+    marginTop: 2,
+
+    fontSize: 7,
+
+    color: '#7A8494',
+
+  },
+
   doseInfo: {
 
     flex: 1,
@@ -2287,6 +2386,16 @@ const styles = StyleSheet.create({
     fontSize: 8,
 
     color: '#7A8494',
+
+  },
+
+  doseTimingMeta: {
+
+    marginTop: 2,
+
+    fontSize: 7,
+
+    color: '#526773',
 
   },
 
@@ -2361,6 +2470,44 @@ const styles = StyleSheet.create({
 
     backgroundColor:
       '#0B4F59',
+
+  },
+
+  earlyDoseButton: {
+
+    backgroundColor: '#8A5A00',
+
+  },
+
+  correctionButton: {
+
+    flex: 1,
+
+    minHeight: 42,
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+    borderRadius: 10,
+
+    backgroundColor: '#455A64',
+
+  },
+
+  notDueText: {
+
+    flex: 1,
+
+    paddingVertical: 12,
+
+    color: '#7A8494',
+
+    fontSize: 10,
+
+    fontWeight: '700',
+
+    textAlign: 'center',
 
   },
 

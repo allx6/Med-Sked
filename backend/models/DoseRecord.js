@@ -86,7 +86,40 @@ const doseRecordSchema =
 
       takenAt: {
         type: Date,
-
+        default: null,
+      },
+      effectiveDueAt: {
+        type: Date,
+        default: null,
+      },
+      takenTiming: {
+        type: String,
+        enum: ['on_time', 'late', 'early'],
+        default: null,
+      },
+      takenBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      takenByRole: {
+        type: String,
+        enum: ['patient', 'caregiver'],
+        default: null,
+      },
+      correctionFromStatus: {
+        type: String,
+        enum: ['missed'],
+        default: null,
+      },
+      correctedAt: {
+        type: Date,
+        default: null,
+      },
+      correctionReason: {
+        type: String,
+        trim: true,
+        maxlength: 500,
         default: null,
       },
 

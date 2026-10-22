@@ -26,6 +26,8 @@ const BLUR_CLOSE_DELAY_MS = 250;
 const MedicineNameInput = forwardRef(function MedicineNameInput({
   value,
   onChangeText,
+  onSelectMedicine,
+  showDatasetWarning = false,
   editable = true,
   ...textFieldProps
 }, ref) {
@@ -60,6 +62,9 @@ const MedicineNameInput = forwardRef(function MedicineNameInput({
   }, [dropdownOpen, query]);
 
   const visibleDropdown = dropdownOpen && editable && medicinesToShow.length > 0;
+  const hasExactMatch = medicines.some(
+    (medicine) => medicine.toLocaleLowerCase() === query
+  );
 
   const updateAnchor = useCallback(() => {
     anchorRef.current?.measureInWindow((x, y, width, height) => {
@@ -99,6 +104,7 @@ const MedicineNameInput = forwardRef(function MedicineNameInput({
   const handleSelect = (medicine) => {
     closeDropdown();
     onChangeText(medicine);
+    onSelectMedicine?.(medicine);
   };
 
   return (
@@ -132,6 +138,11 @@ const MedicineNameInput = forwardRef(function MedicineNameInput({
           }, BLUR_CLOSE_DELAY_MS);
         }}
       />
+      {showDatasetWarning && editable && query && !hasExactMatch ? (
+        <Text style={styles.noMatchText}>
+          Medicine not in the current dataset. Choose a listed medicine or clear this entry.
+        </Text>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={dropdownOpen ? 'Close medicine list' : 'Browse medicines'}
@@ -260,5 +271,12 @@ const styles = StyleSheet.create({
   suggestionText: {
     color: colors.text,
     fontSize: type.caption,
+  },
+  noMatchText: {
+    marginTop: 6,
+    marginRight: 48,
+    color: colors.dangerText,
+    fontSize: type.small,
+    lineHeight: 17,
   },
 });
