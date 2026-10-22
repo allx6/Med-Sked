@@ -56,10 +56,36 @@ const lockAdminMembership = async (session) => {
   }
 };
 
+const cancelLegacyDeleteRequests = async (session, actorId, targetId) => {
+  const query = { actionType: 'USER_DELETE', status: 'PENDING' };
+  if (targetId) query.targetId = targetId;
+  const requests = await PrivilegedActionRequest.find(query).session(session);
+
+  for (const request of requests) {
+    request.status = 'CANCELED';
+    request.canceledBy = actorId;
+    request.canceledAt = new Date();
+    request.cancellationReason = 'Legacy permanent deletion requests are no longer supported.';
+    request.executionResult = 'Canceled without deleting data. Submit a new deactivation request.';
+    await request.save({ session });
+    await recordAuditEvent(
+      session,
+      request,
+      actorId,
+      'LEGACY_USER_DELETE_REQUEST_CANCELED',
+      { reason: request.cancellationReason }
+    );
+  }
+};
+
 const createTargetSnapshot = async (actionType, targetId, session) => {
-  if (actionType === 'USER_DELETE' || actionType === 'USER_ROLE_CHANGE') {
+  if ([
+    'USER_DEACTIVATE',
+    'USER_REACTIVATE',
+    'USER_ROLE_CHANGE',
+  ].includes(actionType)) {
     const target = await User.findById(targetId)
-      .select('_id username role')
+      .select('_id username role accountStatus')
       .session(session);
     return target
       ? {
@@ -68,6 +94,7 @@ const createTargetSnapshot = async (actionType, targetId, session) => {
         requestData: {
           targetLabel: target.username,
           previousRole: target.role,
+          previousAccountStatus: target.accountStatus || 'active',
         },
       }
       : null;
@@ -98,7 +125,7 @@ const createTargetSnapshot = async (actionType, targetId, session) => {
 router.get('/', async (req, res) => {
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : 'PENDING';
-    const statuses = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED'];
+    const statuses = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED', 'CANCELED'];
     if (!statuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid request status.' });
     }
@@ -109,12 +136,17 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ message: 'Page and limit are invalid.' });
     }
 
+    await startTransaction((session) => (
+      cancelLegacyDeleteRequests(session, req.user.userId)
+    ));
+
     const query = { status };
     const [total, requests] = await Promise.all([
       PrivilegedActionRequest.countDocuments(query),
       PrivilegedActionRequest.find(query)
         .populate('requesterId', 'username email role')
         .populate('approverId', 'username email role')
+        .populate('canceledBy', 'username email role')
         .sort({ requestedAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -124,7 +156,7 @@ router.get('/', async (req, res) => {
     const data = await Promise.all(requests.map(async (request) => ({
       ...request,
       target: request.targetType === 'USER'
-        ? await User.findById(request.targetId).select('_id username role').lean()
+        ? await User.findById(request.targetId).select('_id username role accountStatus').lean()
           || { _id: request.targetId, label: request.requestData.targetLabel }
         : await CaregiverRelationship.findById(request.targetId)
           .populate('caregiver', 'username role')
@@ -161,7 +193,12 @@ router.post('/', async (req, res) => {
 
   const { actionType, targetId } = req.body;
   const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
-  if (!['USER_DELETE', 'USER_ROLE_CHANGE', 'CAREGIVER_RELATIONSHIP_REVOKE'].includes(actionType)) {
+  if (actionType === 'USER_DELETE') {
+    return res.status(409).json({
+      message: 'Permanent account deletion is no longer supported. Submit a deactivation request instead.',
+    });
+  }
+  if (!['USER_DEACTIVATE', 'USER_REACTIVATE', 'USER_ROLE_CHANGE', 'CAREGIVER_RELATIONSHIP_REVOKE'].includes(actionType)) {
     return res.status(400).json({ message: 'Invalid privileged action.' });
   }
   if (!mongoose.Types.ObjectId.isValid(targetId)) {
@@ -181,12 +218,18 @@ router.post('/', async (req, res) => {
   }
 
   const requesterId = req.user.userId;
-  if (actionType === 'USER_DELETE' && String(targetId) === String(requesterId)) {
-    return res.status(400).json({ message: 'You cannot request deletion of your own admin account.' });
+  if (
+    ['USER_DEACTIVATE', 'USER_REACTIVATE'].includes(actionType)
+    && String(targetId) === String(requesterId)
+  ) {
+    return res.status(400).json({ message: 'You cannot request a lifecycle change for your own admin account.' });
   }
 
   try {
     const request = await startTransaction(async (session) => {
+      if (actionType === 'USER_DEACTIVATE') {
+        await cancelLegacyDeleteRequests(session, requesterId, targetId);
+      }
       const snapshot = await createTargetSnapshot(actionType, targetId, session);
       if (!snapshot) {
         return { error: 'The requested target does not exist or is no longer eligible.', status: 404 };
@@ -196,6 +239,18 @@ router.post('/', async (req, res) => {
         && snapshot.target.role === req.body.requestedRole
       ) {
         return { error: 'The user already has the requested role.', status: 400 };
+      }
+      if (
+        actionType === 'USER_DEACTIVATE'
+        && snapshot.requestData.previousAccountStatus !== 'active'
+      ) {
+        return { error: 'Only an active account can be deactivated.', status: 409 };
+      }
+      if (
+        actionType === 'USER_REACTIVATE'
+        && snapshot.requestData.previousAccountStatus !== 'deactivated'
+      ) {
+        return { error: 'Only a deactivated account can be reactivated.', status: 409 };
       }
 
       const existing = await PrivilegedActionRequest.findOne({
@@ -251,13 +306,14 @@ router.get('/:requestId', async (req, res) => {
     const request = await PrivilegedActionRequest.findById(req.params.requestId)
       .populate('requesterId', 'username email role')
       .populate('approverId', 'username email role')
+      .populate('canceledBy', 'username email role')
       .lean();
     if (!request) {
       return res.status(404).json({ message: 'Approval request not found.' });
     }
 
     const target = request.targetType === 'USER'
-      ? await User.findById(request.targetId).select('_id username role').lean()
+      ? await User.findById(request.targetId).select('_id username role accountStatus').lean()
         || { _id: request.targetId, label: request.requestData.targetLabel }
       : await CaregiverRelationship.findById(request.targetId)
         .populate('caregiver', 'username role')
@@ -269,6 +325,89 @@ router.get('/:requestId', async (req, res) => {
   } catch (error) {
     console.error('Admin privileged-action request detail error:', error.message);
     return res.status(500).json({ message: 'Failed to retrieve the approval request.' });
+  }
+});
+
+router.patch('/:requestId', async (req, res) => {
+  const body = req.body;
+  if (
+    !body
+    || typeof body !== 'object'
+    || Array.isArray(body)
+    || Object.keys(body).some((key) => key !== 'reason')
+  ) {
+    return res.status(400).json({ message: 'Only the request reason may be updated.' });
+  }
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (!reason || reason.length > MAX_REASON_LENGTH) {
+    return res.status(400).json({ message: 'A reason of 1 to 500 characters is required.' });
+  }
+  if (!mongoose.Types.ObjectId.isValid(req.params.requestId)) {
+    return res.status(400).json({ message: 'Invalid request ID.' });
+  }
+
+  try {
+    const result = await startTransaction(async (session) => {
+      const request = await PrivilegedActionRequest.findById(req.params.requestId).session(session);
+      if (!request) return { error: 'Approval request not found.', status: 404 };
+      if (request.status !== 'PENDING') {
+        return { error: 'Only pending requests can be edited.', status: 409 };
+      }
+      if (String(request.requesterId) !== String(req.user.userId)) {
+        return { error: 'Only the requesting administrator can edit this request.', status: 403 };
+      }
+
+      const previousReason = request.reason;
+      request.reason = reason;
+      await request.save({ session });
+      await recordAuditEvent(session, request, req.user.userId, 'PRIVILEGED_ACTION_UPDATED', {
+        previousReason,
+        updatedReason: reason,
+      });
+      return { request };
+    });
+
+    if (result.error) return res.status(result.status).json({ message: result.error });
+    return res.json({ message: 'Approval request updated.', request: result.request });
+  } catch (error) {
+    console.error('Admin privileged-action request update error:', error.message);
+    return res.status(500).json({ message: 'Failed to update the approval request.' });
+  }
+});
+
+router.post('/:requestId/cancel', async (req, res) => {
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  if (!reason || reason.length > MAX_REASON_LENGTH) {
+    return res.status(400).json({ message: 'A cancellation reason of 1 to 500 characters is required.' });
+  }
+  if (!mongoose.Types.ObjectId.isValid(req.params.requestId)) {
+    return res.status(400).json({ message: 'Invalid request ID.' });
+  }
+
+  try {
+    const result = await startTransaction(async (session) => {
+      const request = await PrivilegedActionRequest.findById(req.params.requestId).session(session);
+      if (!request) return { error: 'Approval request not found.', status: 404 };
+      if (request.status !== 'PENDING') {
+        return { error: 'Only pending requests can be canceled.', status: 409 };
+      }
+      request.status = 'CANCELED';
+      request.canceledBy = req.user.userId;
+      request.canceledAt = new Date();
+      request.cancellationReason = reason;
+      await request.save({ session });
+      await recordAuditEvent(session, request, req.user.userId, 'PRIVILEGED_ACTION_CANCELED', {
+        reason,
+        requesterCanceled: String(request.requesterId) === String(req.user.userId),
+      });
+      return { request };
+    });
+
+    if (result.error) return res.status(result.status).json({ message: result.error });
+    return res.json({ message: 'Approval request canceled.', request: result.request });
+  } catch (error) {
+    console.error('Admin privileged-action request cancellation error:', error.message);
+    return res.status(500).json({ message: 'Failed to cancel the approval request.' });
   }
 });
 
@@ -286,6 +425,26 @@ router.post('/:requestId/reject', async (req, res) => {
       const request = await PrivilegedActionRequest.findById(req.params.requestId).session(session);
       if (!request) {
         return { error: 'Approval request not found.', status: 404 };
+      }
+      if (request.actionType === 'USER_DELETE' && request.status === 'PENDING') {
+        request.status = 'CANCELED';
+        request.canceledBy = req.user.userId;
+        request.canceledAt = new Date();
+        request.cancellationReason = 'Legacy permanent deletion requests are no longer supported.';
+        request.executionResult = 'Canceled without deleting the account or related data.';
+        await request.save({ session });
+        await recordAuditEvent(
+          session,
+          request,
+          req.user.userId,
+          'LEGACY_USER_DELETE_REQUEST_CANCELED',
+          { reason: request.cancellationReason }
+        );
+        return {
+          error: 'This legacy deletion request was canceled without deleting data. Submit a deactivation request instead.',
+          status: 409,
+          request,
+        };
       }
       if (String(request.requesterId) === String(req.user.userId)) {
         return { error: 'You cannot review your own request.', status: 403 };
@@ -336,6 +495,26 @@ router.post('/:requestId/approve', async (req, res) => {
       if (!request) {
         return { error: 'Approval request not found.', status: 404 };
       }
+      if (request.actionType === 'USER_DELETE' && request.status === 'PENDING') {
+        request.status = 'CANCELED';
+        request.canceledBy = req.user.userId;
+        request.canceledAt = new Date();
+        request.cancellationReason = 'Legacy permanent deletion requests are no longer supported.';
+        request.executionResult = 'Canceled without deleting the account or related data.';
+        await request.save({ session });
+        await recordAuditEvent(
+          session,
+          request,
+          req.user.userId,
+          'LEGACY_USER_DELETE_REQUEST_CANCELED',
+          { reason: request.cancellationReason }
+        );
+        return {
+          error: 'This legacy deletion request was canceled without deleting data. Submit a deactivation request instead.',
+          status: 409,
+          request,
+        };
+      }
       if (String(request.requesterId) === String(req.user.userId)) {
         return { error: 'You cannot approve your own request.', status: 403 };
       }
@@ -367,26 +546,79 @@ router.post('/:requestId/approve', async (req, res) => {
       await recordAuditEvent(session, request, req.user.userId, 'PRIVILEGED_ACTION_APPROVED');
 
       let failure = null;
-      if (request.actionType === 'USER_DELETE') {
+      let lifecycleDetails = {};
+      if (['USER_DEACTIVATE', 'USER_REACTIVATE'].includes(request.actionType)) {
         const target = await User.findById(request.targetId).session(session);
-        if (!target || String(target._id) === String(request.requesterId)) {
-          failure = 'The user no longer exists or cannot be deleted by this request.';
-        } else {
-          if (target.role === 'admin') {
-            await lockAdminMembership(session);
-            if (await User.countDocuments({ role: 'admin' }).session(session) <= 1) {
-              failure = 'The last administrator account cannot be deleted.';
-            }
+        const expectedStatus = request.actionType === 'USER_DEACTIVATE'
+          ? 'active'
+          : 'deactivated';
+        const currentStatus = target?.accountStatus || 'active';
+        if (
+          !target
+          || currentStatus !== expectedStatus
+          || request.requestData.previousAccountStatus !== expectedStatus
+        ) {
+          failure = 'The account status changed since this request was submitted.';
+        } else if (String(target._id) === String(request.requesterId)) {
+          failure = 'An administrator cannot change their own account status.';
+        } else if (
+          request.actionType === 'USER_DEACTIVATE'
+          && target.role === 'admin'
+        ) {
+          await lockAdminMembership(session);
+          if (await User.countDocuments({
+            role: 'admin',
+            accountStatus: { $ne: 'deactivated' },
+          }).session(session) <= 1) {
+            failure = 'The last active administrator account cannot be deactivated.';
           }
         }
 
         if (!failure && target) {
-          await CaregiverRelationship.deleteMany({
-            $or: [{ caregiver: request.targetId }, { patient: request.targetId }],
-          }, { session });
-          const deletion = await User.deleteOne({ _id: request.targetId }, { session });
-          if (deletion.deletedCount !== 1) {
-            failure = 'The target user could not be deleted.';
+          const filter = {
+            _id: request.targetId,
+            accountStatus: request.actionType === 'USER_DEACTIVATE'
+              ? { $ne: 'deactivated' }
+              : 'deactivated',
+          };
+          const update = request.actionType === 'USER_DEACTIVATE'
+            ? {
+              $set: {
+                accountStatus: 'deactivated',
+                deactivatedAt: new Date(),
+                deactivatedBy: req.user.userId,
+                deactivationReason: request.reason,
+                deactivationRequestId: request._id,
+              },
+              $inc: { authTokenVersion: 1 },
+            }
+            : {
+              $set: { accountStatus: 'active' },
+              $unset: {
+                deactivatedAt: 1,
+                deactivatedBy: 1,
+                deactivationReason: 1,
+                deactivationRequestId: 1,
+              },
+              $inc: { authTokenVersion: 1 },
+            };
+          const changed = await User.updateOne(
+            filter,
+            update,
+            { session, runValidators: true }
+          );
+          if (changed.modifiedCount !== 1) {
+            failure = 'The account status changed before this request could be executed.';
+          } else {
+            const relationships = await CaregiverRelationship.updateMany(
+              {
+                status: 'active',
+                $or: [{ caregiver: request.targetId }, { patient: request.targetId }],
+              },
+              { $set: { status: 'revoked' } },
+              { session, runValidators: true }
+            );
+            lifecycleDetails.revokedActiveRelationships = relationships.modifiedCount;
           }
         }
       } else if (request.actionType === 'USER_ROLE_CHANGE') {
@@ -401,8 +633,11 @@ router.post('/:requestId/approve', async (req, res) => {
           && requestedRole !== 'admin'
         ) {
           await lockAdminMembership(session);
-          if (await User.countDocuments({ role: 'admin' }).session(session) <= 1) {
-            failure = 'The last administrator account cannot be demoted.';
+          if (await User.countDocuments({
+            role: 'admin',
+            accountStatus: { $ne: 'deactivated' },
+          }).session(session) <= 1) {
+            failure = 'The last active administrator account cannot be demoted.';
           }
         }
 
@@ -449,6 +684,7 @@ router.post('/:requestId/approve', async (req, res) => {
       await request.save({ session });
       await recordAuditEvent(session, request, req.user.userId, 'PRIVILEGED_ACTION_EXECUTED', {
         reason: request.reason,
+        ...lifecycleDetails,
       });
       return { request };
     });

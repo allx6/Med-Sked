@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   approvePrivilegedActionRequest,
+  cancelPrivilegedActionRequest,
   getPrivilegedActionRequest,
   listPrivilegedActionRequests,
   rejectPrivilegedActionRequest,
+  updatePrivilegedActionRequest,
 } from '../services/api';
 
 const getStoredAuth = () => {
@@ -23,7 +25,9 @@ const formatDateTime = (value) => {
 };
 
 const actionLabels = {
-  USER_DELETE: 'Delete user',
+  USER_DELETE: 'Legacy deletion (blocked)',
+  USER_DEACTIVATE: 'Deactivate account',
+  USER_REACTIVATE: 'Reactivate account',
   USER_ROLE_CHANGE: 'Change user role',
   CAREGIVER_RELATIONSHIP_REVOKE: 'Revoke caregiver relationship',
 };
@@ -58,6 +62,12 @@ export default function AdminRequestsPage() {
   const [reviewReason, setReviewReason] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [reviewing, setReviewing] = useState(false);
+  const [editRequest, setEditRequest] = useState(null);
+  const [editReason, setEditReason] = useState('');
+  const [cancelRequest, setCancelRequest] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [updatingRequest, setUpdatingRequest] = useState(false);
+  const [requestLifecycleError, setRequestLifecycleError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -127,6 +137,44 @@ export default function AdminRequestsPage() {
     }
   };
 
+  const submitRequestEdit = async (event) => {
+    event.preventDefault();
+    if (!editRequest || !auth?.token) return;
+    try {
+      setUpdatingRequest(true);
+      setRequestLifecycleError('');
+      await updatePrivilegedActionRequest(auth.token, editRequest._id, { reason: editReason.trim() });
+      setStatusMessage('Request reason updated.');
+      setEditRequest(null);
+      setRefreshKey((current) => current + 1);
+      if (selectedRequest?._id === editRequest._id) setSelectedRequest(null);
+    } catch (err) {
+      setRequestLifecycleError(err.message || 'Unable to update the request.');
+    } finally {
+      setUpdatingRequest(false);
+    }
+  };
+
+  const submitRequestCancellation = async (event) => {
+    event.preventDefault();
+    if (!cancelRequest || !auth?.token) return;
+    try {
+      setUpdatingRequest(true);
+      setRequestLifecycleError('');
+      await cancelPrivilegedActionRequest(auth.token, cancelRequest._id, cancelReason.trim());
+      setStatusMessage('Request canceled. The request record remains available for audit.');
+      setCancelRequest(null);
+      setCancelReason('');
+      setRefreshKey((current) => current + 1);
+      if (selectedRequest?._id === cancelRequest._id) setSelectedRequest(null);
+    } catch (err) {
+      setRequestLifecycleError(err.message || 'Unable to cancel the request.');
+      setRefreshKey((current) => current + 1);
+    } finally {
+      setUpdatingRequest(false);
+    }
+  };
+
   const currentUserId = getUserId(auth?.user);
 
   return (
@@ -151,6 +199,7 @@ export default function AdminRequestsPage() {
           <option value="EXECUTED">Executed</option>
           <option value="REJECTED">Rejected</option>
           <option value="FAILED">Failed</option>
+          <option value="CANCELED">Canceled</option>
         </select>
       </div>
 
@@ -215,6 +264,30 @@ export default function AdminRequestsPage() {
                             >
                               Reject
                             </button>
+                            {isOwnRequest ? (
+                              <button
+                                type="button"
+                                className="secondary-button compact-button"
+                                onClick={() => {
+                                  setEditRequest(request);
+                                  setEditReason(request.reason || '');
+                                  setRequestLifecycleError('');
+                                }}
+                              >
+                                Edit reason
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="secondary-button compact-button"
+                              onClick={() => {
+                                setCancelRequest(request);
+                                setCancelReason('');
+                                setRequestLifecycleError('');
+                              }}
+                            >
+                              Cancel request
+                            </button>
                           </>
                         ) : null}
                       </td>
@@ -260,8 +333,13 @@ export default function AdminRequestsPage() {
               <div><span>Submitted</span><strong>{formatDateTime(selectedRequest.requestedAt)}</strong></div>
               <div><span>Status</span><strong>{selectedRequest.status}</strong></div>
               {selectedRequest.approverId ? <div><span>Reviewed by</span><strong>{displayUser(selectedRequest.approverId)}</strong></div> : null}
+              {selectedRequest.reviewedAt ? <div><span>Reviewed</span><strong>{formatDateTime(selectedRequest.reviewedAt)}</strong></div> : null}
+              {selectedRequest.executedAt ? <div><span>Executed</span><strong>{formatDateTime(selectedRequest.executedAt)}</strong></div> : null}
+              {selectedRequest.canceledBy ? <div><span>Canceled by</span><strong>{displayUser(selectedRequest.canceledBy)}</strong></div> : null}
+              {selectedRequest.canceledAt ? <div><span>Canceled</span><strong>{formatDateTime(selectedRequest.canceledAt)}</strong></div> : null}
               <div className="detail-full"><span>Reason</span><strong>{selectedRequest.reason}</strong></div>
               {selectedRequest.rejectionReason ? <div className="detail-full"><span>Rejection reason</span><strong>{selectedRequest.rejectionReason}</strong></div> : null}
+              {selectedRequest.cancellationReason ? <div className="detail-full"><span>Cancellation reason</span><strong>{selectedRequest.cancellationReason}</strong></div> : null}
               {selectedRequest.executionResult ? <div className="detail-full"><span>Execution result</span><strong>{selectedRequest.executionResult}</strong></div> : null}
             </div>
           </section>
@@ -290,18 +368,59 @@ export default function AdminRequestsPage() {
               {reviewAction.type === 'approve' ? (
                 <p><strong>Requester reason:</strong> {reviewAction.request.reason}</p>
               ) : null}
+
               {reviewAction.type === 'reject' ? (
                 <label>
                   Rejection reason
                   <textarea required maxLength={500} rows={4} value={reviewReason} onChange={(event) => setReviewReason(event.target.value)} />
                 </label>
               ) : null}
+
               {reviewError ? <div className="error-state" role="alert">{reviewError}</div> : null}
               <div className="modal-actions">
                 <button type="button" className="secondary-button" disabled={reviewing} onClick={() => setReviewAction(null)}>Cancel</button>
                 <button type="submit" className="primary-button" disabled={reviewing || (reviewAction.type === 'reject' && !reviewReason.trim())}>
                   {reviewing ? 'Saving…' : reviewAction.type === 'approve' ? 'Approve and execute' : 'Reject request'}
                 </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {editRequest ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="edit-request-reason-title">
+            <div className="modal-heading">
+              <div><p className="eyebrow">Pending request</p><h3 id="edit-request-reason-title">Edit request reason</h3></div>
+              <button type="button" className="modal-close" disabled={updatingRequest} aria-label="Close edit request form" onClick={() => setEditRequest(null)}>×</button>
+            </div>
+            <form className="user-form" onSubmit={submitRequestEdit}>
+              <label>Reason<textarea required maxLength={500} rows={4} value={editReason} onChange={(event) => setEditReason(event.target.value)} /></label>
+              {requestLifecycleError ? <div className="error-state" role="alert">{requestLifecycleError}</div> : null}
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" disabled={updatingRequest} onClick={() => setEditRequest(null)}>Cancel</button>
+                <button type="submit" className="primary-button" disabled={updatingRequest || !editReason.trim()}>{updatingRequest ? 'Saving…' : 'Save reason'}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {cancelRequest ? (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="cancel-request-title">
+            <div className="modal-heading">
+              <div><p className="eyebrow">Pending request</p><h3 id="cancel-request-title">Cancel request?</h3></div>
+              <button type="button" className="modal-close" disabled={updatingRequest} aria-label="Close cancel request form" onClick={() => setCancelRequest(null)}>×</button>
+            </div>
+            <form className="user-form" onSubmit={submitRequestCancellation}>
+              <p>This will stop review and retain the request and its audit history.</p>
+              <label>Cancellation reason<textarea required maxLength={500} rows={4} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} /></label>
+              {requestLifecycleError ? <div className="error-state" role="alert">{requestLifecycleError}</div> : null}
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" disabled={updatingRequest} onClick={() => setCancelRequest(null)}>Keep request</button>
+                <button type="submit" className="primary-button" disabled={updatingRequest || !cancelReason.trim()}>{updatingRequest ? 'Canceling…' : 'Cancel request'}</button>
               </div>
             </form>
           </section>

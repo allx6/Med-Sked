@@ -2,12 +2,14 @@ const mongoose = require('mongoose');
 
 const ACTION_TYPES = [
   'USER_DELETE',
+  'USER_DEACTIVATE',
+  'USER_REACTIVATE',
   'USER_ROLE_CHANGE',
   'CAREGIVER_RELATIONSHIP_REVOKE',
 ];
 
 const TARGET_TYPES = ['USER', 'CAREGIVER_RELATIONSHIP'];
-const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED'];
+const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED', 'FAILED', 'CANCELED'];
 
 const privilegedActionRequestSchema = new mongoose.Schema(
   {
@@ -75,6 +77,21 @@ const privilegedActionRequestSchema = new mongoose.Schema(
       maxlength: 500,
       default: null,
     },
+    canceledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    canceledAt: {
+      type: Date,
+      default: null,
+    },
+    cancellationReason: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -88,6 +105,7 @@ privilegedActionRequestSchema.index(
 );
 
 privilegedActionRequestSchema.index({ status: 1, requestedAt: -1 });
+privilegedActionRequestSchema.index({ actionType: 1, status: 1 });
 privilegedActionRequestSchema.index({ requesterId: 1, requestedAt: -1 });
 
 module.exports = mongoose.model('PrivilegedActionRequest', privilegedActionRequestSchema);

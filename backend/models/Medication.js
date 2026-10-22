@@ -25,6 +25,16 @@ const medicationSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    frequencyType: {
+      type: String,
+      enum: ['fixed_time', 'interval'],
+      default: null,
+    },
+    frequencyIntervalMinutes: {
+      type: Number,
+      min: 0.000001,
+      default: null,
+    },
 
     expirationDate: {
       type: String,

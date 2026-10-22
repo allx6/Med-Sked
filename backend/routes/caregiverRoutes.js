@@ -230,7 +230,7 @@ router.get(
         })
           .populate(
             'medicationId',
-            'name dosage frequency'
+            'name dosage frequency frequencyType frequencyIntervalMinutes'
           )
           .sort({
             time: 1,
@@ -275,7 +275,7 @@ router.get(
         })
           .populate(
             'medicationId',
-            'name dosage frequency'
+            'name dosage frequency frequencyType frequencyIntervalMinutes'
           )
           .populate(
             'scheduleId',
@@ -374,7 +374,7 @@ router.get(
         })
           .populate(
             'medicationId',
-            'name dosage frequency'
+            'name dosage frequency frequencyType frequencyIntervalMinutes'
           )
           .sort({
             time: 1,
@@ -394,7 +394,7 @@ router.get(
         })
           .populate(
             'medicationId',
-            'name dosage frequency'
+            'name dosage frequency frequencyType frequencyIntervalMinutes'
           )
           .populate(
             'scheduleId',

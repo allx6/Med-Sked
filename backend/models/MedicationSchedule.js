@@ -36,6 +36,11 @@ const medicationScheduleSchema =
         required: true,
         trim: true,
       },
+      timeZone: {
+        type: String,
+        default: 'Asia/Manila',
+        immutable: true,
+      },
 
 
       // =============================================

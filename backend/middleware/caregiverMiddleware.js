@@ -1,5 +1,6 @@
 const CaregiverRelationship = require('../models/CaregiverRelationship');
 const mongoose = require('mongoose');
+const User = require('../models/User');
 
 const caregiverPermissions = [
   'VIEW_ONLY',
@@ -36,6 +37,17 @@ const findActiveRelationship = async (req, res) => {
   });
 
   if (!relationship) {
+    res.status(403).json({
+      message: 'You are not authorized to access this patient.',
+    });
+    return null;
+  }
+
+  const patient = await User.findOne({
+    _id: patientId,
+    accountStatus: { $ne: 'deactivated' },
+  }).select('_id');
+  if (!patient) {
     res.status(403).json({
       message: 'You are not authorized to access this patient.',
     });

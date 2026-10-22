@@ -158,6 +158,7 @@ export const listUsers = async (token, options = {}) => {
   if (options.limit) params.set('limit', String(options.limit));
   if (options.search) params.set('search', options.search);
   if (options.role) params.set('role', options.role);
+  if (options.accountStatus) params.set('accountStatus', options.accountStatus);
 
   const queryString = params.toString();
   return fetchWithToken(`/api/admin/users${queryString ? `?${queryString}` : ''}`, token);
@@ -219,6 +220,22 @@ export const listPrivilegedActionRequests = async (token, options = {}) => {
 
 export const getPrivilegedActionRequest = async (token, requestId) => (
   fetchWithToken(`/api/admin/privileged-action-requests/${requestId}`, token)
+);
+
+export const updatePrivilegedActionRequest = async (token, requestId, payload) => {
+  const response = await fetch(`${API_URL}/api/admin/privileged-action-requests/${requestId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(token),
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(response);
+};
+
+export const cancelPrivilegedActionRequest = async (token, requestId, reason) => (
+  postAdminJson(`/api/admin/privileged-action-requests/${requestId}/cancel`, token, { reason })
 );
 
 export const createPrivilegedActionRequest = async (token, payload) => (

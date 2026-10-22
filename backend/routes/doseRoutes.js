@@ -16,8 +16,14 @@ const { detectMissedDoses } = require('../services/missedDoseService');
 
 const {
   generateTodayDoses,
+  getMedicationFrequencyInterval,
   parseTime,
 } = require('../services/doseGenerator');
+const {
+  getMedicationLocalParts,
+  parseScheduledDateTime,
+  toWallClockTimestamp,
+} = require('../utils/medicationTime');
 const {
   consumeMedicationStockBatch,
   restoreMedicationStockBatch,
@@ -50,12 +56,79 @@ const validateDoseId = (value, label = 'dose ID') => {
 const populateDose = (doseId) => DoseRecord.findById(doseId)
   .populate(
     'medicationId',
-    'name dosage frequency quantityOnHand refillThreshold'
+    'name dosage frequency frequencyType frequencyIntervalMinutes quantityOnHand refillThreshold'
   )
   .populate(
     'scheduleId',
-    'time dose days startDate endDate enabled'
+    'time timeZone dose days startDate endDate enabled'
   );
+
+const rebasePendingIntervalDoses = async ({
+  userId,
+  scheduleId,
+  takenDose,
+  takenAt,
+}) => {
+  const originalTakenAt = parseScheduledDateTime(
+    takenDose.scheduledDate,
+    takenDose.scheduledTime
+  );
+  if (!originalTakenAt) return;
+
+  const takenParts = getMedicationLocalParts(takenAt);
+  const actualTakenAt = toWallClockTimestamp(takenParts);
+  const pendingDoses = await DoseRecord.find({
+    userId,
+    scheduleId,
+    status: 'pending',
+    scheduledDate: { $gte: takenDose.scheduledDate },
+  });
+
+  for (const pendingDose of pendingDoses) {
+    const originalDueAt = parseScheduledDateTime(
+      pendingDose.scheduledDate,
+      pendingDose.scheduledTime
+    );
+    if (!originalDueAt || originalDueAt <= originalTakenAt) continue;
+
+    const effectiveDueAt = new Date(
+      originalDueAt.getTime() + actualTakenAt.getTime() - originalTakenAt.getTime()
+    );
+    await DoseRecord.updateOne(
+      { _id: pendingDose._id, userId, status: 'pending' },
+      { $set: { effectiveDueAt } }
+    );
+  }
+};
+
+const notifyDoseTaken = async ({
+  dose,
+  medication,
+  doseOwnerId,
+  takenTiming,
+}) => {
+  try {
+    const medicationName = medication?.name || 'medication';
+    const timing = takenTiming === 'late'
+      ? ' late'
+      : takenTiming === 'early' ? ' early' : '';
+    await createMedicationNotifications({
+      patientId: doseOwnerId,
+      type: 'dose_taken',
+      patientMessage: `Your ${medicationName} dose scheduled at ${dose.scheduledTime} was recorded as taken${timing}.`,
+      caregiverMessage: (patientName) => `${patientName}'s ${medicationName} dose scheduled at ${dose.scheduledTime} was recorded as taken${timing}.`,
+      relatedEntityType: 'DoseRecord',
+      relatedEntityId: dose._id,
+      dedupeKey: `dose_taken:${dose._id}`,
+    });
+  } catch (error) {
+    console.error('Dose status notification failed:', {
+      operation: 'notify-dose-taken',
+      patientId: String(doseOwnerId),
+      errorName: error?.name || 'UnknownError',
+    });
+  }
+};
 
 // =====================================================
 // GENERATE TODAY'S DOSES
@@ -107,7 +180,7 @@ router.get(
       })
         .populate(
           'medicationId',
-          'name dosage frequency'
+          'name dosage frequency frequencyType frequencyIntervalMinutes'
         )
         .populate(
           'scheduleId',
@@ -153,7 +226,7 @@ router.get(
       })
         .populate(
           'medicationId',
-          'name dosage frequency'
+          'name dosage frequency frequencyType frequencyIntervalMinutes'
         )
         .populate(
           'scheduleId',
@@ -306,6 +379,7 @@ router.post(
           scheduleId,
           scheduledDate,
           scheduledTime,
+          effectiveDueAt: parseScheduledDateTime(scheduledDate, scheduledTime),
           status: 'pending',
           takenAt: null,
         });
@@ -321,7 +395,7 @@ router.post(
         )
           .populate(
             'medicationId',
-            'name dosage frequency'
+            'name dosage frequency frequencyType frequencyIntervalMinutes'
           )
           .populate(
             'scheduleId',
@@ -395,6 +469,26 @@ router.put(
       }
 
       if (existingDose.status === 'taken') {
+        const medication = await Medication.findOne({
+          _id: existingDose.medicationId,
+          userId: doseOwnerId,
+        });
+        if (getMedicationFrequencyInterval(medication) && existingDose.takenAt) {
+          await rebasePendingIntervalDoses({
+            userId: doseOwnerId,
+            scheduleId: existingDose.scheduleId,
+            takenDose: existingDose,
+            takenAt: existingDose.takenAt,
+          });
+        }
+        if (existingDose.takenTiming) {
+          await notifyDoseTaken({
+            dose: existingDose,
+            medication,
+            doseOwnerId,
+            takenTiming: existingDose.takenTiming,
+          });
+        }
         return res.json(await populateDose(existingDose._id));
       }
 
@@ -418,38 +512,93 @@ router.put(
         });
       }
 
+      const takenAt = new Date();
+      const nowWallClock = toWallClockTimestamp(getMedicationLocalParts(takenAt));
+      const scheduledAt = existingDose.effectiveDueAt
+        ? new Date(existingDose.effectiveDueAt)
+        : parseScheduledDateTime(existingDose.scheduledDate, existingDose.scheduledTime);
+      if (!scheduledAt) {
+        return res.status(400).json({ message: 'Dose has an invalid scheduled date or time.' });
+      }
+      const isEarly = nowWallClock < scheduledAt;
+      const intervalMinutes = getMedicationFrequencyInterval(medication);
+      if (isEarly) {
+        if (req.body?.earlyDoseConfirmed !== true) {
+          return res.status(409).json({
+            code: 'DOSE_NOT_DUE',
+            message: 'This dose is not due yet. Do not take it early unless your prescription or care team specifically instructs you to.',
+          });
+        }
+        if (!intervalMinutes) {
+          return res.status(409).json({
+            code: 'EARLY_DOSE_NOT_ALLOWED',
+            message: 'Early recording is only available for an explicit interval-based medication schedule.',
+          });
+        }
+        const previousDose = await DoseRecord.findOne({
+          userId: doseOwnerId,
+          scheduleId: existingDose.scheduleId,
+          status: 'taken',
+          takenAt: { $ne: null },
+        }).sort({ takenAt: -1 }).lean();
+        if (!previousDose?.takenAt) {
+          return res.status(409).json({
+            code: 'EARLY_DOSE_INTERVAL_UNVERIFIED',
+            message: 'The minimum interval cannot be verified for this dose. Follow the prescription or contact your care team.',
+          });
+        }
+        const previousTakenAt = toWallClockTimestamp(
+          getMedicationLocalParts(new Date(previousDose.takenAt))
+        );
+        if (
+          nowWallClock.getTime() - previousTakenAt.getTime()
+          < intervalMinutes * 60 * 1000
+        ) {
+          return res.status(409).json({
+            code: 'EARLY_DOSE_INTERVAL_NOT_MET',
+            message: 'The prescribed interval since the last recorded dose has not elapsed.',
+          });
+        }
+      }
+      const takenTiming = isEarly
+        ? 'early'
+        : nowWallClock > scheduledAt ? 'late' : 'on_time';
+
       if (existingDose.refillDeducted) {
-        await DoseRecord.updateOne(
-          { _id: existingDose._id },
+        const updated = await DoseRecord.findOneAndUpdate(
+          {
+            _id: existingDose._id,
+            userId: doseOwnerId,
+            status: 'pending',
+          },
           {
             $set: {
               status: 'taken',
-              takenAt: new Date(),
+              takenAt,
+              takenTiming,
+              takenBy: req.user.userId,
+              takenByRole: req.user.role,
             },
-          }
+          },
+          { returnDocument: 'after', runValidators: true }
         );
-
-        if (req.user.role === 'patient') {
-          try {
-            const medicationName = medication?.name || 'medication';
-            await createMedicationNotifications({
-              patientId: doseOwnerId,
-              type: 'dose_taken',
-              patientMessage: `Your ${medicationName} dose scheduled at ${existingDose.scheduledTime} was marked as taken.`,
-              caregiverMessage: (patientName) => `${patientName}'s ${medicationName} dose scheduled at ${existingDose.scheduledTime} was marked as taken.`,
-              relatedEntityType: 'DoseRecord',
-              relatedEntityId: existingDose._id,
-              dedupeKey: `dose_taken:${existingDose._id}`,
-            });
-          } catch (error) {
-            console.error('Dose status notification failed:', {
-              operation: 'notify-dose-taken',
-              patientId: String(doseOwnerId),
-              errorName: error?.name || 'UnknownError',
-            });
-          }
+        if (!updated) {
+          return res.status(409).json({ message: 'This dose was updated by another request.' });
         }
-
+        if (intervalMinutes) {
+          await rebasePendingIntervalDoses({
+            userId: doseOwnerId,
+            scheduleId: existingDose.scheduleId,
+            takenDose: existingDose,
+            takenAt,
+          });
+        }
+        await notifyDoseTaken({
+          dose: updated,
+          medication,
+          doseOwnerId,
+          takenTiming,
+        });
         return res.json(await populateDose(existingDose._id));
       }
 
@@ -477,7 +626,10 @@ router.put(
           {
             $set: {
               status: 'taken',
-              takenAt: new Date(),
+              takenAt,
+              takenTiming,
+              takenBy: req.user.userId,
+              takenByRole: req.user.role,
               refillDeducted: true,
               stockBatchId,
             },
@@ -542,26 +694,15 @@ router.put(
         });
       }
 
-      if (req.user.role === 'patient') {
-        try {
-          const medicationName = medication?.name || 'medication';
-          await createMedicationNotifications({
-            patientId: doseOwnerId,
-            type: 'dose_taken',
-            patientMessage: `Your ${medicationName} dose scheduled at ${dose.scheduledTime} was marked as taken.`,
-            caregiverMessage: (patientName) => `${patientName}'s ${medicationName} dose scheduled at ${dose.scheduledTime} was marked as taken.`,
-            relatedEntityType: 'DoseRecord',
-            relatedEntityId: dose._id,
-            dedupeKey: `dose_taken:${dose._id}`,
-          });
-        } catch (error) {
-          console.error('Dose status notification failed:', {
-            operation: 'notify-dose-taken',
-            patientId: String(doseOwnerId),
-            errorName: error?.name || 'UnknownError',
-          });
-        }
+      if (intervalMinutes) {
+        await rebasePendingIntervalDoses({
+          userId: doseOwnerId,
+          scheduleId: existingDose.scheduleId,
+          takenDose: existingDose,
+          takenAt,
+        });
       }
+      await notifyDoseTaken({ dose, medication, doseOwnerId, takenTiming });
 
       if (updatedMedication) {
         try {
@@ -591,6 +732,245 @@ router.put(
 
       res.status(error.statusCode || 500).json({
         message: error.statusCode ? error.message : 'Failed to mark dose as taken',
+      });
+    }
+  }
+);
+
+// =====================================================
+// CORRECT AN AUTOMATICALLY MISSED DOSE
+// PUT /api/doses/:id/correct-taken
+// =====================================================
+
+router.put(
+  '/:id/correct-taken',
+  authMiddleware,
+  (req, res, next) => {
+    if (req.user.role === 'caregiver') {
+      return caregiverMiddleware.requirePermission('ADHERENCE_SUPPORT')(req, res, next);
+    }
+    return next();
+  },
+  async (req, res) => {
+    try {
+      validateDoseId(req.params.id);
+      const doseOwnerId = req.user.role === 'caregiver'
+        ? req.body.patientId
+        : req.user.userId;
+      if (req.user.role === 'caregiver' && !mongoose.Types.ObjectId.isValid(doseOwnerId)) {
+        return res.status(400).json({ message: 'Invalid patient ID' });
+      }
+
+      const correctionReason = typeof req.body?.correctionReason === 'string'
+        ? req.body.correctionReason.trim()
+        : '';
+      if (!correctionReason || correctionReason.length > 500) {
+        return res.status(400).json({
+          message: 'A correction reason of 1 to 500 characters is required.',
+        });
+      }
+
+      const takenAt = new Date(req.body?.takenAt);
+      if (!req.body?.takenAt || Number.isNaN(takenAt.getTime()) || takenAt > new Date()) {
+        return res.status(400).json({
+          message: 'Enter a valid actual date and time that is not in the future.',
+        });
+      }
+
+      const existingDose = await DoseRecord.findOne({
+        _id: req.params.id,
+        userId: doseOwnerId,
+      });
+      if (!existingDose) {
+        return res.status(404).json({ message: 'Dose record not found' });
+      }
+
+      const medication = await Medication.findOne({
+        _id: existingDose.medicationId,
+        userId: doseOwnerId,
+      });
+      const intervalMinutes = getMedicationFrequencyInterval(medication);
+
+      if (
+        existingDose.status === 'taken'
+        && existingDose.correctionFromStatus === 'missed'
+      ) {
+        if (intervalMinutes && existingDose.takenAt) {
+          await rebasePendingIntervalDoses({
+            userId: doseOwnerId,
+            scheduleId: existingDose.scheduleId,
+            takenDose: existingDose,
+            takenAt: existingDose.takenAt,
+          });
+        }
+        if (existingDose.takenTiming) {
+          await notifyDoseTaken({
+            dose: existingDose,
+            medication,
+            doseOwnerId,
+            takenTiming: existingDose.takenTiming,
+          });
+        }
+        return res.json(await populateDose(existingDose._id));
+      }
+
+      if (existingDose.status !== 'missed') {
+        return res.status(409).json({
+          message: 'Only automatically missed doses can be corrected.',
+        });
+      }
+
+      if (isDoseDateAfterExpiration(
+        existingDose.scheduledDate,
+        getMedicationExpirationDate(medication)
+      )) {
+        return res.status(400).json({
+          message: 'Cannot correct a dose scheduled after the medication expiration date.',
+        });
+      }
+
+      const scheduledAt = existingDose.effectiveDueAt
+        ? new Date(existingDose.effectiveDueAt)
+        : parseScheduledDateTime(existingDose.scheduledDate, existingDose.scheduledTime);
+      if (!scheduledAt) {
+        return res.status(400).json({ message: 'Dose has an invalid scheduled date or time.' });
+      }
+
+      const actualWallClock = toWallClockTimestamp(getMedicationLocalParts(takenAt));
+      const isEarly = actualWallClock < scheduledAt;
+      if (isEarly) {
+        if (!intervalMinutes) {
+          return res.status(409).json({
+            code: 'EARLY_DOSE_NOT_ALLOWED',
+            message: 'An early dose correction is only available for an explicit interval-based medication schedule.',
+          });
+        }
+        const previousDose = await DoseRecord.findOne({
+          userId: doseOwnerId,
+          scheduleId: existingDose.scheduleId,
+          status: 'taken',
+          takenAt: { $ne: null },
+        }).sort({ takenAt: -1 }).lean();
+        if (!previousDose?.takenAt) {
+          return res.status(409).json({
+            code: 'EARLY_DOSE_INTERVAL_UNVERIFIED',
+            message: 'The minimum interval cannot be verified for this correction.',
+          });
+        }
+        const previousWallClock = toWallClockTimestamp(
+          getMedicationLocalParts(new Date(previousDose.takenAt))
+        );
+        if (actualWallClock.getTime() - previousWallClock.getTime() < intervalMinutes * 60 * 1000) {
+          return res.status(409).json({
+            code: 'EARLY_DOSE_INTERVAL_NOT_MET',
+            message: 'The prescribed interval since the last recorded dose had not elapsed.',
+          });
+        }
+      }
+
+      const takenTiming = isEarly
+        ? 'early'
+        : actualWallClock > scheduledAt ? 'late' : 'on_time';
+      let stockBatchId = existingDose.stockBatchId || null;
+      let updatedMedication = null;
+      if (!existingDose.refillDeducted) {
+        const stockReservation = await consumeMedicationStockBatch(
+          existingDose.medicationId,
+          doseOwnerId
+        );
+        if (!stockReservation) {
+          return res.status(409).json({
+            message: 'Cannot correct this dose because there is no unexpired medication stock available to reconcile.',
+          });
+        }
+        updatedMedication = stockReservation.medication;
+        stockBatchId = stockReservation.batchId;
+      }
+
+      let correctedDose;
+      try {
+        correctedDose = await DoseRecord.findOneAndUpdate(
+          {
+            _id: existingDose._id,
+            userId: doseOwnerId,
+            status: 'missed',
+          },
+          {
+            $set: {
+              status: 'taken',
+              takenAt,
+              takenTiming,
+              takenBy: req.user.userId,
+              takenByRole: req.user.role,
+              correctionFromStatus: 'missed',
+              correctedAt: new Date(),
+              correctionReason,
+              refillDeducted: true,
+              stockBatchId,
+            },
+          },
+          { returnDocument: 'after', runValidators: true }
+        );
+      } catch (error) {
+        if (stockBatchId && !existingDose.refillDeducted) {
+          await restoreMedicationStockBatch(
+            existingDose.medicationId,
+            doseOwnerId,
+            stockBatchId
+          );
+        }
+        throw error;
+      }
+
+      if (!correctedDose) {
+        if (stockBatchId && !existingDose.refillDeducted) {
+          await restoreMedicationStockBatch(
+            existingDose.medicationId,
+            doseOwnerId,
+            stockBatchId
+          );
+        }
+        return res.status(409).json({
+          message: 'This dose was updated by another request.',
+        });
+      }
+
+      if (intervalMinutes) {
+        await rebasePendingIntervalDoses({
+          userId: doseOwnerId,
+          scheduleId: existingDose.scheduleId,
+          takenDose: existingDose,
+          takenAt,
+        });
+      }
+      await notifyDoseTaken({
+        dose: correctedDose,
+        medication,
+        doseOwnerId,
+        takenTiming,
+      });
+
+      if (updatedMedication) {
+        try {
+          await notifyLowRefill({
+            medication: updatedMedication,
+            triggerId: correctedDose._id,
+          });
+        } catch (error) {
+          console.error('Low-refill notification failed:', {
+            patientId: String(updatedMedication.userId),
+            medicationId: String(updatedMedication._id),
+            operation: 'notify-after-dose-correction',
+            errorName: error?.name || 'UnknownError',
+          });
+        }
+      }
+
+      return res.json(await populateDose(correctedDose._id));
+    } catch (error) {
+      console.error('Correct missed dose error:', error);
+      return res.status(error.statusCode || 500).json({
+        message: error.statusCode ? error.message : 'Failed to correct missed dose',
       });
     }
   }
@@ -670,7 +1050,7 @@ router.put(
         )
           .populate(
             'medicationId',
-            'name dosage frequency'
+            'name dosage frequency frequencyType frequencyIntervalMinutes'
           )
           .populate(
             'scheduleId',

@@ -41,6 +41,9 @@ const queryResult = (value) => ({
   session() { return this; },
   select() { return this; },
   populate() { return this; },
+  sort() { return this; },
+  skip() { return this; },
+  limit() { return this; },
   lean() { return this; },
   then(resolve, reject) {
     return Promise.resolve(value).then(resolve, reject);
@@ -123,7 +126,7 @@ test('request creation rejects spoofed identity fields and missing reasons', asy
   const spoofedResponse = response();
   await handler({
     body: {
-      actionType: 'USER_DELETE',
+      actionType: 'USER_DEACTIVATE',
       targetId,
       reason: 'Required cleanup',
       requesterId: approverId,
@@ -134,10 +137,18 @@ test('request creation rejects spoofed identity fields and missing reasons', asy
 
   const missingReasonResponse = response();
   await handler({
-    body: { actionType: 'USER_DELETE', targetId, reason: '  ' },
+    body: { actionType: 'USER_DEACTIVATE', targetId, reason: '  ' },
     user: { userId: requesterId, role: 'admin' },
   }, missingReasonResponse);
   assert.equal(missingReasonResponse.statusCode, 400);
+
+  const legacyDeleteResponse = response();
+  await handler({
+    body: { actionType: 'USER_DELETE', targetId, reason: 'No longer supported' },
+    user: { userId: requesterId, role: 'admin' },
+  }, legacyDeleteResponse);
+  assert.equal(legacyDeleteResponse.statusCode, 409);
+  assert.match(legacyDeleteResponse.body.message, /deactivation request/);
 });
 
 test('request creation records a reason and audits the authenticated requester', async () => {
@@ -253,7 +264,7 @@ test('an administrator cannot approve an action targeting their own account', as
     _id: requestId,
     requesterId,
     status: 'PENDING',
-    actionType: 'USER_DELETE',
+    actionType: 'USER_DEACTIVATE',
     targetType: 'USER',
     targetId: approverId,
     requestData: { targetLabel: 'reviewer' },
@@ -286,6 +297,7 @@ test('a different admin approval executes the requested change and audits each s
     findRequest: PrivilegedActionRequest.findById,
     findUser: User.findById,
     updateUser: User.updateOne,
+    updateRelationships: CaregiverRelationship.updateMany,
     auditSave: AuditLog.prototype.save,
     lockUpdate: PrivilegedActionLock.updateOne,
   };
@@ -344,6 +356,375 @@ test('a different admin approval executes the requested change and audits each s
   }
 });
 
+test('deactivation retains the account and revokes active caregiver relationships', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findRequest: PrivilegedActionRequest.findById,
+    findUser: User.findById,
+    updateUser: User.updateOne,
+    updateRelationships: CaregiverRelationship.updateMany,
+    auditSave: AuditLog.prototype.save,
+    lockUpdate: PrivilegedActionLock.updateOne,
+  };
+  const actions = [];
+  const target = { _id: targetId, role: 'patient', accountStatus: 'active', authTokenVersion: 0 };
+  const request = {
+    _id: requestId,
+    requesterId,
+    status: 'PENDING',
+    actionType: 'USER_DEACTIVATE',
+    targetType: 'USER',
+    targetId,
+    requestData: { previousAccountStatus: 'active' },
+    reason: 'Account owner requested closure',
+    save: async () => {},
+  };
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
+  PrivilegedActionLock.updateOne = async () => ({ matchedCount: 1 });
+  PrivilegedActionRequest.findById = () => queryResult(request);
+  User.findById = () => queryResult(target);
+  User.updateOne = async (filter, update) => {
+    assert.deepEqual(filter, { _id: targetId, accountStatus: { $ne: 'deactivated' } });
+    target.accountStatus = update.$set.accountStatus;
+    target.authTokenVersion += update.$inc.authTokenVersion;
+    return { modifiedCount: 1 };
+  };
+  CaregiverRelationship.updateMany = async (filter, update) => {
+    assert.deepEqual(filter, {
+      status: 'active',
+      $or: [{ caregiver: targetId }, { patient: targetId }],
+    });
+    assert.deepEqual(update, { $set: { status: 'revoked' } });
+    return { modifiedCount: 2 };
+  };
+  AuditLog.prototype.save = async function save() {
+    actions.push({ action: this.action, details: this.details });
+    return this;
+  };
+
+  try {
+    const res = response();
+    await routeHandler(privilegedRoutes, '/:requestId/approve', 'post')(
+      { params: { requestId }, body: {}, user: { userId: approverId, role: 'admin' } },
+      res
+    );
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(target.accountStatus, 'deactivated');
+    assert.equal(target.authTokenVersion, 1);
+    assert.equal(request.status, 'EXECUTED');
+    assert.deepEqual(actions.map(({ action }) => action), [
+      'PRIVILEGED_ACTION_APPROVED',
+      'PRIVILEGED_ACTION_EXECUTED',
+    ]);
+    assert.equal(actions[1].details.revokedActiveRelationships, 2);
+  } finally {
+    mongoose.startSession = originals.startSession;
+    PrivilegedActionRequest.findById = originals.findRequest;
+    User.findById = originals.findUser;
+    User.updateOne = originals.updateUser;
+    CaregiverRelationship.updateMany = originals.updateRelationships;
+    AuditLog.prototype.save = originals.auditSave;
+    PrivilegedActionLock.updateOne = originals.lockUpdate;
+  }
+});
+
+test('reactivation requires an independent approval and invalidates old access tokens', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findRequest: PrivilegedActionRequest.findById,
+    findUser: User.findById,
+    updateUser: User.updateOne,
+    updateRelationships: CaregiverRelationship.updateMany,
+    auditSave: AuditLog.prototype.save,
+    lockUpdate: PrivilegedActionLock.updateOne,
+  };
+  const target = { _id: targetId, role: 'patient', accountStatus: 'deactivated', authTokenVersion: 4 };
+  const request = {
+    _id: requestId,
+    requesterId,
+    status: 'PENDING',
+    actionType: 'USER_REACTIVATE',
+    targetType: 'USER',
+    targetId,
+    requestData: { previousAccountStatus: 'deactivated' },
+    reason: 'Identity verified; access may resume',
+    save: async () => {},
+  };
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
+  PrivilegedActionLock.updateOne = async () => ({ matchedCount: 1 });
+  PrivilegedActionRequest.findById = () => queryResult(request);
+  User.findById = () => queryResult(target);
+  User.updateOne = async (filter, update) => {
+    assert.deepEqual(filter, { _id: targetId, accountStatus: 'deactivated' });
+    assert.deepEqual(update.$inc, { authTokenVersion: 1 });
+    assert.deepEqual(update.$unset, {
+      deactivatedAt: 1,
+      deactivatedBy: 1,
+      deactivationReason: 1,
+      deactivationRequestId: 1,
+    });
+    target.accountStatus = update.$set.accountStatus;
+    target.authTokenVersion += update.$inc.authTokenVersion;
+    return { modifiedCount: 1 };
+  };
+  CaregiverRelationship.updateMany = async (filter, update) => {
+    assert.deepEqual(filter, {
+      status: 'active',
+      $or: [{ caregiver: targetId }, { patient: targetId }],
+    });
+    assert.deepEqual(update, { $set: { status: 'revoked' } });
+    return { modifiedCount: 1 };
+  };
+  AuditLog.prototype.save = async function save() { return this; };
+
+  try {
+    const res = response();
+    await routeHandler(privilegedRoutes, '/:requestId/approve', 'post')(
+      { params: { requestId }, body: {}, user: { userId: approverId, role: 'admin' } },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(target.accountStatus, 'active');
+    assert.equal(target.authTokenVersion, 5);
+    assert.equal(request.status, 'EXECUTED');
+  } finally {
+    mongoose.startSession = originals.startSession;
+    PrivilegedActionRequest.findById = originals.findRequest;
+    User.findById = originals.findUser;
+    User.updateOne = originals.updateUser;
+    CaregiverRelationship.updateMany = originals.updateRelationships;
+    AuditLog.prototype.save = originals.auditSave;
+    PrivilegedActionLock.updateOne = originals.lockUpdate;
+  }
+});
+
+test('last active administrator cannot be deactivated', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findRequest: PrivilegedActionRequest.findById,
+    findUser: User.findById,
+    countAdmins: User.countDocuments,
+    updateUser: User.updateOne,
+    auditSave: AuditLog.prototype.save,
+    lockUpdate: PrivilegedActionLock.updateOne,
+  };
+  const request = {
+    _id: requestId,
+    requesterId,
+    status: 'PENDING',
+    actionType: 'USER_DEACTIVATE',
+    targetType: 'USER',
+    targetId,
+    requestData: { previousAccountStatus: 'active' },
+    reason: 'No longer required',
+    save: async () => {},
+  };
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
+  PrivilegedActionLock.updateOne = async () => ({ matchedCount: 1 });
+  PrivilegedActionRequest.findById = () => queryResult(request);
+  User.findById = () => queryResult({ _id: targetId, role: 'admin', accountStatus: 'active' });
+  User.countDocuments = () => queryResult(1);
+  User.updateOne = async () => {
+    assert.fail('The final active administrator must not be deactivated.');
+  };
+  AuditLog.prototype.save = async function save() { return this; };
+
+  try {
+    const res = response();
+    await routeHandler(privilegedRoutes, '/:requestId/approve', 'post')(
+      { params: { requestId }, body: {}, user: { userId: approverId, role: 'admin' } },
+      res
+    );
+    assert.equal(res.statusCode, 409);
+    assert.equal(request.status, 'FAILED');
+    assert.match(request.executionResult, /last active administrator/i);
+  } finally {
+    mongoose.startSession = originals.startSession;
+    PrivilegedActionRequest.findById = originals.findRequest;
+    User.findById = originals.findUser;
+    User.countDocuments = originals.countAdmins;
+    User.updateOne = originals.updateUser;
+    AuditLog.prototype.save = originals.auditSave;
+    PrivilegedActionLock.updateOne = originals.lockUpdate;
+  }
+});
+
+test('legacy pending deletion requests are canceled without deleting data', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findRequest: PrivilegedActionRequest.findById,
+    auditSave: AuditLog.prototype.save,
+    lockUpdate: PrivilegedActionLock.updateOne,
+    deleteOne: User.deleteOne,
+  };
+  const actions = [];
+  const request = {
+    _id: requestId,
+    requesterId,
+    status: 'PENDING',
+    actionType: 'USER_DELETE',
+    targetType: 'USER',
+    targetId,
+    requestData: { targetLabel: 'patient' },
+    save: async () => {},
+  };
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
+  PrivilegedActionLock.updateOne = async () => ({ matchedCount: 1 });
+  PrivilegedActionRequest.findById = () => queryResult(request);
+  User.deleteOne = async () => {
+    assert.fail('Legacy deletion approval must never delete an account.');
+  };
+  AuditLog.prototype.save = async function save() {
+    actions.push(this.action);
+    return this;
+  };
+
+  try {
+    const res = response();
+    await routeHandler(privilegedRoutes, '/:requestId/approve', 'post')(
+      { params: { requestId }, body: {}, user: { userId: approverId, role: 'admin' } },
+      res
+    );
+    assert.equal(res.statusCode, 409);
+    assert.equal(request.status, 'CANCELED');
+    assert.match(request.executionResult, /without deleting/);
+    assert.deepEqual(actions, ['LEGACY_USER_DELETE_REQUEST_CANCELED']);
+  } finally {
+    mongoose.startSession = originals.startSession;
+    PrivilegedActionRequest.findById = originals.findRequest;
+    AuditLog.prototype.save = originals.auditSave;
+    PrivilegedActionLock.updateOne = originals.lockUpdate;
+    User.deleteOne = originals.deleteOne;
+  }
+});
+
+test('listing requests transitions existing pending deletions to canceled with an audit event', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findRequests: PrivilegedActionRequest.find,
+    countRequests: PrivilegedActionRequest.countDocuments,
+    auditSave: AuditLog.prototype.save,
+  };
+  const actions = [];
+  const legacyRequest = {
+    _id: requestId,
+    requesterId,
+    status: 'PENDING',
+    actionType: 'USER_DELETE',
+    targetType: 'USER',
+    targetId,
+    requestData: { targetLabel: 'patient' },
+    save: async () => {},
+  };
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
+  PrivilegedActionRequest.find = (filter) => queryResult(
+    filter.actionType === 'USER_DELETE' ? [legacyRequest] : []
+  );
+  PrivilegedActionRequest.countDocuments = () => queryResult(0);
+  AuditLog.prototype.save = async function save() {
+    actions.push(this.action);
+    return this;
+  };
+
+  try {
+    const res = response();
+    await routeHandler(privilegedRoutes, '/', 'get')(
+      { query: {}, user: { userId: approverId, role: 'admin' } },
+      res
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(legacyRequest.status, 'CANCELED');
+    assert.match(legacyRequest.executionResult, /without deleting data/);
+    assert.deepEqual(actions, ['LEGACY_USER_DELETE_REQUEST_CANCELED']);
+  } finally {
+    mongoose.startSession = originals.startSession;
+    PrivilegedActionRequest.find = originals.findRequests;
+    PrivilegedActionRequest.countDocuments = originals.countRequests;
+    AuditLog.prototype.save = originals.auditSave;
+  }
+});
+
+test('pending requests can be edited by requesters and canceled by another admin', async () => {
+  const originals = {
+    startSession: mongoose.startSession,
+    findRequest: PrivilegedActionRequest.findById,
+    auditSave: AuditLog.prototype.save,
+  };
+  const actions = [];
+  const request = {
+    _id: requestId,
+    requesterId,
+    status: 'PENDING',
+    actionType: 'USER_DEACTIVATE',
+    targetType: 'USER',
+    targetId,
+    requestData: { previousAccountStatus: 'active' },
+    reason: 'Initial reason',
+    save: async () => {},
+  };
+  mongoose.startSession = async () => ({
+    withTransaction: async (callback) => callback(),
+    endSession: async () => {},
+  });
+  PrivilegedActionRequest.findById = () => queryResult(request);
+  AuditLog.prototype.save = async function save() {
+    actions.push({ action: this.action, details: this.details });
+    return this;
+  };
+
+  try {
+    const editResponse = response();
+    await routeHandler(privilegedRoutes, '/:requestId', 'patch')(
+      {
+        params: { requestId },
+        body: { reason: 'Updated justification' },
+        user: { userId: requesterId, role: 'admin' },
+      },
+      editResponse
+    );
+    assert.equal(editResponse.statusCode, 200);
+    assert.equal(request.reason, 'Updated justification');
+
+    const cancelResponse = response();
+    await routeHandler(privilegedRoutes, '/:requestId/cancel', 'post')(
+      {
+        params: { requestId },
+        body: { reason: 'Request is no longer needed.' },
+        user: { userId: approverId, role: 'admin' },
+      },
+      cancelResponse
+    );
+    assert.equal(cancelResponse.statusCode, 200);
+    assert.equal(request.status, 'CANCELED');
+    assert.equal(request.canceledBy, approverId);
+    assert.equal(request.cancellationReason, 'Request is no longer needed.');
+    assert.deepEqual(actions.map(({ action }) => action), [
+      'PRIVILEGED_ACTION_UPDATED',
+      'PRIVILEGED_ACTION_CANCELED',
+    ]);
+  } finally {
+    mongoose.startSession = originals.startSession;
+    PrivilegedActionRequest.findById = originals.findRequest;
+    AuditLog.prototype.save = originals.auditSave;
+  }
+});
+
 test('rejection records the reason without executing the requested action', async () => {
   const originals = {
     startSession: mongoose.startSession,
@@ -356,7 +737,7 @@ test('rejection records the reason without executing the requested action', asyn
     _id: requestId,
     requesterId,
     status: 'PENDING',
-    actionType: 'USER_DELETE',
+    actionType: 'USER_DEACTIVATE',
     targetType: 'USER',
     targetId,
     requestData: { targetLabel: 'patient' },
@@ -460,68 +841,6 @@ test('approval revokes a relationship only after reviewer approval', async () =>
   }
 });
 
-test('approval deletes a user and related caregiver relationships only after approval', async () => {
-  const originals = {
-    startSession: mongoose.startSession,
-    findRequest: PrivilegedActionRequest.findById,
-    findUser: User.findById,
-    countAdmins: User.countDocuments,
-    deleteUser: User.deleteOne,
-    deleteRelationships: CaregiverRelationship.deleteMany,
-    auditSave: AuditLog.prototype.save,
-    lockUpdate: PrivilegedActionLock.updateOne,
-  };
-  const actions = [];
-  const request = {
-    _id: requestId,
-    requesterId,
-    status: 'PENDING',
-    actionType: 'USER_DELETE',
-    targetType: 'USER',
-    targetId,
-    requestData: { targetLabel: 'patient' },
-    reason: 'Duplicate account',
-    save: async () => {},
-  };
-  mongoose.startSession = async () => ({
-    withTransaction: async (callback) => callback(),
-    endSession: async () => {},
-  });
-  PrivilegedActionLock.updateOne = async () => ({ matchedCount: 1 });
-  PrivilegedActionRequest.findById = () => queryResult(request);
-  User.findById = () => queryResult({ _id: targetId, role: 'patient' });
-  User.countDocuments = () => queryResult(2);
-  User.deleteOne = async () => ({ deletedCount: 1 });
-  CaregiverRelationship.deleteMany = async () => ({ deletedCount: 1 });
-  AuditLog.prototype.save = async function save() {
-    actions.push(this.action);
-    return this;
-  };
-
-  try {
-    const res = response();
-    await routeHandler(privilegedRoutes, '/:requestId/approve', 'post')(
-      { params: { requestId }, body: {}, user: { userId: approverId, role: 'admin' } },
-      res
-    );
-    assert.equal(res.statusCode, 200);
-    assert.equal(request.status, 'EXECUTED');
-    assert.deepEqual(actions, [
-      'PRIVILEGED_ACTION_APPROVED',
-      'PRIVILEGED_ACTION_EXECUTED',
-    ]);
-  } finally {
-    mongoose.startSession = originals.startSession;
-    PrivilegedActionRequest.findById = originals.findRequest;
-    User.findById = originals.findUser;
-    User.countDocuments = originals.countAdmins;
-    User.deleteOne = originals.deleteUser;
-    CaregiverRelationship.deleteMany = originals.deleteRelationships;
-    AuditLog.prototype.save = originals.auditSave;
-    PrivilegedActionLock.updateOne = originals.lockUpdate;
-  }
-});
-
 test('last administrator cannot be demoted through an approved request', async () => {
   const originals = {
     startSession: mongoose.startSession,
@@ -568,7 +887,7 @@ test('last administrator cannot be demoted through an approved request', async (
     );
     assert.equal(res.statusCode, 409);
     assert.equal(request.status, 'FAILED');
-    assert.match(request.executionResult, /last administrator/i);
+    assert.match(request.executionResult, /last active administrator/i);
     assert.deepEqual(actions, [
       'PRIVILEGED_ACTION_APPROVED',
       'PRIVILEGED_ACTION_EXECUTION_FAILED',

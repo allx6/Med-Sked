@@ -6,6 +6,7 @@ const MedicationSchedule = require('../models/MedicationSchedule');
 
 const {
   generateDosesForDate,
+  getMedicationFrequencyInterval,
   parseTime,
   reconcilePendingDosesForSchedule,
   scheduleAppliesToDate,
@@ -43,7 +44,7 @@ test('invalid schedule times are rejected', () => {
 });
 
 test('edited schedule rules control eligibility while preserving an open end date', () => {
-  const sunday = new Date(2026, 8, 20);
+  const sunday = new Date(Date.UTC(2026, 8, 20));
   const schedule = {
     startDate: '2026-09-20',
     endDate: null,
@@ -53,7 +54,7 @@ test('edited schedule rules control eligibility while preserving an open end dat
 
   assert.equal(scheduleAppliesToDate(schedule, sunday), true);
   assert.equal(
-    scheduleAppliesToDate(schedule, new Date(2026, 8, 23)),
+    scheduleAppliesToDate(schedule, new Date(Date.UTC(2026, 8, 23))),
     false
   );
   assert.equal(
@@ -122,11 +123,39 @@ test('eight-hour intervals remain distinct from fixed schedule times', () => {
   assert.deepEqual(generated, ['8:00 AM', '4:00 PM', '12:00 AM']);
 });
 
+test('structured frequency settings control interval dosing with legacy text fallback', () => {
+  assert.equal(
+    getMedicationFrequencyInterval({
+      frequency: 'Every 8 hours',
+      frequencyType: 'interval',
+      frequencyIntervalMinutes: 480,
+    }),
+    480
+  );
+  assert.equal(
+    getMedicationFrequencyInterval({
+      frequency: 'Every 8 hours',
+      frequencyType: 'fixed_time',
+      frequencyIntervalMinutes: null,
+    }),
+    null
+  );
+  assert.equal(
+    getMedicationFrequencyInterval({ frequency: 'Every 8 hours' }),
+    480
+  );
+  assert.equal(
+    getMedicationFrequencyInterval({ frequency: 'Twice daily' }),
+    null
+  );
+});
+
 const runGenerationWithModels = async ({ targetDate, medication, schedule }) => {
   const originals = {
     scheduleFind: MedicationSchedule.find,
     medicationFind: Medication.find,
     doseCreate: DoseRecord.create,
+    doseFindOne: DoseRecord.findOne,
     consoleLog: console.log,
   };
   const created = [];
@@ -141,6 +170,10 @@ const runGenerationWithModels = async ({ targetDate, medication, schedule }) => 
     created.push(dose);
     return dose;
   };
+  DoseRecord.findOne = () => ({
+    sort() { return this; },
+    lean: async () => null,
+  });
   console.log = () => {};
 
   try {
@@ -149,6 +182,7 @@ const runGenerationWithModels = async ({ targetDate, medication, schedule }) => 
     MedicationSchedule.find = originals.scheduleFind;
     Medication.find = originals.medicationFind;
     DoseRecord.create = originals.doseCreate;
+    DoseRecord.findOne = originals.doseFindOne;
     console.log = originals.consoleLog;
   }
 
@@ -162,15 +196,15 @@ const makeDateSchedule = (date, overrides = {}) => ({
   time: '08:00',
   startDate: formatTestDate(date),
   endDate: null,
-  days: [new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(date)],
+  days: [new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(date)],
   enabled: true,
   ...overrides,
 });
 
-const formatTestDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const formatTestDate = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 
 test('generateDosesForDate creates the dose on expiration day', async () => {
-  const targetDate = new Date(2026, 9, 10);
+  const targetDate = new Date(Date.UTC(2026, 9, 10));
   const created = await runGenerationWithModels({
     targetDate,
     medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Daily', expirationDate: '2026-10-10' },
@@ -182,7 +216,7 @@ test('generateDosesForDate creates the dose on expiration day', async () => {
 });
 
 test('generateDosesForDate skips a null-ended schedule after expiration', async () => {
-  const targetDate = new Date(2026, 9, 11);
+  const targetDate = new Date(Date.UTC(2026, 9, 11));
   const created = await runGenerationWithModels({
     targetDate,
     medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Daily', expirationDate: '2026-10-10' },
@@ -193,7 +227,7 @@ test('generateDosesForDate skips a null-ended schedule after expiration', async 
 });
 
 test('generateDosesForDate checks the final interval candidate after midnight', async () => {
-  const targetDate = new Date(2026, 9, 10);
+  const targetDate = new Date(Date.UTC(2026, 9, 10));
   const created = await runGenerationWithModels({
     targetDate,
     medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Every 8 hours', expirationDate: '2026-10-10' },
@@ -204,7 +238,7 @@ test('generateDosesForDate checks the final interval candidate after midnight', 
 });
 
 test('generateDosesForDate preserves legacy behavior without expiration', async () => {
-  const targetDate = new Date(2026, 9, 11);
+  const targetDate = new Date(Date.UTC(2026, 9, 11));
   const created = await runGenerationWithModels({
     targetDate,
     medication: { _id: 'medication-id', userId: 'user-id', frequency: 'Daily', expirationDate: null },

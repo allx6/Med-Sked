@@ -40,6 +40,35 @@ const userSchema = new mongoose.Schema(
       ],
       default: 'patient',
     },
+    accountStatus: {
+      type: String,
+      enum: ['active', 'deactivated'],
+      default: 'active',
+      index: true,
+    },
+    deactivatedAt: {
+      type: Date,
+      default: null,
+    },
+    deactivatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    deactivationReason: {
+      type: String,
+      maxlength: 500,
+      default: null,
+    },
+    deactivationRequestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PrivilegedActionRequest',
+      default: null,
+    },
+    authTokenVersion: {
+      type: Number,
+      default: 0,
+    },
 
     termsAccepted: {
       type: Boolean,

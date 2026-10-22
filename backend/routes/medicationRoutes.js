@@ -31,6 +31,7 @@ const {
   getUsableMedicationQuantity,
   validateBatchExpirationDate,
 } = require('../utils/medicationInventory');
+const { getFrequencyConfigFromText } = require('../utils/medicationFrequency');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const caregiverMiddleware = require('../middleware/caregiverMiddleware');
@@ -374,6 +375,8 @@ const createMedicationForOwner = async (req, res) => {
         frequency:
           frequency.trim(),
 
+        ...getFrequencyConfigFromText(frequency.trim()),
+
         expirationDate: normalizedExpirationDate,
 
         quantityOnHand: normalizedQuantity ?? 0,
@@ -526,6 +529,7 @@ router.put('/:id', authMiddleware, authorizeMedicationMutation, async (req, res)
       name: name.trim(),
       dosage: dosage.trim(),
       frequency: frequency.trim(),
+      ...getFrequencyConfigFromText(frequency.trim()),
       normalizedMedicationKey,
     };
 

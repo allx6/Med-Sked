@@ -141,8 +141,22 @@ test('8 AM Manila dose becomes missed by 3 PM Manila when backend time is UTC', 
 
 test('today pending doses become missed after the scheduled time', async () => {
   const dose = createDose('2026-10-13', '7:00 PM');
-  const { result } = await detectAt(dose, new Date('2026-10-13T11:01:00.000Z'));
+  const { result } = await detectAt(dose, new Date('2026-10-13T11:16:00.000Z'));
 
+  assert.equal(result.markedMissed, 1);
+  assert.equal(dose.status, 'missed');
+});
+
+test('pending dose stays actionable during the fifteen-minute grace period', async () => {
+  const dose = createDose('2026-10-13', '7:00 PM');
+  const { result } = await detectAt(dose, new Date('2026-10-13T11:14:00.000Z'));
+  assert.equal(result.markedMissed, 0);
+  assert.equal(dose.status, 'pending');
+});
+
+test('pending dose becomes missed after the fifteen-minute grace period', async () => {
+  const dose = createDose('2026-10-13', '7:00 PM');
+  const { result } = await detectAt(dose, new Date('2026-10-13T11:16:00.000Z'));
   assert.equal(result.markedMissed, 1);
   assert.equal(dose.status, 'missed');
 });

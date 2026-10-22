@@ -25,10 +25,12 @@ import {
   takeDose,
   skipDose,
   deleteDoseRecord,
+  correctMissedDose,
 } from '../services/api';
 
 import StatusBadge from '../components/StatusBadge';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import DoseCorrectionDialog from '../components/DoseCorrectionDialog';
 import { getDoseActionErrorMessage } from '../utils/doseErrors';
 import { getSafeUserErrorMessage } from '../utils/medicationValidation';
 import {
@@ -36,6 +38,12 @@ import {
   getAvailableDoseDates,
   normalizeDoseDate,
 } from '../utils/doseHistory';
+import {
+  formatActualTakenAt,
+  getDoseDueDisplay,
+  isDoseDue,
+  isIntervalFrequency,
+} from '../utils/doseTiming';
 
 const DOSE_STATUS_OPTIONS = [
   { key: 'all', label: 'All' },
@@ -60,6 +68,8 @@ export default function DoseHistoryScreen({
   const [error, setError] = useState('');
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [doseCorrection, setDoseCorrection] = useState(null);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
 
   // Medication filter
   const [selectedMedication, setSelectedMedication] =
@@ -238,11 +248,12 @@ export default function DoseHistoryScreen({
   // MARK AS TAKEN
   // =====================================================
 
-  const handleTake = async (doseId) => {
+  const handleTake = async (doseId, earlyDoseConfirmed = false) => {
     try {
       const updatedDose = await takeDose(
         token,
-        doseId
+        doseId,
+        { earlyDoseConfirmed }
       );
 
       setDoses((previous) =>
@@ -296,6 +307,30 @@ export default function DoseHistoryScreen({
     }
   };
 
+  const submitDoseCorrection = async (correction) => {
+    if (!doseCorrection?.doseId) return;
+    try {
+      setCorrectionSaving(true);
+      const updatedDose = await correctMissedDose(
+        token,
+        doseCorrection.doseId,
+        correction
+      );
+      setDoses((previous) => previous.map((dose) => (
+        dose._id === doseCorrection.doseId ? updatedDose : dose
+      )));
+      setDoseCorrection(null);
+    } catch (correctionError) {
+      console.error('Dose correction error:', correctionError);
+      Alert.alert(
+        'Unable to correct dose record',
+        getDoseActionErrorMessage(correctionError)
+      );
+    } finally {
+      setCorrectionSaving(false);
+    }
+  };
+
   // =====================================================
   // DELETE DOSE
   // =====================================================
@@ -309,8 +344,8 @@ export default function DoseHistoryScreen({
     setShowActionDialog(true);
   };
 
-  const requestDoseAction = (doseId, action) => {
-    setPendingAction({ doseId, action });
+  const requestDoseAction = (doseId, action, earlyDoseConfirmed = false) => {
+    setPendingAction({ doseId, action, earlyDoseConfirmed });
     setShowActionDialog(true);
   };
 
@@ -323,7 +358,9 @@ export default function DoseHistoryScreen({
 
     try {
       if (action === 'take') {
-        const updatedDose = await takeDose(token, doseId);
+        const updatedDose = await takeDose(token, doseId, {
+          earlyDoseConfirmed: pendingAction.earlyDoseConfirmed,
+        });
         setDoses((previous) =>
           previous.map((dose) =>
             dose._id === doseId ? updatedDose : dose
@@ -456,6 +493,9 @@ export default function DoseHistoryScreen({
 
     const status =
       item.status || 'pending';
+    const dueDisplay = getDoseDueDisplay(item);
+    const canTakeNow = isDoseDue(item);
+    const canConfirmEarly = isIntervalFrequency(medication);
 
     return (
       <View style={styles.card}>
@@ -509,10 +549,16 @@ export default function DoseHistoryScreen({
           <Text
             style={styles.detailText}
           >
-            Scheduled:{' '}
-            {item.scheduledTime ||
-              'Not specified'}
+            {dueDisplay.adjusted ? 'Adjusted due: ' : 'Scheduled: '}
+            {dueDisplay.date ? `${dueDisplay.date} at ` : ''}
+            {dueDisplay.time}
           </Text>
+
+          {dueDisplay.adjusted ? (
+            <Text style={styles.detailText}>
+              Original schedule: {item.scheduledDate} at {item.scheduledTime}
+            </Text>
+          ) : null}
 
           {schedule?.dose ? (
             <Text style={styles.detailText}>
@@ -534,9 +580,19 @@ export default function DoseHistoryScreen({
               style={styles.detailText}
             >
               Taken:{' '}
-              {new Date(
-                item.takenAt
-              ).toLocaleString()}
+              {formatActualTakenAt(item.takenAt)}
+              {item.takenTiming ? ` (${item.takenTiming.replace('_', ' ')})` : ''}
+              {item.takenByRole ? ` - recorded by ${item.takenByRole}` : ''}
+            </Text>
+          ) : null}
+          {item.correctionReason ? (
+            <Text style={styles.detailText}>
+              Correction reason: {item.correctionReason}
+            </Text>
+          ) : null}
+          {item.correctedAt ? (
+            <Text style={styles.detailText}>
+              Corrected: {formatActualTakenAt(item.correctedAt)}
             </Text>
           ) : null}
         </View>
@@ -547,20 +603,23 @@ export default function DoseHistoryScreen({
           <View
             style={[styles.actionRow, compactLayout && styles.compactActionRow]}
           >
-            <Pressable
-              style={styles.takeButton}
-              onPress={() =>
-                requestDoseAction(item._id, 'take')
-              }
-            >
-              <Text
-                style={
-                  styles.takeButtonText
-                }
+            {canTakeNow ? (
+              <Pressable
+                style={styles.takeButton}
+                onPress={() => requestDoseAction(item._id, 'take')}
               >
-                Mark as Taken
-              </Text>
-            </Pressable>
+                <Text style={styles.takeButtonText}>Mark as Taken</Text>
+              </Pressable>
+            ) : canConfirmEarly ? (
+              <Pressable
+                style={[styles.takeButton, styles.earlyDoseButton]}
+                onPress={() => requestDoseAction(item._id, 'take', true)}
+              >
+                <Text style={styles.takeButtonText}>Confirm Early Dose</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.notDueText}>Not due yet</Text>
+            )}
 
             <Pressable
               style={styles.skipButton}
@@ -578,6 +637,20 @@ export default function DoseHistoryScreen({
             </Pressable>
           </View>
         )}
+
+        {status === 'missed' ? (
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[styles.takeButton, styles.correctionButton]}
+              onPress={() => setDoseCorrection({
+                doseId: item._id,
+                medicationName,
+              })}
+            >
+              <Text style={styles.takeButtonText}>Correct missed record</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* DELETE PENDING RECORDS ONLY */}
 
@@ -993,14 +1066,18 @@ export default function DoseHistoryScreen({
         }
         message={
           pendingAction?.action === 'take'
-            ? 'You are about to mark this dose as taken.'
+            ? pendingAction.earlyDoseConfirmed
+              ? 'This dose is scheduled for later. Confirm only if your prescription or care team specifically instructs you to take it now. The minimum interval must also be verified.'
+              : 'You are about to mark this dose as taken.'
             : pendingAction?.action === 'skip'
               ? 'You are about to skip this dose.'
               : 'Are you sure you want to delete this dose history record?'
         }
         confirmLabel={
           pendingAction?.action === 'take'
-            ? 'Mark as Taken'
+            ? pendingAction.earlyDoseConfirmed
+              ? 'Confirm Early Dose'
+              : 'Mark as Taken'
             : pendingAction?.action === 'skip'
               ? 'Skip'
               : 'Delete'
@@ -1015,6 +1092,15 @@ export default function DoseHistoryScreen({
           setShowActionDialog(false);
           setPendingAction(null);
         }}
+      />
+      <DoseCorrectionDialog
+        visible={Boolean(doseCorrection)}
+        doseName={doseCorrection?.medicationName}
+        submitting={correctionSaving}
+        onCancel={() => {
+          if (!correctionSaving) setDoseCorrection(null);
+        }}
+        onSubmit={submitDoseCorrection}
       />
     </View>
   );
@@ -1643,6 +1729,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#218C73',
     borderRadius: 5,
     alignItems: 'center',
+  },
+
+  earlyDoseButton: {
+    backgroundColor: '#8A5A00',
+  },
+
+  correctionButton: {
+    backgroundColor: '#455A64',
+  },
+
+  notDueText: {
+    flex: 1,
+    minHeight: 42,
+    color: '#718991',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
 
   takeButtonText: {

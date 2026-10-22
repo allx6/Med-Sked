@@ -49,6 +49,7 @@ export default function UsersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [accountStatusFilter, setAccountStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -90,6 +91,7 @@ export default function UsersPage() {
           limit: 20,
           search: searchTerm,
           role: roleFilter,
+          accountStatus: accountStatusFilter,
         });
 
         setUsers(result?.users || []);
@@ -103,7 +105,7 @@ export default function UsersPage() {
     };
 
     loadUsers();
-  }, [page, searchTerm, roleFilter]);
+  }, [page, searchTerm, roleFilter, accountStatusFilter]);
 
   const updateRole = (user, nextRole) => {
     if (!nextRole || nextRole === user.role) {
@@ -115,8 +117,11 @@ export default function UsersPage() {
     setActionRequestError('');
   };
 
-  const removeUser = (user) => {
-    setActionRequest({ actionType: 'USER_DELETE', user });
+  const requestAccountLifecycleChange = (user) => {
+    const actionType = user.accountStatus === 'deactivated'
+      ? 'USER_REACTIVATE'
+      : 'USER_DEACTIVATE';
+    setActionRequest({ actionType, user });
     setActionReason('');
     setActionRequestError('');
   };
@@ -251,6 +256,19 @@ export default function UsersPage() {
             <option value="patient">Patient</option>
             <option value="caregiver">Caregiver</option>
           </select>
+          <select
+            className="select-input"
+            value={accountStatusFilter}
+            aria-label="Filter users by account status"
+            onChange={(event) => {
+              setAccountStatusFilter(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All account statuses</option>
+            <option value="active">Active</option>
+            <option value="deactivated">Deactivated</option>
+          </select>
         </div>
 
         {statusMessage ? <div className="success-banner">{statusMessage}</div> : null}
@@ -268,6 +286,7 @@ export default function UsersPage() {
                   <th>Username</th>
                   <th>Email</th>
                   <th>Role</th>
+                  <th>Account status</th>
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -289,16 +308,19 @@ export default function UsersPage() {
                         <option value="admin">Admin</option>
                       </select>
                     </td>
+                    <td>{user.accountStatus === 'deactivated' ? 'Deactivated' : 'Active'}</td>
                     <td>{formatDate(user.createdAt)}</td>
                     <td>
                       <button
                         type="button"
                         className="secondary-button compact-button"
                         disabled={String(user._id) === String(currentAdminId)}
-                        title={String(user._id) === String(currentAdminId) ? 'You cannot request deletion of your own account.' : undefined}
-                        onClick={() => removeUser(user)}
+                        title={String(user._id) === String(currentAdminId) ? 'You cannot request a lifecycle change for your own account.' : undefined}
+                        onClick={() => requestAccountLifecycleChange(user)}
                       >
-                        Request deletion
+                        {user.accountStatus === 'deactivated'
+                          ? 'Request reactivation'
+                          : 'Request deactivation'}
                       </button>
                     </td>
                   </tr>
@@ -427,7 +449,11 @@ export default function UsersPage() {
               <div>
                 <p className="eyebrow">Administrator approval</p>
                 <h3 id="privileged-user-request-title">
-                  {actionRequest.actionType === 'USER_DELETE' ? 'Request user deletion' : 'Request role change'}
+                  {actionRequest.actionType === 'USER_DEACTIVATE'
+                    ? 'Request account deactivation'
+                    : actionRequest.actionType === 'USER_REACTIVATE'
+                      ? 'Request account reactivation'
+                      : 'Request role change'}
                 </h3>
               </div>
               <button type="button" className="modal-close" aria-label="Close request form" onClick={closeActionRequest}>×</button>
@@ -437,7 +463,9 @@ export default function UsersPage() {
                 {actionRequest.user.username || actionRequest.user.email}
                 {actionRequest.requestedRole
                   ? `: ${getRoleLabel(actionRequest.user.role)} → ${getRoleLabel(actionRequest.requestedRole)}`
-                  : ' will only be deleted after a different administrator approves.'}
+                  : actionRequest.actionType === 'USER_DEACTIVATE'
+                    ? ' will be deactivated only after a different administrator approves. Their data and relationships will be retained.'
+                    : ' will be reactivated only after a different administrator approves. Existing caregiver access will not be restored automatically.'}
               </p>
               <label>
                 Reason for this request
