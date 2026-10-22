@@ -190,6 +190,21 @@ test('admin login emails a code, verifies it once, and clears legacy authenticat
   }
 });
 
+test('admin MFA lookup keeps the account email in the selected fields', () => {
+  const query = User.findOne({
+    _id: '507f1f77bcf86cd799439011',
+    role: 'admin',
+  }).select(
+    '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt'
+  );
+  query._applyPaths();
+
+  const projection = query.projection();
+  assert.equal(projection.email, undefined);
+  assert.equal(projection.adminMfaOtpHash, undefined);
+  assert.ok(Object.values(projection).every((value) => value === 0));
+});
+
 test('admin sign-in code email failures issue no challenge or access token', async () => {
   const originalJwtSecret = process.env.JWT_SECRET;
   process.env.JWT_SECRET = 'admin-mfa-email-failure-test-secret';

@@ -23,7 +23,11 @@ import {
 
 import { colors, radius, spacing, shadow } from '../theme';
 
-export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitoring }) {
+export default function CaregiverConnectionsScreen({
+  token,
+  onLogout,
+  onOpenPatientMonitoring,
+}) {
   const [connectedPatients, setConnectedPatients] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,6 +39,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
   const [searching, setSearching] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const loadConnections = useCallback(async (isRefresh = false) => {
     try {
@@ -45,6 +50,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
       }
 
       setError('');
+      setSessionExpired(false);
 
       const [patientData, requestData] = await Promise.all([
         getMyPatients(token),
@@ -55,6 +61,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
       setPendingRequests(Array.isArray(requestData) ? requestData : []);
     } catch (err) {
       console.error('Caregiver connections load error:', err);
+      setSessionExpired(err.statusCode === 401);
       setError(err.message || 'Failed to load caregiver connections.');
     } finally {
       setLoading(false);
@@ -92,6 +99,7 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
       setSearchResults([]);
       setSearchResult(null);
       setHasSearched(false);
+      setSessionExpired(err.statusCode === 401);
       setError(err.message || 'Unable to find this patient.');
     } finally {
       setSearching(false);
@@ -115,6 +123,11 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
       await loadConnections(true);
       Alert.alert('Request sent', 'The patient can accept or reject the caregiver request.');
     } catch (err) {
+      if (err.statusCode === 401) {
+        setSessionExpired(true);
+        setError(err.message);
+        return;
+      }
       Alert.alert('Request failed', err.message || 'Unable to send caregiver request.');
     } finally {
       setSending(false);
@@ -206,6 +219,11 @@ export default function CaregiverConnectionsScreen({ token, onOpenPatientMonitor
         {error ? (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>{error}</Text>
+            {sessionExpired ? (
+              <Pressable onPress={onLogout}>
+                <Text style={styles.retryText}>Log in again</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
@@ -427,6 +445,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   errorText: { color: colors.dangerText, fontWeight: '600' },
+  retryText: { marginTop: spacing.sm, color: colors.primary, fontWeight: '800' },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   loadingText: { marginTop: spacing.md, color: '#A7CDD0' },
 });

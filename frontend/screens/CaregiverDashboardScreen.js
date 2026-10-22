@@ -57,6 +57,7 @@ export default function CaregiverDashboardScreen({
     useState(false);
 
   const [error, setError] = useState('');
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
@@ -75,6 +76,7 @@ export default function CaregiverDashboardScreen({
         }
 
         setError('');
+        setSessionExpired(false);
 
         const [patientData, requestData] = await Promise.all([
           getMyPatients(token),
@@ -129,6 +131,7 @@ export default function CaregiverDashboardScreen({
           err
         );
 
+        setSessionExpired(err.statusCode === 401);
         setError(
           err.message ||
             'Failed to load your patients.'
@@ -281,12 +284,10 @@ export default function CaregiverDashboardScreen({
             </Text>
 
             <Pressable
-              onPress={() =>
-                loadPatients()
-              }
+              onPress={sessionExpired ? onLogout : () => loadPatients()}
             >
               <Text style={styles.retryText}>
-                Retry
+                {sessionExpired ? 'Log in again' : 'Retry'}
               </Text>
             </Pressable>
 

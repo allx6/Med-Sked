@@ -33,7 +33,10 @@ const handleResponse = async (response, options = {}) => {
       && !options.isLogin
       && !options.preserveSafeClientMessage
     ) {
-      throw new Error('Your session has expired. Please log in again.');
+      const error = new Error('Your session has expired. Please log in again.');
+      error.statusCode = response.status;
+      error.code = data.code;
+      throw error;
     }
 
     if (response.status === 403) {

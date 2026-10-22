@@ -15,6 +15,7 @@ const createFixture = () => {
   const sentCodes = [];
   const originals = {
     findOne: User.findOne,
+    findById: User.findById,
     findOneAndUpdate: User.findOneAndUpdate,
     updateOne: User.updateOne,
     exists: User.exists,
@@ -37,7 +38,24 @@ const createFixture = () => {
     return actual === expected;
   });
 
-  User.findOne = async (filter) => (matches(filter) ? cloneUser(user) : null);
+  User.findOne = (filter) => ({
+    select() {
+      return this;
+    },
+    then(resolve, reject) {
+      return Promise.resolve(matches(filter) ? cloneUser(user) : null)
+        .then(resolve, reject);
+    },
+  });
+  User.findById = (id) => ({
+    select() {
+      return this;
+    },
+    then(resolve, reject) {
+      return Promise.resolve(user?._id === id ? cloneUser(user) : null)
+        .then(resolve, reject);
+    },
+  });
   User.findOneAndUpdate = async (filter, update) => {
     if (!matches(filter)) return null;
     Object.assign(user, update.$set || {});
@@ -81,6 +99,7 @@ const createFixture = () => {
     },
     restore() {
       User.findOne = originals.findOne;
+      User.findById = originals.findById;
       User.findOneAndUpdate = originals.findOneAndUpdate;
       User.updateOne = originals.updateOne;
       User.exists = originals.exists;

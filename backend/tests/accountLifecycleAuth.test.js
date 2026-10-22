@@ -115,11 +115,24 @@ test('deactivated accounts and stale token versions cannot use existing access t
 
   try {
     for (const account of [
-      { accountStatus: 'deactivated', authTokenVersion: 2, sessionVersion: 2 },
-      { accountStatus: 'active', authTokenVersion: 3, sessionVersion: 2 },
+      {
+        accountStatus: 'deactivated',
+        authTokenVersion: 2,
+        sessionVersion: 2,
+        expectedCode: 'ACCOUNT_DEACTIVATED',
+      },
+      {
+        accountStatus: 'active',
+        authTokenVersion: 3,
+        sessionVersion: 2,
+        expectedCode: 'SESSION_VERSION_MISMATCH',
+      },
     ]) {
       User.findById = () => ({
-        select() { return this; },
+        select(fields) {
+          assert.equal(fields, '_id accountStatus authTokenVersion');
+          return this;
+        },
         lean: async () => ({
           _id: '507f1f77bcf86cd799439014',
           accountStatus: account.accountStatus,
@@ -147,6 +160,7 @@ test('deactivated accounts and stale token versions cannot use existing access t
         headers: { authorization: `Bearer ${token}` },
       }, res, () => { nextCalled = true; });
       assert.equal(res.statusCode, 401);
+      assert.equal(res.body.code, account.expectedCode);
       assert.equal(nextCalled, false);
     }
   } finally {
@@ -154,4 +168,13 @@ test('deactivated accounts and stale token versions cannot use existing access t
     if (originalJwtSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = originalJwtSecret;
   }
+});
+
+test('auth middleware selects the real authTokenVersion field', async () => {
+  const query = User.findById('507f1f77bcf86cd799439014')
+    .select('_id accountStatus authTokenVersion');
+  query._applyPaths();
+
+  assert.equal(query.projection().authTokenVersion, 1);
+  assert.equal(query.projection()['+authTokenVersion'], undefined);
 });

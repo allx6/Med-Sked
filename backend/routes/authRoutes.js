@@ -55,13 +55,31 @@ const logAuthFailure = (operation, error) => {
     failureReason = 'SMTP_AUTHENTICATION_REJECTED';
   } else if (errorCode === 'ECONNECTION' || errorCode === 'ETIMEDOUT') {
     failureReason = 'SMTP_CONNECTION_FAILED';
+  } else if (errorCode === 'EENVELOPE') {
+    failureReason = 'SMTP_ENVELOPE_REJECTED';
+  } else if (errorCode === 'EMAIL_ADDRESS_INVALID') {
+    failureReason = 'EMAIL_ADDRESS_INVALID';
   }
+  const diagnostic = typeof error?.message === 'string'
+    ? error.message
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+      .slice(0, 300)
+    : undefined;
 
   console.error(`${operation} failed:`, {
     errorName: error?.name || 'UnknownError',
     ...(failureReason ? { failureReason } : {}),
+    ...(diagnostic ? { diagnostic } : {}),
     ...(errorCode ? { errorCode } : {}),
+    ...(error?.emailField ? { emailField: error.emailField } : {}),
     ...(Number.isInteger(error?.responseCode) ? { responseCode: error.responseCode } : {}),
+    ...(typeof error?.response === 'string'
+      ? {
+        providerResponse: error.response
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+          .slice(0, 300),
+      }
+      : {}),
     ...(command ? { command } : {}),
     emailConfig: {
       smtpHostConfigured: Boolean(process.env.SMTP_HOST),
@@ -95,26 +113,35 @@ const ensurePatientId = async (user) => {
   }
 };
 
-const createAuthenticationPayload = (user) => ({
-  token: jwt.sign(
-    {
-      userId: user._id.toString(),
-      username: user.username,
-      role: user.role,
-      purpose: 'access',
-      sessionVersion: Number(user.authTokenVersion || 0),
+const createAuthenticationPayload = async (user) => {
+  const currentUser = await User.findById(user._id);
+  if (!currentUser || currentUser.accountStatus === 'deactivated') {
+    const error = new Error('Account is unavailable. Please sign in again.');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return {
+    token: jwt.sign(
+      {
+        userId: currentUser._id.toString(),
+        username: currentUser.username,
+        role: currentUser.role,
+        purpose: 'access',
+        sessionVersion: Number(currentUser.authTokenVersion || 0),
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    ),
+    user: {
+      id: currentUser._id,
+      username: currentUser.username,
+      email: currentUser.email,
+      patientId: currentUser.patientId,
+      role: currentUser.role,
     },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  ),
-  user: {
-    id: user._id,
-    username: user.username,
-    email: user.email,
-    patientId: user.patientId,
-    role: user.role,
-  },
-});
+  };
+};
 
 const createMfaChallenge = (user) => jwt.sign(
   {
@@ -154,7 +181,7 @@ const findAdminForMfa = (userId) => User.findOne({
   emailVerified: true,
   accountStatus: { $ne: 'deactivated' },
 }).select(
-  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt +authTokenVersion'
+  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt'
 );
 
 class AdminMfaError extends Error {
@@ -561,7 +588,7 @@ router.post('/login', async (req, res) => {
       await User.findOne({
         email:
           normalizedEmail,
-      }).select('+authTokenVersion');
+      });
 
 
     if (!user) {
@@ -617,7 +644,7 @@ router.post('/login', async (req, res) => {
       ));
     }
 
-    const authentication = createAuthenticationPayload(user);
+    const authentication = await createAuthenticationPayload(user);
     await loginAttemptProtection.clearAccountFailures(normalizedEmail);
 
 
@@ -751,7 +778,7 @@ router.post('/mfa/verify', async (req, res) => {
     await loginAttemptProtection.clearAccountFailures(user.email);
     return res.json({
       message: 'Administrator sign-in verified.',
-      ...createAuthenticationPayload(authenticatedUser),
+      ...(await createAuthenticationPayload(authenticatedUser)),
     });
   } catch (error) {
     if (error instanceof AdminMfaError) {
@@ -821,7 +848,7 @@ router.get('/session', async (req, res) => {
       return res.status(401).json({ message: 'Invalid or expired authentication token' });
     }
     const user = await User.findById(decoded.userId)
-      .select('_id username email role patientId accountStatus +authTokenVersion');
+      .select('_id username email role patientId accountStatus authTokenVersion');
 
     if (!user) {
       return res.status(401).json({ message: 'Session is invalid.' });
@@ -877,7 +904,7 @@ router.post('/verify-email', async (req, res) => {
     }
     return res.json({
       message: 'Email verified successfully.',
-      ...createAuthenticationPayload(verifiedUser),
+      ...(await createAuthenticationPayload(verifiedUser)),
     });
   } catch (error) {
     if (error instanceof AdminMfaError) {
