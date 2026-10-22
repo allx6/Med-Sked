@@ -205,6 +205,26 @@ test('missing EMAIL_FROM rejects before creating a transporter', async () => {
   }
 });
 
+test('invalid email addresses are rejected before creating a transporter', async () => {
+  const transportCount = transportConfigs.length;
+  const originalEmailFrom = process.env.EMAIL_FROM;
+
+  await assert.rejects(
+    emailService.sendAdminLoginCode('not-an-email', '123456'),
+    { code: 'EMAIL_ADDRESS_INVALID', emailField: 'recipient' }
+  );
+  process.env.EMAIL_FROM = 'MedSked <invalid-sender>';
+  try {
+    await assert.rejects(
+      emailService.sendAdminLoginCode('admin@example.com', '123456'),
+      { code: 'EMAIL_ADDRESS_INVALID', emailField: 'sender' }
+    );
+  } finally {
+    process.env.EMAIL_FROM = originalEmailFrom;
+  }
+  assert.equal(transportConfigs.length, transportCount);
+});
+
 for (const missingSetting of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD']) {
   test(`missing ${missingSetting} rejects before sending`, async () => {
     const originalValue = process.env[missingSetting];

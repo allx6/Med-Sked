@@ -55,13 +55,31 @@ const logAuthFailure = (operation, error) => {
     failureReason = 'SMTP_AUTHENTICATION_REJECTED';
   } else if (errorCode === 'ECONNECTION' || errorCode === 'ETIMEDOUT') {
     failureReason = 'SMTP_CONNECTION_FAILED';
+  } else if (errorCode === 'EENVELOPE') {
+    failureReason = 'SMTP_ENVELOPE_REJECTED';
+  } else if (errorCode === 'EMAIL_ADDRESS_INVALID') {
+    failureReason = 'EMAIL_ADDRESS_INVALID';
   }
+  const diagnostic = typeof error?.message === 'string'
+    ? error.message
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+      .slice(0, 300)
+    : undefined;
 
   console.error(`${operation} failed:`, {
     errorName: error?.name || 'UnknownError',
     ...(failureReason ? { failureReason } : {}),
+    ...(diagnostic ? { diagnostic } : {}),
     ...(errorCode ? { errorCode } : {}),
+    ...(error?.emailField ? { emailField: error.emailField } : {}),
     ...(Number.isInteger(error?.responseCode) ? { responseCode: error.responseCode } : {}),
+    ...(typeof error?.response === 'string'
+      ? {
+        providerResponse: error.response
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+          .slice(0, 300),
+      }
+      : {}),
     ...(command ? { command } : {}),
     emailConfig: {
       smtpHostConfigured: Boolean(process.env.SMTP_HOST),
@@ -163,7 +181,7 @@ const findAdminForMfa = (userId) => User.findOne({
   emailVerified: true,
   accountStatus: { $ne: 'deactivated' },
 }).select(
-  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt authTokenVersion'
+  '+adminMfaOtpHash +adminMfaOtpExpiresAt +adminMfaOtpAttempts +adminMfaOtpLastSentAt'
 );
 
 class AdminMfaError extends Error {

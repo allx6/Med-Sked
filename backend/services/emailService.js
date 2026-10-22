@@ -1,4 +1,27 @@
 const nodemailer = require('nodemailer');
+const parseAddresses = require('nodemailer/lib/addressparser');
+
+const isValidMailbox = (address) => (
+  typeof address === 'string'
+  && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(address)
+);
+
+const validateEmailAddress = (value, field, { allowDisplayName = false } = {}) => {
+  const input = typeof value === 'string' ? value.trim() : '';
+  const parsed = parseAddresses(input);
+  if (
+    parsed.length !== 1
+    || !isValidMailbox(parsed[0].address)
+    || (!allowDisplayName && parsed[0].name)
+  ) {
+    const error = new Error(`Email ${field} address is invalid.`);
+    error.code = 'EMAIL_ADDRESS_INVALID';
+    error.emailField = field;
+    throw error;
+  }
+
+  return parsed[0];
+};
 
 const createEmailTransporter = () => {
   const {
@@ -37,12 +60,14 @@ const sendEmail = async (email, subject, text) => {
     throw new Error('Email sender is not configured.');
   }
 
+  const recipient = validateEmailAddress(email, 'recipient').address;
+  validateEmailAddress(process.env.EMAIL_FROM, 'sender', { allowDisplayName: true });
   const transporter = createEmailTransporter();
 
   try {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: email,
+      from: process.env.EMAIL_FROM.trim(),
+      to: recipient,
       subject,
       text,
     });
